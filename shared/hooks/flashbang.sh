@@ -16,13 +16,19 @@ import re
 import shutil
 import subprocess
 import sys
-import tkinter as tk
 
 
 def notify_fallback() -> None:
     notify_send = shutil.which("notify-send")
     if notify_send:
         subprocess.run([notify_send, "AI assistant requires attention"], check=False)
+
+
+try:
+    import tkinter as tk
+except ImportError:
+    notify_fallback()
+    sys.exit(0)
 
 
 def monitor_bounds(primary_only: bool) -> tuple[int, int, int, int]:
