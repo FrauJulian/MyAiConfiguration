@@ -24,8 +24,14 @@ read_managed_manifest() {
   [ -f "$path" ] || return 0
   local rel hash first=1
   while IFS=$'\t' read -r rel hash; do
-    if [ "$first" = 1 ]; then first=0; [ "$rel" = path ] && continue; fi
+    hash=${hash%$'\r'} # tolerate a CRLF-terminated manifest (read only strips the trailing \n)
+    if [ "$first" = 1 ]; then
+      first=0
+      rel=${rel#$'\xef\xbb\xbf'} # tolerate a UTF-8 BOM on the header line
+      [ "$rel" = path ] && continue
+    fi
     [ -n "$rel" ] || continue
+    hash=$(printf '%s' "$hash" | tr '[:upper:]' '[:lower:]') # tolerate uppercase hashes from older manifests
     out_ref[$rel]=$hash
   done < "$path"
 }
