@@ -13,3 +13,8 @@ The current structure is organized by purpose:
 - `git/`: pull request responses and reviews
 
 The files intentionally define only a small baseline. Detailed personal workflows and standards can be added later without changing the structure.
+
+Claude's generated package additionally has `skills/rules/`: one skill per technology- or situation-specific rule in
+`shared/rules/` (driven by `adapters/claude/rule-skills.tsv`), so the full rule text loads only when Claude invokes the
+matching skill instead of sitting permanently in context. This category does not exist for Codex, which keeps loading
+every rule as a plain file instead. See `docs/configuration.md`.
