@@ -49,3 +49,4 @@ Test-BuildFails 'leftover template placeholder' {
 
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'PASS build validation: invalid JSON, duplicate agent, duplicate plugin, and leftover placeholders are all rejected'
+exit 0
