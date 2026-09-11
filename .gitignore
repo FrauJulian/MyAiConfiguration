@@ -1,0 +1,11 @@
+generated/
+*.log
+*.tmp
+*.bak
+backups/
+.env
+.env.*
+auth.json
+credentials.json
+secrets.json
+!.env.example
