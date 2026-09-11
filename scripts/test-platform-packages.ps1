@@ -49,4 +49,5 @@ foreach ($platformSelection in @('1','2')) {
     }
 }
 Write-Output 'PASS four platform packages and six PowerShell selections'
+exit 0
 
