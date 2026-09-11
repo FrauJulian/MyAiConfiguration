@@ -2,6 +2,7 @@
 set -euo pipefail
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+. "$root/scripts/lib/manifest.sh"
 home_path=${HOME:?HOME is required}
 failed=false
 
@@ -14,15 +15,75 @@ for tool in codex claude; do
   if command -v "$tool" >/dev/null; then result PASS "$tool available ($($tool --version 2>&1 | head -n 1))"; else result WARN "$tool unavailable"; fi
 done
 command -v jq >/dev/null && result PASS 'jq available for Claude status line' || result WARN 'jq unavailable; Claude status line is disabled'
+
+source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+source_skill_count=$(find "$root/shared/skills" -name SKILL.md 2>/dev/null | wc -l)
+rule_skill_manifest="$root/adapters/claude/rule-skills.tsv"
+rule_skill_count=0
+[ -f "$rule_skill_manifest" ] && rule_skill_count=$(($(wc -l < "$rule_skill_manifest") - 1))
+
 for platform in windows linux; do
-[ -f "$root/generated/codex-$platform/AGENTS.md" ] && result PASS 'generated output present' || result FAIL 'generated output missing; run build'
-[ -f "$root/generated/codex-$platform/hooks/scripts/Validate-CommandSafety.ps1" ] && [ -f "$root/generated/codex-$platform/hooks/scripts/validate-command-safety.sh" ] && [ -f "$root/generated/claude-$platform/hooks/scripts/Validate-CommandSafety.ps1" ] && [ -f "$root/generated/claude-$platform/hooks/scripts/validate-command-safety.sh" ] && result PASS 'generated hooks present' || result FAIL 'generated hooks missing; run build'
+  [ -f "$root/generated/codex-$platform/AGENTS.md" ] && result PASS "generated output present ($platform)" || result FAIL "generated output missing ($platform); run build"
+  [ -f "$root/generated/codex-$platform/hooks/scripts/Validate-CommandSafety.ps1" ] && [ -f "$root/generated/codex-$platform/hooks/scripts/validate-command-safety.sh" ] && [ -f "$root/generated/claude-$platform/hooks/scripts/Validate-CommandSafety.ps1" ] && [ -f "$root/generated/claude-$platform/hooks/scripts/validate-command-safety.sh" ] && result PASS "generated hooks present ($platform)" || result FAIL "generated hooks missing ($platform); run build"
+  for client in codex claude; do
+    package="$root/generated/$client-$platform"
+    [ -d "$package" ] || continue
+    agent_count=$(find "$package/agents" -type f 2>/dev/null | wc -l)
+    if [ "$agent_count" -eq "$source_agent_count" ]; then result PASS "$client-$platform agent count matches source ($agent_count)"; else result FAIL "$client-$platform agent count $agent_count does not match source ($source_agent_count)"; fi
+    expected_skill_count=$source_skill_count
+    [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
+    skill_count=$(find "$package/skills" -name SKILL.md 2>/dev/null | wc -l)
+    if [ "$skill_count" -eq "$expected_skill_count" ]; then result PASS "$client-$platform skill count matches source ($skill_count)"; else result FAIL "$client-$platform skill count $skill_count does not match source ($expected_skill_count)"; fi
+    leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$package" 2>/dev/null | sort -u | grep -v '^__AI_CONFIG_ROOT__$' || true)
+    if [ -n "$leftover_tokens" ]; then result FAIL "$client-$platform has unresolved placeholders"; else result PASS "$client-$platform has no unresolved placeholders"; fi
+  done
 done
+
 for path in .codex/AGENTS.md .codex/config.toml .claude/CLAUDE.md .claude/settings.json; do
   [ -f "$home_path/$path" ] && result PASS "installed $path" || result WARN "not installed $path"
 done
+
+if [ -f "$home_path/.claude/settings.json" ]; then
+  if command -v jq >/dev/null 2>&1; then
+    if jq empty "$home_path/.claude/settings.json" >/dev/null 2>&1; then result PASS 'installed .claude/settings.json is valid JSON'; else result FAIL 'installed .claude/settings.json is not valid JSON'; fi
+  elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
+    if python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$home_path/.claude/settings.json" 2>/dev/null; then
+      result PASS 'installed .claude/settings.json is valid JSON'
+    else
+      result FAIL 'installed .claude/settings.json is not valid JSON'
+    fi
+  fi
+fi
+if [ -f "$home_path/.codex/config.toml" ]; then
+  quote_count=$(grep -o '"' "$home_path/.codex/config.toml" | wc -l)
+  open_brackets=$(grep -o '\[' "$home_path/.codex/config.toml" | wc -l)
+  close_brackets=$(grep -o '\]' "$home_path/.codex/config.toml" | wc -l)
+  if [ $((quote_count % 2)) -eq 0 ] && [ "$open_brackets" -eq "$close_brackets" ]; then
+    result PASS 'installed .codex/config.toml looks structurally valid'
+  else
+    result FAIL 'installed .codex/config.toml has unbalanced quotes or brackets'
+  fi
+fi
+
+for destination in "$home_path/.codex" "$home_path/.agents/skills" "$home_path/.claude"; do
+  manifest=$(manifest_path "$destination")
+  [ -f "$manifest" ] || continue
+  declare -A managed
+  read_managed_manifest "$manifest" managed
+  missing=()
+  modified=()
+  for relative in "${!managed[@]}"; do
+    target="$destination/$relative"
+    if [ ! -f "$target" ]; then missing+=("$relative"); continue; fi
+    [ "$(sha256_of_file "$target")" = "${managed[$relative]}" ] || modified+=("$relative")
+  done
+  if [ "${#missing[@]}" -eq 0 ]; then result PASS "$destination has no missing managed files"; else result WARN "$destination is missing managed files: ${missing[*]}"; fi
+  if [ "${#modified[@]}" -eq 0 ]; then result PASS "$destination has no locally modified managed files"; else result WARN "$destination has locally modified managed files: ${modified[*]}"; fi
+done
+
 for path in shared/rules shared/skills shared/agents shared/hooks/scripts; do
   [ -e "$root/$path" ] && result PASS "source $path" || result FAIL "missing $path"
 done
+
 "$failed" && exit 1
 printf 'PASS doctor\n'
