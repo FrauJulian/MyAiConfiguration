@@ -25,7 +25,7 @@
           {
             "type": "command",
             "command": "__HOOK_COMMAND__ \"__AI_CONFIG_ROOT__/hooks/__HOOK_SCRIPT__\"",
-            "timeout": 20
+            "timeout": 8
           }
         ]
       }
