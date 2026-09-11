@@ -7,7 +7,7 @@ status_line = ["model", "reasoning", "project-name", "git-branch", "context-wind
 
 [agents]
 enabled = true
-max_threads = 5
+max_concurrent_threads_per_session = 5
 
 [features]
 hooks = true
