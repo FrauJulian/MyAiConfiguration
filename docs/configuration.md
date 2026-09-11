@@ -4,7 +4,7 @@ Codex receives a generated global `AGENTS.md`, agent TOML files, skills, rule fi
 
 Claude's rule loading differs from Codex's by design: `general.md` is the only rule shipped as a plain, always-applied file (its text is also embedded directly in `CLAUDE.md`). Every technology- or situation-specific rule in `shared/rules/` is instead generated as a skill under `skills/rules/`, driven by `adapters/claude/rule-skills.tsv` (rule file, skill name, trigger description). Only a skill's name and description are ever permanently in context; Claude loads the full rule text only when it invokes the skill. Codex is unaffected — it keeps receiving every rule as a plain file and is told to load the matching one by path, exactly as before.
 
-Neither current client configuration model exposes a supported global `max_depth` setting. The repository does not emit an unsupported key that would be ignored or cause configuration validation errors.
+Codex's current configuration schema has no `agents.max_depth` or other agent-recursion-depth key. The only `max_depth`-shaped setting in the schema is `network_proxy.glob_scan_max_depth`, which bounds glob-pattern expansion for the network proxy feature and is unrelated to agents; Claude Code's settings likewise expose no comparable key. The repository does not emit either as an invented key.
 
 Client settings remain thin adapters. Shared semantics remain in `shared/`.
 
