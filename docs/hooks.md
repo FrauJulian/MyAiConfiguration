@@ -1,0 +1,7 @@
+# Hooks
+
+Deterministic safety and validation hooks live in `shared/hooks/scripts/`. The flashbang entry points live directly in `shared/hooks/`. The command safety hook rejects obvious destructive commands outside the current development workspace. The session validation hook checks repository-local generated inputs. The post-change hook is an optional verification entry point.
+
+The build includes the hooks and their client-specific registration in each payload. Installation places them beside the generated client files. The scripts do not grant permissions, bypass approvals, or replace client permission systems.
+
+The PowerShell and Bash hook variants are registered only for the Codex and Claude `Stop` events. They run after the main agent finishes responding, not during tool calls, thinking, permission requests, or notifications. The default flash lasts about 500 milliseconds. The Windows command deliberately omits `-WindowStyle Hidden`, which can hide or minimize the shared terminal. The PowerShell hook creates a low-opacity click-through overlay without activating another window. The Bash hook creates the equivalent temporary overlay through Python's standard `tkinter` module, uses `xrandr` for multi-monitor bounds when available, and does not reactivate the terminal. It falls back to `notify-send` in headless or minimal environments. Hooks are intentionally not executed during build or doctor.
