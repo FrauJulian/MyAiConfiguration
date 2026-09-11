@@ -1,0 +1,6 @@
+name: verifier
+description: Focused verification of completed work
+role: verifier
+write_permissions: read-only by default
+capabilities: acceptance criteria, tests, regressions, generated output, configuration, evidence
+delegation: verify the requested scope independently and report evidence and remaining uncertainty

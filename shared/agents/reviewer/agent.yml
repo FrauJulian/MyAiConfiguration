@@ -1,0 +1,6 @@
+name: reviewer
+description: Independent quality review
+role: reviewer
+write_permissions: read-only by default
+capabilities: correctness, regressions, security, maintainability, architecture, tests, complexity
+delegation: review independently; do not blindly trust implementation claims
