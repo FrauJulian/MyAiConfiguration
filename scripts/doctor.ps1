@@ -66,3 +66,4 @@ foreach ($path in @('shared/rules','shared/skills','shared/agents','shared/hooks
 
 if ($fail) { exit 1 }
 Write-Output 'PASS doctor'
+exit 0
