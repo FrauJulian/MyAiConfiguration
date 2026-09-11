@@ -6,6 +6,8 @@ Claude's rule loading differs from Codex's by design: `general.md` is the only r
 
 Codex's current configuration schema has no `agents.max_depth` or other agent-recursion-depth key. The only `max_depth`-shaped setting in the schema is `network_proxy.glob_scan_max_depth`, which bounds glob-pattern expansion for the network proxy feature and is unrelated to agents; Claude Code's settings likewise expose no comparable key. The repository does not emit either as an invented key.
 
+`[agents].enabled = true` (set explicitly, matching its own documented default) is the current, documented way to enable Codex's multi-agent tools. A separate `[features].multi_agent` toggle exists in the schema but is not set here, since `[agents].enabled` already covers it and setting both would be redundant. `multi_agent_v2` does not appear in the current documented schema at all — it surfaced only in upstream issue titles describing an internal/experimental flag — so it is deliberately not configured.
+
 Client settings remain thin adapters. Shared semantics remain in `shared/`.
 
 User plugins are managed separately through `adapters/plugins.tsv` and the client-native plugin commands. They are not copied into `generated/` because each client owns its plugin cache and authentication state.
