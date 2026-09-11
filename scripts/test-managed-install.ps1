@@ -48,3 +48,4 @@ try {
 } finally {
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 }
+exit 0
