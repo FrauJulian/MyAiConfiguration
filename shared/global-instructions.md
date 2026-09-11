@@ -2,24 +2,7 @@
 
 This instruction set is generated into the client-specific `AGENTS.md` and `CLAUDE.md` files. Do not edit generated copies.
 
-Always load and apply `rules/general.md` before starting any task.
-
-When programming, always load and apply `rules/security.md`. This includes implementing, modifying, debugging, reviewing, testing, and configuring software, scripts, hooks, infrastructure, and integrations.
-
-Detect the languages, frameworks, tools, and change areas from the repository and the requested work. Load every applicable rule file before editing. Load all matching files when multiple technologies apply.
-
-Load rule files when their subject applies:
-
-- rules/angular.md for Angular work.
-- rules/typescript.md for TypeScript work.
-- rules/csharp.md for C# or .NET work.
-- rules/wpf.md for WPF work.
-- rules/ui-ux.md for UI or UX decisions.
-- rules/microsoft.md for Microsoft 365, Azure DevOps, or Teams work.
-- rules/git.md for Git operations.
-- rules/refactoring.md for refactoring work.
-- rules/definition-of-done.md when validating completion.
-- rules/decision-rule.md when requirements, behavior, or technical choices need to be evaluated.
+__RULE_LOADING__
 
 Apply instructions in this order: direct current user instructions; security and data-loss protections; applicable project instructions; these global rules; existing project conventions; agent preferences.
 
