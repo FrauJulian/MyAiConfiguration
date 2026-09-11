@@ -7,14 +7,18 @@ $statusInput = '{"model":{"display_name":"Test Model"},"effort":{"level":"high"}
 $branch = & git -C $root branch --show-current
 $statusOutput = $statusInput | & (Join-Path $root 'shared/statusline/statusline.ps1')
 if ($statusOutput -ne "Model: Test Model | Effort: high | Repo: TestRepo | Branch: $branch | Max Context: 200000 | Used Context: 9% | Used Tokens: 16700") { throw 'PowerShell status line output is incorrect.' }
+$sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory).Count
+$sourceSkillCount = @(Get-ChildItem (Join-Path $root 'shared/skills') -Filter 'SKILL.md' -Recurse).Count
+$ruleSkillCount = @(Import-Csv -LiteralPath (Join-Path $root 'adapters/claude/rule-skills.tsv') -Delimiter ([char]9)).Count
 foreach ($platform in @('windows','linux')) {
     foreach ($client in @('codex','claude')) {
         $package = Join-Path $root "generated/$client-$platform"
         $file = if ($client -eq 'codex') { 'config.toml' } else { 'settings.json' }
         $content = Get-Content -LiteralPath (Join-Path $package $file) -Raw
         if ($client -eq 'claude') { $settings = $content | ConvertFrom-Json }
-        if (@(Get-ChildItem "$package/agents" -File).Count -ne 5) { throw "Missing agents in $package" }
-        if (@(Get-ChildItem "$package/skills" -Filter SKILL.md -Recurse).Count -ne 22) { throw "Missing skills in $package" }
+        if (@(Get-ChildItem "$package/agents" -File).Count -ne $sourceAgentCount) { throw "Missing agents in $package" }
+        $expectedSkillCount = if ($client -eq 'claude') { $sourceSkillCount + $ruleSkillCount } else { $sourceSkillCount }
+        if (@(Get-ChildItem "$package/skills" -Filter SKILL.md -Recurse).Count -ne $expectedSkillCount) { throw "Missing skills in $package" }
         $expected = if ($platform -eq 'windows') { 'powershell .*flashbang.ps1' } else { 'bash .*flashbang.sh' }
         if ($content -notmatch $expected -or $content -match '__HOOK_|__WINDOWS_HOOK_') { throw "Incorrect platform command in $package" }
         if ($platform -eq 'windows' -and $content -match 'WindowStyle\s+Hidden') { throw "Windows hook hides the terminal in $package" }
