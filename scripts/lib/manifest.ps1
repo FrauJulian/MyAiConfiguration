@@ -5,13 +5,15 @@ function Get-ManagedManifestPath {
 
 function Get-Sha256Hash {
     param([Parameter(Mandatory=$true)][string]$Path)
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+    # Lowercase to match sha256sum's output, since the manifest must be readable by
+    # both this module and its Bash equivalent regardless of which one wrote it.
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
 function Get-Sha256HashOfBytes {
     param([Parameter(Mandatory=$true)][byte[]]$Bytes)
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
-    try { return ([System.BitConverter]::ToString($sha256.ComputeHash($Bytes))).Replace('-', '') }
+    try { return ([System.BitConverter]::ToString($sha256.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant() }
     finally { $sha256.Dispose() }
 }
 
@@ -19,7 +21,8 @@ function Read-ManagedManifest {
     param([Parameter(Mandatory=$true)][string]$ManifestPath)
     $entries = @{}
     if (Test-Path -LiteralPath $ManifestPath) {
-        Import-Csv -LiteralPath $ManifestPath -Delimiter ([char]9) | ForEach-Object { $entries[$_.path] = $_.sha256 }
+        # Lowercase to tolerate an older manifest written before hashes were normalized.
+        Import-Csv -LiteralPath $ManifestPath -Delimiter ([char]9) | ForEach-Object { $entries[$_.path] = $_.sha256.ToLowerInvariant() }
     }
     return $entries
 }
@@ -29,7 +32,12 @@ function Write-ManagedManifest {
     $lines = @("path`tsha256")
     foreach ($path in ($Entries.Keys | Sort-Object)) { $lines += "$path`t$($Entries[$path])" }
     New-Item (Split-Path $ManifestPath -Parent) -ItemType Directory -Force | Out-Null
-    Set-Content -LiteralPath $ManifestPath -Value $lines -Encoding UTF8
+    # Windows PowerShell 5.1's -Encoding UTF8 always prepends a BOM, which Bash's plain
+    # `read` would otherwise fold into the first field of the header line. Write UTF-8
+    # without BOM and with LF line endings so either implementation can read the file
+    # regardless of which one wrote it.
+    $content = ($lines -join "`n") + "`n"
+    [System.IO.File]::WriteAllText($ManifestPath, $content, (New-Object System.Text.UTF8Encoding($false)))
 }
 
 function Sync-ManagedDestination {
