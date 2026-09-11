@@ -173,3 +173,4 @@ $leftoverPlaceholders = @(Get-ChildItem $output -File -Recurse | ForEach-Object 
 if ($leftoverPlaceholders.Count) { throw "Unresolved template placeholders in: $($leftoverPlaceholders -join ', ')" }
 
 Write-Output 'PASS build: codex-windows, claude-windows, codex-linux, claude-linux'
+exit 0
