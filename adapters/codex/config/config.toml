@@ -1,0 +1,20 @@
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+sandbox_mode = "workspace-write"
+
+[tui]
+status_line = ["model", "reasoning", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]
+
+[agents]
+enabled = true
+max_threads = 5
+
+[features]
+hooks = true
+
+[[hooks.Stop]]
+[[hooks.Stop.hooks]]
+type = "command"
+command = '__HOOK_COMMAND__ "__AI_CONFIG_ROOT__/hooks/__HOOK_SCRIPT__"'
+command_windows = '__WINDOWS_HOOK_COMMAND__ "__AI_CONFIG_ROOT__/hooks/__WINDOWS_HOOK_SCRIPT__"'
+timeout = 20
