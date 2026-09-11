@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# Managed-file manifest: tracks every file this setup previously installed into a
+# destination so a later run can detect stale files (removed from the source) or
+# locally modified files (changed on disk since the last install) without ever
+# touching a file it never installed itself.
+
+sha256_of_file() {
+  sha256sum -- "$1" | cut -d' ' -f1
+}
+
+sha256_of_string() {
+  printf '%s' "$1" | sha256sum | cut -d' ' -f1
+}
+
+manifest_path() {
+  printf '%s/.ai-config-manifest.tsv' "$1"
+}
+
+# read_managed_manifest <manifest-file> <assoc-array-name>
+read_managed_manifest() {
+  local path=$1
+  local -n out_ref=$2
+  out_ref=()
+  [ -f "$path" ] || return 0
+  local rel hash first=1
+  while IFS=$'\t' read -r rel hash; do
+    if [ "$first" = 1 ]; then first=0; [ "$rel" = path ] && continue; fi
+    [ -n "$rel" ] || continue
+    out_ref[$rel]=$hash
+  done < "$path"
+}
+
+# write_managed_manifest <manifest-file> <assoc-array-name>
+write_managed_manifest() {
+  local path=$1
+  local -n in_ref=$2
+  mkdir -p "$(dirname -- "$path")"
+  {
+    printf 'path\tsha256\n'
+    for rel in $(printf '%s\n' "${!in_ref[@]}" | sort); do
+      printf '%s\t%s\n' "$rel" "${in_ref[$rel]}"
+    done
+  } > "$path"
+}
+
+# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <windows-shell-command> <dry-run: true|false>
+sync_managed_destination() {
+  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 windows_shell_command=$6 dry_run=$7
+  printf 'SOURCE %s -> %s\n' "$source" "$destination"
+  local manifest
+  manifest=$(manifest_path "$destination")
+  declare -A old_manifest
+  read_managed_manifest "$manifest" old_manifest
+  declare -A new_manifest
+  local backup_root="$destination/backups/$stamp"
+
+  while IFS= read -r -d '' source_file; do
+    local relative target content needs_sub new_hash exists current_hash action backup
+    relative=${source_file#"$source/"}
+    target="$destination/$relative"
+    content=$(<"$source_file")
+    needs_sub=false
+    if [[ "$content" == *'__AI_CONFIG_ROOT__'* || "$content" == *'__HOOK_COMMAND__'* || "$content" == *'__WINDOWS_HOOK_COMMAND__'* ]]; then
+      needs_sub=true
+      content=${content//__AI_CONFIG_ROOT__/$ai_config_root}
+      content=${content//__HOOK_COMMAND__/$shell_command}
+      content=${content//__WINDOWS_HOOK_COMMAND__/$windows_shell_command}
+      content=${content//__HOOK_SCRIPT__/flashbang.sh}
+      content=${content//__WINDOWS_HOOK_SCRIPT__/flashbang.sh}
+      new_hash=$(sha256_of_string "$content")
+    else
+      new_hash=$(sha256_of_file "$source_file")
+    fi
+    new_manifest[$relative]=$new_hash
+
+    exists=false
+    [ -f "$target" ] && exists=true
+    if [ "$exists" = true ]; then
+      current_hash=$(sha256_of_file "$target")
+      if [ "$current_hash" = "$new_hash" ]; then
+        printf 'UNCHANGED %s\n' "$target"
+        continue
+      fi
+      action=UPDATE
+    else
+      action=CREATE
+    fi
+
+    if [ "$dry_run" = true ]; then printf 'DRYRUN %s %s\n' "$action" "$target"; continue; fi
+
+    if [ "$exists" = true ]; then
+      backup="$backup_root/$relative"
+      mkdir -p "$(dirname -- "$backup")"
+      cp -- "$target" "$backup"
+      printf 'BACKUP %s -> %s\n' "$target" "$backup"
+      if [ -z "${old_manifest[$relative]+x}" ]; then
+        printf 'WARN %s existed before this installation but was not tracked by a previous run; it was backed up before being overwritten.\n' "$target"
+      fi
+    fi
+    mkdir -p "$(dirname -- "$target")"
+    if [ "$needs_sub" = true ]; then
+      printf '%s' "$content" > "$target"
+    else
+      cp -- "$source_file" "$target"
+    fi
+    printf '%s %s\n' "$action" "$target"
+  done < <(find "$source" -type f -print0)
+
+  local relative target current_hash backup
+  for relative in "${!old_manifest[@]}"; do
+    [ -z "${new_manifest[$relative]+x}" ] || continue
+    target="$destination/$relative"
+    [ -f "$target" ] || continue
+    if [ "$dry_run" = true ]; then printf 'DRYRUN REMOVE %s\n' "$target"; continue; fi
+    backup="$backup_root/$relative"
+    mkdir -p "$(dirname -- "$backup")"
+    cp -- "$target" "$backup"
+    printf 'BACKUP %s -> %s\n' "$target" "$backup"
+    current_hash=$(sha256_of_file "$target")
+    if [ "$current_hash" = "${old_manifest[$relative]}" ]; then
+      rm -f -- "$target"
+      printf 'REMOVE %s\n' "$target"
+    else
+      printf 'WARN %s was managed by a previous installation and has changed locally; it was backed up but left in place instead of being removed.\n' "$target"
+    fi
+  done
+
+  if [ "$dry_run" != true ]; then write_managed_manifest "$manifest" new_manifest; fi
+}
