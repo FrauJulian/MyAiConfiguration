@@ -50,3 +50,4 @@ foreach ($item in $targets) {
 
 Install-ConfiguredPlugins -RepositoryRoot $root -Client $Client -DryRun:$DryRun -Update:$UpdatePlugins
 Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' }))
+exit 0
