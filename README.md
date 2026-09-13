@@ -25,7 +25,8 @@ into platform-specific packages that can be inspected before they are installed.
   or deleting them.
 - Dry-run support (no writes, no backups, no plugin changes) and timestamped, per-run backup directories.
 - Shared safety, notification, validation, and status-line hooks.
-- User-level plugin installation for Ponytail, i-have-adhd, Superpowers, and Context7; updates only with
+- User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, Humanizer, Impeccable,
+  and Anthropic Frontend Design; updates only with
   `-UpdatePlugins`/`--update-plugins`.
 
 ## Architecture

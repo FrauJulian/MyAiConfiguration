@@ -53,8 +53,8 @@ install_configured_plugins() {
     *) printf 'Unknown plugin client selection: %s\n' "$client_selection" >&2; return 1;;
   esac
 
-  local client name claude_marketplace claude_plugin codex_marketplace codex_plugin marketplace plugin
-  while IFS=$'\t' read -r name claude_marketplace claude_plugin codex_marketplace codex_plugin; do
+  local client name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill marketplace plugin
+  while IFS=$'\t' read -r name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill; do
     [ "$name" = name ] && continue
     [ -n "$name" ] || continue
     [ "$claude_marketplace" = - ] && claude_marketplace=
@@ -62,6 +62,23 @@ install_configured_plugins() {
     for client in "${clients[@]}"; do
       if [ "$client" = claude ]; then marketplace=$claude_marketplace; plugin=$claude_plugin; else marketplace=$codex_marketplace; plugin=$codex_plugin; fi
       [ -n "$plugin" ] || { printf 'Plugin selector missing for %s: %s\n' "$client" "$name" >&2; return 1; }
+      if [ "$client" = codex ] && [ "$codex_method" != plugin ]; then
+        case "$codex_method" in
+          skill)
+            if [ "$codex_skill" = - ]; then
+              run_plugin_command "$dry_run" npx -y skills add "$codex_source" --global --agent codex
+            else
+              run_plugin_command "$dry_run" npx -y skills add "$codex_source" --skill "$codex_skill" --global --agent codex
+            fi
+            ;;
+          impeccable)
+            run_plugin_command "$dry_run" npx -y impeccable install -y --providers=codex --scope=global
+            ;;
+          *) printf 'Unknown Codex install method for %s: %s\n' "$client" "$name" >&2; return 1;;
+        esac
+        printf 'PASS Codex skill ensured: %s\n' "$name"
+        continue
+      fi
       if [ "$dry_run" = false ] && plugin_installed "$client" "$plugin"; then
         if [ "$update" = true ] && [ "$client" = claude ]; then
           run_plugin_command "$dry_run" claude plugin update "$plugin"

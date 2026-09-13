@@ -85,6 +85,20 @@ function Install-ConfiguredPlugins {
             $plugin = if ($selectedClient -eq 'Claude') { $entry.claude_plugin } else { $entry.codex_plugin }
             if ([string]::IsNullOrWhiteSpace($plugin)) { throw ('Plugin selector missing for {0}: {1}' -f $selectedClient, $entry.name) }
 
+            if ($selectedClient -eq 'Codex' -and $entry.codex_method -ne 'plugin') {
+                if ($entry.codex_method -eq 'skill') {
+                    $arguments = @('-y','skills','add',$entry.codex_source,'--global','--agent','codex')
+                    if ($entry.codex_skill -ne '-') { $arguments = @('-y','skills','add',$entry.codex_source,'--skill',$entry.codex_skill,'--global','--agent','codex') }
+                } elseif ($entry.codex_method -eq 'impeccable') {
+                    $arguments = @('-y','impeccable','install','-y','--providers=codex','--scope=global')
+                } else {
+                    throw "Unknown Codex install method '$($entry.codex_method)' for $($entry.name)."
+                }
+                Invoke-PluginCommand -Command 'npx' -Arguments $arguments -DryRun:$DryRun
+                Write-Output "PASS Codex skill ensured: $($entry.name)"
+                continue
+            }
+
             $installedItem = if ($selectedClient -eq 'Claude') { $installed | Where-Object { $_.id -eq $plugin } | Select-Object -First 1 } else { $installed | Where-Object { $_.pluginId -eq $plugin } | Select-Object -First 1 }
             if ($Update -and $selectedClient -eq 'Claude' -and $null -ne $installedItem) {
                 Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','update',$plugin) -DryRun:$DryRun
