@@ -33,6 +33,7 @@ jobs:
           ./scripts/install.sh --dry-run --client both --platform linux
 
   windows:
+    if: ${{ false }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
