@@ -84,6 +84,14 @@ Detect the languages, frameworks, tools, and change areas from the repository an
 
 Load rule files when their subject applies:
 
+- rules/security-auth.md for authentication, authorization, sessions, tokens, permissions, or tenant boundaries.
+- rules/security-web.md for browser, frontend, cookie, redirect, XSS, or CSRF work.
+- rules/security-api.md for HTTP APIs, request handling, serialization, or endpoints.
+- rules/security-data.md for databases, persistence, sensitive data, or multi-tenancy.
+- rules/security-files.md for files, uploads, archives, paths, processes, IPC, or deserialization.
+- rules/security-network.md for network access, URLs, TLS, proxies, or SSRF.
+- rules/security-crypto.md for cryptography, secrets, credentials, keys, or tokens.
+- rules/security-supply-chain.md for dependencies, packages, plugins, builds, deployments, or CI.
 - rules/angular.md for Angular work.
 - rules/typescript.md for TypeScript work.
 - rules/csharp.md for C# or .NET work.
@@ -180,19 +188,18 @@ for client in codex claude; do
 done
 
 toml_path="$output/codex-$platform/config.toml"
-quote_count=$(grep -o '"' "$toml_path" | wc -l)
-[ $((quote_count % 2)) -eq 0 ] || { printf 'Generated Codex config.toml has unbalanced quotes: %s\n' "$toml_path" >&2; exit 1; }
-open_brackets=$(grep -o '\[' "$toml_path" | wc -l)
-close_brackets=$(grep -o '\]' "$toml_path" | wc -l)
-[ "$open_brackets" -eq "$close_brackets" ] || { printf 'Generated Codex config.toml has unbalanced brackets: %s\n' "$toml_path" >&2; exit 1; }
-
 settings_path="$output/claude-$platform/settings.json"
-if command -v jq >/dev/null 2>&1; then
-  jq empty "$settings_path" >/dev/null 2>&1 || { printf 'Generated Claude settings.json is not valid JSON: %s\n' "$settings_path" >&2; exit 1; }
-elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
-  # On Windows, `python3` can resolve to a non-functional Microsoft Store app-execution
-  # alias that still passes `command -v`; probe it with a real invocation before trusting it.
-  python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$settings_path" || { printf 'Generated Claude settings.json is not valid JSON: %s\n' "$settings_path" >&2; exit 1; }
+python3 "$root/scripts/validate-config.py" "$toml_path" "$settings_path"
+if command -v codex >/dev/null; then
+  schema_home=$(mktemp -d)
+  cp "$toml_path" "$schema_home/config.toml"
+  CODEX_HOME="$schema_home" codex --strict-config --help >/dev/null
+  rm -rf -- "$schema_home"
+elif [ "${REQUIRE_CODEX_SCHEMA:-false}" = true ]; then
+  printf 'Codex CLI is required for schema validation.\n' >&2
+  exit 1
+else
+  printf 'WARN Codex CLI unavailable; skipped Codex schema validation.\n' >&2
 fi
 done
 

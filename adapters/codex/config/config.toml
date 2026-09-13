@@ -8,6 +8,7 @@ status_line = ["model", "reasoning", "project-name", "git-branch", "context-wind
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 5
+max_depth = 1
 
 [features]
 hooks = true

@@ -55,14 +55,14 @@ if [ -f "$home_path/.claude/settings.json" ]; then
   fi
 fi
 if [ -f "$home_path/.codex/config.toml" ]; then
-  quote_count=$(grep -o '"' "$home_path/.codex/config.toml" | wc -l)
-  open_brackets=$(grep -o '\[' "$home_path/.codex/config.toml" | wc -l)
-  close_brackets=$(grep -o '\]' "$home_path/.codex/config.toml" | wc -l)
-  if [ $((quote_count % 2)) -eq 0 ] && [ "$open_brackets" -eq "$close_brackets" ]; then
-    result PASS 'installed .codex/config.toml looks structurally valid'
+  if python3 -c 'import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8-sig"))' "$home_path/.codex/config.toml"; then
+    result PASS 'installed .codex/config.toml parses as TOML'
   else
-    result FAIL 'installed .codex/config.toml has unbalanced quotes or brackets'
+    result FAIL 'installed .codex/config.toml is invalid TOML'
   fi
+  if command -v codex >/dev/null; then
+    if CODEX_HOME="$home_path/.codex" codex --strict-config --help >/dev/null 2>&1; then result PASS 'installed .codex/config.toml matches the installed Codex schema'; else result FAIL 'installed .codex/config.toml has unsupported Codex settings'; fi
+  else result WARN 'Codex CLI unavailable; skipped installed Codex schema validation'; fi
 fi
 
 for destination in "$home_path/.codex" "$home_path/.agents/skills" "$home_path/.claude"; do

@@ -42,9 +42,16 @@ if (Test-Path -LiteralPath $settingsPath) {
 }
 $configTomlPath = Join-Path $homePath '.codex/config.toml'
 if (Test-Path -LiteralPath $configTomlPath) {
-    $tomlContent = Get-Content -LiteralPath $configTomlPath -Raw
-    $balanced = (([regex]::Matches($tomlContent, '(?<!\\)"')).Count % 2 -eq 0) -and (([regex]::Matches($tomlContent, '\[')).Count -eq ([regex]::Matches($tomlContent, '\]')).Count)
-    if ($balanced) { Result 'PASS' 'installed .codex/config.toml looks structurally valid' } else { Result 'FAIL' 'installed .codex/config.toml has unbalanced quotes or brackets' }
+    $parseResult = & python -c 'import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8-sig"))' $configTomlPath 2>&1
+    if ($LASTEXITCODE -eq 0) { Result 'PASS' 'installed .codex/config.toml parses as TOML' } else { Result 'FAIL' "installed .codex/config.toml is invalid TOML: $parseResult" }
+    if (Get-Command codex -ErrorAction SilentlyContinue) {
+        $previousCodexHome = $env:CODEX_HOME
+        try {
+            $env:CODEX_HOME = Split-Path $configTomlPath -Parent
+            $schemaResult = & codex --strict-config --help 2>&1
+            if ($LASTEXITCODE -eq 0) { Result 'PASS' 'installed .codex/config.toml matches the installed Codex schema' } else { Result 'FAIL' "installed .codex/config.toml has unsupported Codex settings: $schemaResult" }
+        } finally { $env:CODEX_HOME = $previousCodexHome }
+    } else { Result 'WARN' 'Codex CLI unavailable; skipped installed Codex schema validation' }
 }
 
 foreach ($destination in @((Join-Path $homePath '.codex'), (Join-Path $homePath '.agents/skills'), (Join-Path $homePath '.claude'))) {
@@ -63,6 +70,12 @@ foreach ($destination in @((Join-Path $homePath '.codex'), (Join-Path $homePath 
 }
 
 foreach ($path in @('shared/rules','shared/skills','shared/agents','shared/hooks/scripts')) { if (Test-Path (Join-Path $root $path)) { Result 'PASS' "source $path" } else { Result 'FAIL' "missing $path" } }
+
+foreach ($client in @('codex','claude')) {
+    $config = if ($client -eq 'codex') { Join-Path $root 'adapters/codex/config/config.toml' } else { Join-Path $root 'adapters/claude/config/settings.json' }
+    $registered = if ($client -eq 'codex') { (Get-Content $config -Raw) -match '\[\[hooks\.Stop\]\]' } else { ((Get-Content $config -Raw | ConvertFrom-Json).hooks.PSObject.Properties.Name -contains 'Stop') }
+    if ($registered) { Result 'PASS' "$client Stop hook is registered" } else { Result 'WARN' "$client ships hook utilities, but no Stop hook is registered" }
+}
 
 if ($fail) { exit 1 }
 Write-Output 'PASS doctor'

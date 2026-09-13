@@ -12,7 +12,7 @@ $pluginEntries = @(Import-Csv -LiteralPath $pluginManifest -Delimiter ([char]9))
 if ($pluginEntries.Count -eq 0) { throw 'Plugin manifest must define at least one plugin.' }
 $pluginNames = @()
 foreach ($pluginEntry in $pluginEntries) {
-    foreach ($field in @('name','claude_plugin','codex_plugin')) {
+    foreach ($field in @('name','claude_plugin','codex_method')) {
         if ([string]::IsNullOrWhiteSpace($pluginEntry.$field)) { throw "Missing $field for plugin $($pluginEntry.name)." }
     }
     if ($pluginNames -contains $pluginEntry.name) { throw "Duplicate plugin name in manifest: $($pluginEntry.name)" }
@@ -52,6 +52,32 @@ function Read-Field($path, $name) {
 function Quote-Toml($value) {
     return ('"' + $value.Replace('\','\\').Replace('"','\"').Replace("`r",'').Replace("`n",'\n') + '"')
 }
+function Test-CodexSchema($configPath) {
+    if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+        if ($env:REQUIRE_CODEX_SCHEMA -eq 'true') { throw 'Codex CLI is required for schema validation.' }
+        Write-Warning 'Codex CLI unavailable; skipped Codex schema validation.'
+        return
+    }
+    $tempHome = Join-Path ([System.IO.Path]::GetTempPath()) ("codex-schema-" + [Guid]::NewGuid())
+    $previousCodexHome = $env:CODEX_HOME
+    try {
+        New-Item $tempHome -ItemType Directory -Force | Out-Null
+        Copy-Item $configPath (Join-Path $tempHome 'config.toml') -Force
+        $env:CODEX_HOME = $tempHome
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            $schemaOutput = @(& codex --strict-config --help 2>&1)
+            $schemaExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+        if ($schemaExitCode -ne 0) { throw "Codex schema validation failed: $configPath`n$($schemaOutput -join [Environment]::NewLine)" }
+    } finally {
+        $env:CODEX_HOME = $previousCodexHome
+        Remove-Item $tempHome -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 
 & (Join-Path $root 'shared/hooks/scripts/Test-SessionConfig.ps1') -RepositoryRoot $root
 
@@ -75,6 +101,14 @@ Detect the languages, frameworks, tools, and change areas from the repository an
 
 Load rule files when their subject applies:
 
+- rules/security-auth.md for authentication, authorization, sessions, tokens, permissions, or tenant boundaries.
+- rules/security-web.md for browser, frontend, cookie, redirect, XSS, or CSRF work.
+- rules/security-api.md for HTTP APIs, request handling, serialization, or endpoints.
+- rules/security-data.md for databases, persistence, sensitive data, or multi-tenancy.
+- rules/security-files.md for files, uploads, archives, paths, processes, IPC, or deserialization.
+- rules/security-network.md for network access, URLs, TLS, proxies, or SSRF.
+- rules/security-crypto.md for cryptography, secrets, credentials, keys, or tokens.
+- rules/security-supply-chain.md for dependencies, packages, plugins, builds, deployments, or CI.
 - rules/angular.md for Angular work.
 - rules/typescript.md for TypeScript work.
 - rules/csharp.md for C# or .NET work.
@@ -154,13 +188,10 @@ foreach ($platform in @('windows','linux')) {
     }
 
     $tomlPath = Join-Path $output "codex-$platform/config.toml"
-    $tomlContent = Get-Content -LiteralPath $tomlPath -Raw
-    if (([regex]::Matches($tomlContent, '(?<!\\)"')).Count % 2 -ne 0) { throw "Generated Codex config.toml has unbalanced quotes: $tomlPath" }
-    if (([regex]::Matches($tomlContent, '\[')).Count -ne ([regex]::Matches($tomlContent, '\]')).Count) { throw "Generated Codex config.toml has unbalanced brackets: $tomlPath" }
-
     $settingsPath = Join-Path $output "claude-$platform/settings.json"
-    try { Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json | Out-Null }
-    catch { throw "Generated Claude settings.json is not valid JSON: $settingsPath" }
+    & python (Join-Path $root 'scripts/validate-config.py') $tomlPath $settingsPath
+    if ($LASTEXITCODE -ne 0) { throw "Generated configuration validation failed for $platform." }
+    Test-CodexSchema $tomlPath
 }
 
 $leftoverPlaceholders = @(Get-ChildItem $output -File -Recurse | ForEach-Object {

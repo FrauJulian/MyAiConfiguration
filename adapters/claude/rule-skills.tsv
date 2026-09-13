@@ -7,6 +7,14 @@ git.md	rules-git	Git operations such as commits, branches, or merges
 microsoft.md	rules-microsoft	Microsoft 365, Azure DevOps, or Teams operations
 refactoring.md	rules-refactoring	refactoring existing code without changing behavior
 security.md	rules-security	any software development task: implementing, modifying, debugging, reviewing, testing, or configuring code, scripts, hooks, or infrastructure
+security-auth.md	rules-security-auth	authentication, authorization, sessions, tokens, permissions, or tenant-boundary work
+security-web.md	rules-security-web	web, browser, frontend, cookie, redirect, or XSS/CSRF work
+security-api.md	rules-security-api	HTTP API, request handling, serialization, or endpoint work
+security-data.md	rules-security-data	database, query, persistence, sensitive-data, or multi-tenant work
+security-files.md	rules-security-files	file, upload, archive, path, process, IPC, or deserialization work
+security-network.md	rules-security-network	network, URL fetch, proxy, outbound request, TLS, or SSRF work
+security-crypto.md	rules-security-crypto	cryptography, secrets, credentials, key, or token work
+security-supply-chain.md	rules-security-supply-chain	dependency, package, plugin, build, deployment, or CI supply-chain work
 typescript.md	rules-typescript	TypeScript or modern ECMAScript implementation work
 ui-ux.md	rules-ui-ux	UI or UX design and interaction decisions
 wpf.md	rules-wpf	WPF, XAML, or MVVM desktop UI work
