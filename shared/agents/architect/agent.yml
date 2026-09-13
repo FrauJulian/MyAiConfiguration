@@ -1,6 +1,3 @@
 name: architect
 description: Technical architecture and design
 role: architect
-write_permissions: read-only by default
-capabilities: boundaries, dependencies, interfaces, trade-offs, constraints, technical options
-delegation: ask the user about business behavior, user experience, APIs, data models, or configuration formats when certainty is incomplete

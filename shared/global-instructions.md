@@ -12,4 +12,4 @@ Never modify existing documentation automatically. Ask before a code change that
 
 Project-specific instructions may specialize global defaults but must not weaken security or data-loss protections without explicit user approval. Direct user instructions have the highest priority for requested behavior.
 
-Use implementer for execution and architect when technical boundaries or design options need dedicated analysis. Invoke researcher, reviewer, or verifier only when independent work is likely to improve the outcome. Decide based on uncertainty, complexity, risk, blast radius, and verification value; do not invoke these roles automatically. Parallelize only genuinely independent work.
+Use one implementer for small, contained tasks. Add researcher only for material uncertainty, architect only for architecture or boundary decisions, reviewer only for independent quality review, and verifier only for explicit acceptance criteria, tests, or generated artifacts. Do not start reviewer and verifier by default or let subagents create further subagents. Parallelize only genuinely independent work.
