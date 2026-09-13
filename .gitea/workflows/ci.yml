@@ -32,40 +32,39 @@ jobs:
           mkdir -p "$HOME"
           ./scripts/install.sh --dry-run --client both --platform linux
 
-  windows:
-    if: ${{ false }}
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Install current Codex CLI for schema validation
-        shell: powershell
-        run: npm install --global @openai/codex@latest
-      - name: PowerShell syntax
-        shell: powershell
-        run: |
-          $errors = @()
-          Get-ChildItem scripts,shared/hooks -Recurse -Filter *.ps1 | ForEach-Object {
-            $tokens = $null
-            $parseErrors = $null
-            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors)
-            $errors += $parseErrors
-          }
-          if ($errors.Count) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
-      - name: Build
-        shell: powershell
-        run: $env:REQUIRE_CODEX_SCHEMA = 'true'; .\scripts\build.ps1
-      - name: Doctor
-        shell: powershell
-        run: .\scripts\doctor.ps1
-      - name: Platform package tests
-        shell: powershell
-        run: .\scripts\test-platform-packages.ps1
-      - name: Managed manifest tests
-        shell: powershell
-        run: .\scripts\test-managed-install.ps1
-      - name: Build validation tests
-        shell: powershell
-        run: .\scripts\test-build-validation.ps1
-      - name: Install dry run
-        shell: powershell
-        run: .\scripts\install.ps1 -DryRun -Client Both -Platform Windows
+#  windows:
+#    runs-on: windows-latest
+#    steps:
+#      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+#      - name: Install current Codex CLI for schema validation
+#        shell: powershell
+#        run: npm install --global @openai/codex@latest
+#      - name: PowerShell syntax
+#        shell: powershell
+#        run: |
+#          $errors = @()
+#          Get-ChildItem scripts,shared/hooks -Recurse -Filter *.ps1 | ForEach-Object {
+#            $tokens = $null
+#            $parseErrors = $null
+#            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors)
+#            $errors += $parseErrors
+#          }
+#          if ($errors.Count) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+#      - name: Build
+#        shell: powershell
+#        run: $env:REQUIRE_CODEX_SCHEMA = 'true'; .\scripts\build.ps1
+#      - name: Doctor
+#        shell: powershell
+#        run: .\scripts\doctor.ps1
+#      - name: Platform package tests
+#        shell: powershell
+#        run: .\scripts\test-platform-packages.ps1
+#      - name: Managed manifest tests
+#        shell: powershell
+#        run: .\scripts\test-managed-install.ps1
+#      - name: Build validation tests
+#        shell: powershell
+#        run: .\scripts\test-build-validation.ps1
+#      - name: Install dry run
+#        shell: powershell
+#        run: .\scripts\install.ps1 -DryRun -Client Both -Platform Windows
