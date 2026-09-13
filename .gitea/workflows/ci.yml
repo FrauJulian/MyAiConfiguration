@@ -4,14 +4,20 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '23 4 * * 1'
 
 jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install current Codex CLI for schema validation
+        run: npm install --global @openai/codex@latest
+      - name: Bash syntax
+        run: find scripts shared/hooks -name '*.sh' -print0 | xargs -0 -n1 bash -n
       - name: Build
-        run: ./scripts/build.sh
+        run: REQUIRE_CODEX_SCHEMA=true ./scripts/build.sh
       - name: Doctor
         run: ./scripts/doctor.sh
       - name: Platform package tests
@@ -20,7 +26,7 @@ jobs:
         run: ./scripts/test-managed-install.sh
       - name: Build validation tests
         run: ./scripts/test-build-validation.sh
-      - name: Install dry run (isolated HOME)
+      - name: Install dry run
         run: |
           export HOME="$RUNNER_TEMP/isolated-home"
           mkdir -p "$HOME"
@@ -29,10 +35,24 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install current Codex CLI for schema validation
+        shell: powershell
+        run: npm install --global @openai/codex@latest
+      - name: PowerShell syntax
+        shell: powershell
+        run: |
+          $errors = @()
+          Get-ChildItem scripts,shared/hooks -Recurse -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors)
+            $errors += $parseErrors
+          }
+          if ($errors.Count) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
       - name: Build
         shell: powershell
-        run: .\scripts\build.ps1
+        run: $env:REQUIRE_CODEX_SCHEMA = 'true'; .\scripts\build.ps1
       - name: Doctor
         shell: powershell
         run: .\scripts\doctor.ps1
@@ -47,8 +67,4 @@ jobs:
         run: .\scripts\test-build-validation.ps1
       - name: Install dry run
         shell: powershell
-        # -DryRun performs no writes, so it is safe to run against the runner's
-        # real profile path. [Environment]::GetFolderPath('UserProfile') reads
-        # from the Windows profile API on PowerShell 5.1, not $env:USERPROFILE,
-        # so overriding that variable would not relocate it anyway.
         run: .\scripts\install.ps1 -DryRun -Client Both -Platform Windows
