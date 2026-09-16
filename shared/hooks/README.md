@@ -1,5 +1,7 @@
 # Hooks
 
-Hooks are conservative entry points shared by clients. They validate obvious command hazards, check repository-local configuration inputs, and provide an optional post-change verification command. They do not bypass client permission prompts or grant access.
+This directory contains registered hooks and optional utilities. They do not bypass client permission prompts or grant access.
 
-Only the `Stop` hook (`flashbang`) is registered in the generated client configuration. `Validate-CommandSafety`/`validate-command-safety.sh` and `Invoke-PostChangeVerification`/`invoke-post-change-verification.sh` are utility scripts, not active hooks; nothing in this repository invokes them automatically. Wire one up as a client-native `PreToolUse`/equivalent hook yourself if you want it enforced, and do not assume it runs otherwise.
+Both clients register `Stop` (`flashbang`) for finish notifications. Claude also registers `PreCompact` (`Record-Compact`/`record-compact.sh`) and `SessionStart` (`Show-SessionStatePointer`/`show-session-state-pointer.sh`). These use `.ai-session/` under the installed configuration root: the first records a compaction timestamp, and the second points to an existing `state.json`. They do not create a task summary.
+
+`Validate-CommandSafety`/`validate-command-safety.sh` and `Invoke-PostChangeVerification`/`invoke-post-change-verification.sh` are not registered or invoked automatically. The safety utility checks selected command-text patterns; the verification utility runs the repository build only when explicitly invoked. `Test-SessionConfig`/`test-session-config.sh` checks repository inputs during a build.
