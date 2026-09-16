@@ -17,4 +17,9 @@ The files intentionally define only a small baseline. Detailed personal workflow
 Claude's generated package additionally has `skills/rules/`: one skill per technology- or situation-specific rule in
 `shared/rules/` (driven by `adapters/claude/rule-skills.tsv`), so the full rule text loads only when Claude invokes the
 matching skill instead of sitting permanently in context. This category does not exist for Codex, which keeps loading
-every rule as a plain file instead. See `docs/configuration.md`.
+applicable focused rules as plain files instead. Both clients embed the general rules in their global instructions.
+Split Angular, WPF, and UI/UX rules load supporting references only for the topic being worked on. See [Configuration](configuration.md).
+
+Skills guide a task when needed; their availability does not require a full review, build, or test suite after every
+change. The shared Verification rules govern proportional checking, including when generic skill workflows call
+for more work than the change needs.
