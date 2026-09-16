@@ -20,7 +20,7 @@ fi
 [ "$build_summary_output" = 'Build: PASS | 4 packages' ]
 status_output=$(printf '{"model":{"display_name":"Test Model"},"effort":{"level":"high"},"workspace":{"current_dir":"%s","repo":{"name":"TestRepo"}},"context_window":{"context_window_size":200000,"used_percentage":8.5,"total_input_tokens":15500,"total_output_tokens":1200}}' "$root" | bash "$root/shared/statusline/statusline.sh")
 plain_status_output=$(printf '%s' "$status_output" | sed -E $'s/\x1b\\[[0-9;]*m//g')
-expected_status_output=$'Test Model \xc2\xb7 high\nTestRepo on '"$branch"$'  \xc2\xb7  9% ctx (16.7k tok)'
+expected_status_output=$'Test Model \xc2\xb7 Effort high \xc2\xb7 TestRepo @ '"$branch"$'\nCtx 200k \xc2\xb7 Used 9% \xc2\xb7 Tokens 16.7k'
 [ "$plain_status_output" = "$expected_status_output" ]
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
@@ -113,4 +113,3 @@ for entry_point in install update; do
 done
 printf '%s\n' "$doctor_summary_output" | grep '^WARN ' || true
 if [ "$summary" = true ]; then printf 'Tests: PASS | platform packages\n'; else printf 'PASS four platform packages and six Bash selections\n'; fi
-

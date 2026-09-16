@@ -11,7 +11,7 @@ $buildSummaryOutput = & (Join-Path $root 'scripts/build.ps1') -Summary
 if (@($buildSummaryOutput | Where-Object { $_ -eq 'Build: PASS | 4 packages' }).Count -ne 1) { throw "build.ps1 -Summary must still print the PASS line: $($buildSummaryOutput -join '; ')" }
 $statusOutput = ($statusInput | & (Join-Path $root 'shared/statusline/statusline.ps1')) -join "`n"
 $plainStatusOutput = [regex]::Replace($statusOutput, [char]27 + '\[[0-9;]*m', '')
-$expectedStatusOutput = "Test Model $([char]0x00B7) high`nTestRepo on $branch  $([char]0x00B7)  9% ctx (16.7k tok)"
+$expectedStatusOutput = "Test Model $([char]0x00B7) Effort high $([char]0x00B7) TestRepo @ $branch`nCtx 200k $([char]0x00B7) Used 9% $([char]0x00B7) Tokens 16.7k"
 if ($buildSummaryOutput.Count -ne 1) { throw 'Build summary must contain only one success line.' }
 if ($plainStatusOutput -ne $expectedStatusOutput) { throw 'PowerShell status line output is incorrect.' }
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory).Count
