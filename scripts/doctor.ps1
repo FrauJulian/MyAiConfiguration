@@ -6,10 +6,15 @@ $root = Split-Path $PSScriptRoot -Parent
 $homePath = [Environment]::GetFolderPath('UserProfile')
 $script:fail = $false
 $script:checkCount = 0
+$script:passBuffer = @()
 function Result($state, $message) {
     $script:checkCount++
     if ($state -eq 'FAIL') { $script:fail = $true }
-    if (-not $Summary -or $script:fail -or $state -ne 'PASS') { Write-Output ("$state $message") }
+    if ($Summary -and $state -eq 'PASS') {
+        $script:passBuffer += "$state $message"
+    } else {
+        Write-Output ("$state $message")
+    }
 }
 
 foreach ($tool in @('codex','claude')) { if (Get-Command $tool -ErrorAction SilentlyContinue) { $version = & $tool --version 2>&1 | Select-Object -First 1; Result 'PASS' "$tool available ($version)" } else { Result 'WARN' "$tool unavailable" } }
@@ -47,7 +52,7 @@ if (Test-Path -LiteralPath $settingsPath) {
 }
 $configTomlPath = Join-Path $homePath '.codex/config.toml'
 if (Test-Path -LiteralPath $configTomlPath) {
-    try { $parseResult = & python -c 'import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8-sig"))' $configTomlPath 2>&1 } catch { $parseResult = $_ }
+    $parseResult = & python -c 'import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8-sig"))' $configTomlPath 2>&1
     if ($LASTEXITCODE -eq 0) { Result 'PASS' 'installed .codex/config.toml parses as TOML' } else { Result 'FAIL' "installed .codex/config.toml is invalid TOML: $parseResult" }
     if (Get-Command codex -ErrorAction SilentlyContinue) {
         $previousCodexHome = $env:CODEX_HOME
@@ -83,7 +88,11 @@ foreach ($client in @('codex','claude')) {
 }
 
 if ($Summary) {
-    if ($script:fail) { Write-Output "Doctor: FAIL | $script:checkCount checks"; exit 1 }
+    if ($script:fail) {
+        $script:passBuffer | ForEach-Object { Write-Output $_ }
+        Write-Output "Doctor: FAIL | $script:checkCount checks"
+        exit 1
+    }
     Write-Output "Doctor: PASS | $script:checkCount checks"
 } else {
     if ($script:fail) { exit 1 }

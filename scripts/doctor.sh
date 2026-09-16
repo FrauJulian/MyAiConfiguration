@@ -14,11 +14,16 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 home_path=${HOME:?HOME is required}
 failed=false
 check_count=0
+pass_buffer=()
 
 result() {
   check_count=$((check_count + 1))
   [ "$1" != FAIL ] || failed=true
-  if [ "$summary" = false ] || [ "$failed" = true ] || [ "$1" != PASS ]; then printf '%s %s\n' "$1" "$2"; fi
+  if [ "$summary" = true ] && [ "$1" = PASS ]; then
+    pass_buffer+=("$1 $2")
+  else
+    printf '%s %s\n' "$1" "$2"
+  fi
 }
 
 for tool in codex claude; do
@@ -96,7 +101,11 @@ for path in shared/rules shared/skills shared/agents shared/hooks/scripts; do
 done
 
 if [ "$summary" = true ]; then
-  if [ "$failed" = true ]; then printf 'Doctor: FAIL | %s checks\n' "$check_count"; exit 1; fi
+  if [ "$failed" = true ]; then
+    for line in "${pass_buffer[@]}"; do printf '%s\n' "$line"; done
+    printf 'Doctor: FAIL | %s checks\n' "$check_count"
+    exit 1
+  fi
   printf 'Doctor: PASS | %s checks\n' "$check_count"
 else
   [ "$failed" = false ] || exit 1
