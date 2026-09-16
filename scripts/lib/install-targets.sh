@@ -9,12 +9,7 @@ read_install_platform() {
       *) printf 'Unknown --platform value: %s (expected windows or linux)\n' "$platform" >&2; return 1 ;;
     esac
   fi
-  printf 'Select target platform:\n1) Windows\n2) Linux\n' >&2
-  local selection
-  while :; do
-    read -r -p 'Selection [1-2] ' selection
-    case "$selection" in 1) printf 'windows\n'; return 0 ;; 2) printf 'linux\n'; return 0 ;; esac
-  done
+  read_single_selection 'Select shell' 'PowerShell' 'windows' 'Bash' 'linux'
 }
 
 read_install_client() {
@@ -27,12 +22,15 @@ read_install_client() {
       *) printf 'Unknown --client value: %s (expected codex, claude, or both)\n' "$client" >&2; return 1 ;;
     esac
   fi
-  printf 'Select installation target:\n1) Codex\n2) Claude\n3) Both\n' >&2
-  local selection
-  while :; do
-    read -r -p 'Selection [1-3] ' selection
-    case "$selection" in 1) printf 'codex\n'; return 0 ;; 2) printf 'claude\n'; return 0 ;; 3) printf 'both\n'; return 0 ;; esac
-  done
+  read_single_selection 'Select client' 'Codex' 'codex' 'Claude' 'claude' 'Both' 'both'
+}
+
+clear_interactive() { [ -t 0 ] && [ "${CI:-}" != true ] && [ "${AI_CONFIG_NO_INTERACTIVE:-}" != 1 ] && printf '\033[2J\033[H'; }
+read_single_selection() {
+  local title=$1; shift; local labels=() values=() label value index=0 key
+  while [ $# -gt 0 ]; do labels+=("$1"); values+=("$2"); shift 2; done
+  if [ ! -t 0 ] || [ "${CI:-}" = true ] || [ "${AI_CONFIG_NO_INTERACTIVE:-}" = 1 ]; then printf '%s\n' "$title" >&2; for ((index=0;index<${#labels[@]};index++)); do printf '%d) %s\n' "$((index+1))" "${labels[$index]}" >&2; done; while read -r -p 'Selection ' value; do [[ "$value" =~ ^[1-9][0-9]*$ ]] && [ "$value" -le "${#labels[@]}" ] && { printf '%s\n' "${values[$((value-1))]}"; return; }; done; return 1; fi
+  local selected=0; while :; do clear_interactive; printf '%s\n' "$title"; for ((index=0;index<${#labels[@]};index++)); do [ "$index" -eq "$selected" ] && printf '> %s\n' "${labels[$index]}" || printf '  %s\n' "${labels[$index]}"; done; printf '↑/↓ Navigate   Enter Confirm\n'; IFS= read -rsn1 key || return 1; case "$key" in $'\x1b') read -rsn2 key; case "$key" in '[A') selected=$(( (selected+${#labels[@]}-1)%${#labels[@]} ));; '[B') selected=$(( (selected+1)%${#labels[@]} ));; esac;; '') clear_interactive; printf '%s\n' "${values[$selected]}"; return;; esac; done
 }
 
 # get_install_destinations <home> <client> -- prints one destination per line

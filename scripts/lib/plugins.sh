@@ -22,11 +22,19 @@ run_plugin_command() {
       printf '%s\n' "$output" | grep -Ei 'warn|error|fail|deprecat' || true
     else
       status=$?
-      printf '%s\n' "$output" >&2
+      [ "${AI_CONFIG_VERBOSE:-}" = 1 ] && printf '%s\n' "$output" >&2
+      printf 'Plugin command failed: %s\n' "$*" >&2
       return "$status"
     fi
   else
     "$@"
+  fi
+}
+
+update_codex_marketplace() {
+  local dry_run=$1 marketplace_name=$2 source=$3
+  if ! run_plugin_command "$dry_run" codex plugin marketplace upgrade "$marketplace_name"; then
+    ensure_codex_marketplace "$dry_run" "$source" "$marketplace_name"
   fi
 }
 
@@ -81,7 +89,10 @@ plugin_toggleable() {
 read_plugin_toggle_selection() {
   local -n names_ref=$1
   local -n checked_ref=$2
-  local answer i mark
+  local answer i mark index=0 key
+  if [ -t 0 ] && [ "${CI:-}" != true ] && [ "${AI_CONFIG_NO_INTERACTIVE:-}" != 1 ]; then
+    while :; do clear_interactive; printf 'Select plugins\n'; for ((i=0;i<${#names_ref[@]};i++)); do mark=' '; [ "${checked_ref[$i]}" = true ] && mark=x; [ "$i" -eq "$index" ] && printf '> [%s] %s\n' "$mark" "${names_ref[$i]}" || printf '  [%s] %s\n' "$mark" "${names_ref[$i]}"; done; printf '↑/↓ Navigate   Space Toggle   Enter Confirm\n'; IFS= read -rsn1 key || return 1; case "$key" in $'\x1b') read -rsn2 key; case "$key" in '[A') index=$(( (index+${#names_ref[@]}-1)%${#names_ref[@]} ));; '[B') index=$(( (index+1)%${#names_ref[@]} ));; esac;; ' ') [ "${checked_ref[$index]}" = true ] && checked_ref[$index]=false || checked_ref[$index]=true;; '') clear_interactive; return 0;; esac; done
+  fi
   while :; do
     printf 'Select plugins (enter a number to toggle, "done" to confirm):\n'
     for ((i = 0; i < ${#names_ref[@]}; i++)); do
@@ -227,6 +238,7 @@ install_configured_plugins() {
           run_plugin_command "$dry_run" claude plugin enable "$plugin"
           updated_count=$((updated_count + 1))
         elif [ "$update" = true ] && [ "$client" = codex ]; then
+          [ -z "$marketplace" ] || [ "$marketplace" = openai-curated-remote ] || update_codex_marketplace "$dry_run" "${plugin##*@}" "$marketplace"
           run_plugin_command "$dry_run" codex plugin add "$plugin"
           updated_count=$((updated_count + 1))
         else

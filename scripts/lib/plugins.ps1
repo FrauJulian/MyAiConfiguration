@@ -19,7 +19,7 @@ function Invoke-PluginCommand {
         $output = @(& $resolvedCommand @Arguments 2>&1)
         $exitCode = $LASTEXITCODE
     } finally { $ErrorActionPreference = $previousPreference }
-    $output | Where-Object { -not $Summary -or $exitCode -ne 0 -or $_ -is [System.Management.Automation.ErrorRecord] -or "$_" -match '(?i)warn|error|fail|deprecat' }
+    if (-not $Summary -or $env:AI_CONFIG_VERBOSE -eq '1') { $output | Write-Output } elseif ($exitCode -eq 0) { $output | Where-Object { "$_" -match '(?i)warn|error|fail|deprecat' } }
     if ($exitCode -ne 0) { throw "Plugin command failed: $display" }
 }
 
@@ -68,7 +68,7 @@ function Ensure-CodexMarketplace {
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
-    $output | Where-Object { -not $Summary -or $exitCode -ne 0 -or $_ -is [System.Management.Automation.ErrorRecord] -or "$_" -match '(?i)warn|error|fail|deprecat' }
+    if (-not $Summary -or $env:AI_CONFIG_VERBOSE -eq '1') { $output | Write-Output } elseif ($exitCode -eq 0) { $output | Where-Object { "$_" -match '(?i)warn|error|fail|deprecat' } }
     if ($exitCode -eq 0) { return }
 
     $text = $output -join [Environment]::NewLine
@@ -87,19 +87,14 @@ function Read-PluginToggleSelection {
         [Parameter(Mandatory=$true)][bool[]]$Checked
     )
     $state = @($Checked)
-    while ($true) {
-        Write-Host 'Select plugins (enter a number to toggle, "done" to confirm):'
-        for ($i = 0; $i -lt $Names.Count; $i++) {
-            $mark = if ($state[$i]) { 'x' } else { ' ' }
-            Write-Host ("  {0}) [{1}] {2}" -f ($i + 1), $mark, $Names[$i])
-        }
-        $answer = Read-Host 'Toggle number or "done"'
-        if ([string]::IsNullOrWhiteSpace($answer) -or $answer -eq 'done') { return $state }
-        $index = 0
-        if ([int]::TryParse($answer, [ref]$index) -and $index -ge 1 -and $index -le $Names.Count) {
-            $state[$index - 1] = -not $state[$index - 1]
-        }
-    }
+    if ([Console]::IsInputRedirected -or $env:CI -eq 'true' -or $env:AI_CONFIG_NO_INTERACTIVE -eq '1') { while($true){ Write-Host 'Select plugins (enter a number to toggle, "done" to confirm):'; for($i=0;$i -lt $Names.Count;$i++){Write-Host ("  {0}) [{1}] {2}" -f ($i+1),$(if($state[$i]){'x'}else{' '}),$Names[$i])}; $answer=Read-Host 'Toggle number or "done"'; if([string]::IsNullOrWhiteSpace($answer)-or $answer -eq 'done'){return $state}; $index=0;if([int]::TryParse($answer,[ref]$index)-and $index -ge 1 -and $index -le $Names.Count){$state[$index-1]= -not $state[$index-1]} } }
+    $index=0; while($true){ Clear-Host; Write-Host 'Select plugins'; for($i=0;$i -lt $Names.Count;$i++){ $focus=if($i -eq $index){'>'}else{' '}; $mark=if($state[$i]){'x'}else{' '}; Write-Host "$focus [$mark] $($Names[$i])" }; Write-Host 'â†‘/â†“ Navigate   Space Toggle   Enter Confirm'; $key=[Console]::ReadKey($true); if($key.Key -eq 'Up'){$index=($index+$Names.Count-1)%$Names.Count}elseif($key.Key -eq 'Down'){$index=($index+1)%$Names.Count}elseif($key.Key -eq 'Spacebar'){$state[$index]= -not $state[$index]}elseif($key.Key -eq 'Enter'){Clear-Host;return $state} }
+}
+
+function Update-CodexMarketplace {
+    param([Parameter(Mandatory=$true)][string]$MarketplaceName,[Parameter(Mandatory=$true)][string]$Source,[switch]$DryRun,[switch]$Summary)
+    try { Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','marketplace','upgrade',$MarketplaceName) -DryRun:$DryRun -Summary:$Summary }
+    catch { Ensure-CodexMarketplace -Source $Source -MarketplaceName $MarketplaceName -DryRun:$DryRun -Summary:$Summary }
 }
 
 function Select-ConfiguredPlugins {
@@ -231,6 +226,9 @@ function Install-ConfiguredPlugins {
                 }
                 Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','install',$plugin,'--scope','user') -DryRun:$DryRun -Summary:$Summary
             } else {
+                if ($Update -and -not [string]::IsNullOrWhiteSpace($marketplace) -and $marketplace -ne 'openai-curated-remote') {
+                    Update-CodexMarketplace -MarketplaceName (($plugin -split '@')[-1]) -Source $marketplace -DryRun:$DryRun -Summary:$Summary
+                }
                 if (-not [string]::IsNullOrWhiteSpace($marketplace) -and $marketplace -ne 'openai-curated-remote') {
                     $marketplaceName = ($plugin -split '@')[-1]
                     Ensure-CodexMarketplace -Source $marketplace -MarketplaceName $marketplaceName -DryRun:$DryRun -Summary:$Summary
@@ -243,3 +241,4 @@ function Install-ConfiguredPlugins {
         if ($Summary) { Write-Output ("PLUGINS {0}: {1} ensured, {2} already installed, {3} updated" -f $selectedClient, $tally.Ensured, $tally.AlreadyInstalled, $tally.Updated) }
     }
 }
+

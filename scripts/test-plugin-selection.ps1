@@ -30,8 +30,10 @@ $detailed = @(Invoke-PluginCommand -Command Test-PluginOutput -Arguments @('succ
 if ($detailed.Count -ne 2 -or $detailed[0] -ne 'download progress') { throw 'Detailed output must retain progress.' }
 $diagnostics = [System.Collections.Generic.List[string]]::new()
 $failed = $false
+$env:AI_CONFIG_VERBOSE = '1'
 try { Invoke-PluginCommand -Command Test-PluginOutput -Arguments @('fail') -Summary | ForEach-Object { $diagnostics.Add("$_") } }
 catch { $failed = $true }
+$env:AI_CONFIG_VERBOSE = $null
 if (-not $failed -or $diagnostics -notcontains 'download progress' -or $diagnostics -notcontains 'WARN test warning') { throw 'Plugin failure must retain full diagnostics and fail.' }
 $global:LASTEXITCODE = 0
 function Get-InstalledPlugins { [pscustomobject]@{ pluginId = 'test@market' } }
