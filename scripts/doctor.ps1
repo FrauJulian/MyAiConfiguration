@@ -52,7 +52,7 @@ if (Test-Path -LiteralPath $settingsPath) {
 }
 $configTomlPath = Join-Path $homePath '.codex/config.toml'
 if (Test-Path -LiteralPath $configTomlPath) {
-    $parseResult = & python -c 'import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8-sig"))' $configTomlPath 2>&1
+    $parseResult = & python -c "import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8-sig'))" $configTomlPath 2>&1
     if ($LASTEXITCODE -eq 0) { Result 'PASS' 'installed .codex/config.toml parses as TOML' } else { Result 'FAIL' "installed .codex/config.toml is invalid TOML: $parseResult" }
     if (Get-Command codex -ErrorAction SilentlyContinue) {
         $previousCodexHome = $env:CODEX_HOME
