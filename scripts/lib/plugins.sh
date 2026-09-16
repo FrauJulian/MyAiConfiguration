@@ -91,7 +91,7 @@ read_plugin_toggle_selection() {
   local -n checked_ref=$2
   local answer i mark index=0 key
   if [ -t 0 ] && [ "${CI:-}" != true ] && [ "${AI_CONFIG_NO_INTERACTIVE:-}" != 1 ]; then
-    while :; do clear_interactive; printf 'Select plugins\n'; for ((i=0;i<${#names_ref[@]};i++)); do mark=' '; [ "${checked_ref[$i]}" = true ] && mark=x; [ "$i" -eq "$index" ] && printf '> [%s] %s\n' "$mark" "${names_ref[$i]}" || printf '  [%s] %s\n' "$mark" "${names_ref[$i]}"; done; printf '↑/↓ Navigate   Space Toggle   Enter Confirm\n'; IFS= read -rsn1 key || return 1; case "$key" in $'\x1b') read -rsn2 key; case "$key" in '[A') index=$(( (index+${#names_ref[@]}-1)%${#names_ref[@]} ));; '[B') index=$(( (index+1)%${#names_ref[@]} ));; esac;; ' ') [ "${checked_ref[$index]}" = true ] && checked_ref[$index]=false || checked_ref[$index]=true;; '') clear_interactive; return 0;; esac; done
+    while :; do clear_interactive; printf 'Select plugins\n'; for ((i=0;i<${#names_ref[@]};i++)); do mark=' '; [ "${checked_ref[$i]}" = true ] && mark=x; [ "$i" -eq "$index" ] && printf '> [%s] %s\n' "$mark" "${names_ref[$i]}" || printf '  [%s] %s\n' "$mark" "${names_ref[$i]}"; done; printf 'Up/Down Navigate   Space Toggle   Enter Confirm\n'; IFS= read -rsn1 key || return 1; case "$key" in $'\x1b') read -rsn2 key; case "$key" in '[A') index=$(( (index+${#names_ref[@]}-1)%${#names_ref[@]} ));; '[B') index=$(( (index+1)%${#names_ref[@]} ));; esac;; ' ') [ "${checked_ref[$index]}" = true ] && checked_ref[$index]=false || checked_ref[$index]=true;; '') clear_interactive; return 0;; esac; done
   fi
   while :; do
     printf 'Select plugins (enter a number to toggle, "done" to confirm):\n'
