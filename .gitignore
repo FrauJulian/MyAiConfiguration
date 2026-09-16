@@ -4,6 +4,7 @@ generated/
 *.tmp
 *.bak
 backups/
+.ai-session/
 .env
 .env.*
 auth.json
