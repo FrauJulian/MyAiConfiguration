@@ -33,6 +33,10 @@ Project instructions may specialize global defaults, but must not weaken securit
 * Prefer self-explanatory code and clear names.
 * Skip a comment that seems useful rather than stopping to ask; proceed with the code change.
 
+## Tool output
+
+* Prefer a script's documented summary mode for routine agent runs; keep warnings and failure diagnostics visible. Use detailed output when investigating a failure or when requested.
+
 ## Language
 
 * Write code and repository-generated user-facing text in English.

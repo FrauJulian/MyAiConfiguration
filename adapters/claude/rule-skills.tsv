@@ -1,7 +1,7 @@
 rule_file	skill_name	trigger
 angular	rules-angular	Angular component, template, or RxJS/signal work
 csharp.md	rules-csharp	C# or .NET implementation, review, or refactoring work
-decision-rule.md	rules-decision-rule	evaluating requirements, ambiguous behavior, or technical choices that need a decision
+decision-rule.md	rules-decision-rule	unresolved requirements, ambiguous behavior, or a meaningful technical choice
 definition-of-done.md	rules-definition-of-done	validating that a task is complete or ready for review
 git.md	rules-git	Git operations such as commits, branches, or merges
 microsoft.md	rules-microsoft	Microsoft 365, Azure DevOps, or Teams operations
