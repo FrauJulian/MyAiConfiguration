@@ -52,7 +52,7 @@ write_managed_manifest() {
 # sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <windows-shell-command> <dry-run: true|false> [summary: true|false]
 sync_managed_destination() {
   local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 windows_shell_command=$6 dry_run=$7 summary=${8:-false}
-  printf 'SOURCE %s -> %s\n' "$source" "$destination"
+  [ "$summary" = true ] || printf 'SOURCE %s -> %s\n' "$source" "$destination"
   local manifest
   manifest=$(manifest_path "$destination")
   declare -A old_manifest

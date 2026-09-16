@@ -59,7 +59,7 @@ function Sync-ManagedDestination {
         [switch]$DryRun,
         [switch]$Summary
     )
-    Write-Output "SOURCE $Source -> $Destination"
+    if (-not $Summary) { Write-Output "SOURCE $Source -> $Destination" }
     $manifestPath = Get-ManagedManifestPath $Destination
     $oldManifest = Read-ManagedManifest $manifestPath
     $newManifest = @{}
