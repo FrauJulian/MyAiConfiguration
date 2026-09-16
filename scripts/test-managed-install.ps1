@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([switch]$Summary)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'lib/manifest.ps1')
@@ -48,7 +48,7 @@ try {
     if (@($outSummary | Where-Object { $_ -like 'CREATE*' -or $_ -like 'UPDATE*' -or $_ -like 'UNCHANGED*' -or $_ -like 'BACKUP*' }).Count -ne 0) { throw "Summary mode must not print per-file lines: $($outSummary -join '; ')" }
     if (@($outSummary | Where-Object { $_ -match '^SYNC .* unchanged' }).Count -ne 1) { throw "Summary mode must print exactly one SYNC tally line: $($outSummary -join '; ')" }
 
-    Write-Output 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free'
+    if ($Summary) { Write-Output 'Tests: PASS | managed install' } else { Write-Output 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free' }
 } finally {
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 }

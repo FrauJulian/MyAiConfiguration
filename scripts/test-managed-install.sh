@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+summary=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --summary) summary=true; shift ;;
+    *) printf 'Unknown argument: %s\n' "$1" >&2; exit 1 ;;
+  esac
+done
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$root/scripts/lib/manifest.sh"
@@ -54,4 +61,4 @@ if [ "$(printf '%s\n' "$out_summary" | grep -c '^SYNC .* unchanged')" -ne 1 ]; t
   exit 1
 fi
 
-printf 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free\n'
+if [ "$summary" = true ]; then printf 'Tests: PASS | managed install\n'; else printf 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free\n'; fi

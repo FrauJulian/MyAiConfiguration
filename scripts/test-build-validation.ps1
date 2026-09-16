@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([switch]$Summary)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $work = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-config-build-validation-" + [Guid]::NewGuid())
@@ -48,5 +48,5 @@ Test-BuildFails 'leftover template placeholder' {
 }
 
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
-Write-Output 'PASS build validation: invalid JSON, duplicate agent, duplicate plugin, and leftover placeholders are all rejected'
+if ($Summary) { Write-Output 'Tests: PASS | build validation' } else { Write-Output 'PASS build validation: invalid JSON, duplicate agent, duplicate plugin, and leftover placeholders are all rejected' }
 exit 0
