@@ -11,6 +11,77 @@
 It keeps rules, skills, agents, hooks, and orchestration guidance in shared source files. Client adapters turn those files
 into platform-specific packages that can be inspected before they are installed.
 
+## Quickstart
+
+From an existing checkout, with the [requirements](#requirements) installed, run pull, build, then install.
+Stop if any command fails. Installation asks for the platform, client, and plugin selection.
+
+PowerShell (Windows):
+
+```powershell
+git pull --ff-only
+.\scripts\build.ps1 -Summary
+.\scripts\install.ps1 -Summary
+```
+
+Bash (Linux):
+
+```bash
+git pull --ff-only
+./scripts/build.sh --summary
+./scripts/install.sh --summary
+```
+
+For an already-installed configuration, use Quickupdate instead.
+
+## Quickupdate
+
+Run these commands from the repository root. Quick reuses the platform, client, and plugin selection from the last
+successful installation or update without opening selection menus. Stop if any command fails.
+
+PowerShell (Windows):
+
+```powershell
+git pull --ff-only
+.\scripts\build.ps1 -Summary
+.\scripts\update.ps1 -Quick -Summary
+```
+
+Bash (Linux):
+
+```bash
+git pull --ff-only
+./scripts/build.sh --summary
+./scripts/update.sh --quick --summary
+```
+
+If no selection has been saved yet, Quick stops with a hint. Run `scripts/update.ps1` or `./scripts/update.sh` once
+without Quick to save your choices. They are stored in `~/.my-ai-configuration/selection.json`; dry runs and failed
+runs do not overwrite them. To change the selection later, run a normal update again. Quick does not automatically
+select newly added plugins.
+
+Install and update also rebuild internally; the explicit build above lets you check the packages before installation.
+
+## Documentation
+
+| Document | Contents |
+| --- | --- |
+| [Architecture](docs/architecture.md) | Shared sources, adapters, generated packages, and installation. |
+| [Configuration](docs/configuration.md) | Client settings, permission defaults, status displays, and verification. |
+| [Plugins](docs/plugins.md) | Plugin sources, selection, installation, updates, and removal. |
+| [Hooks](docs/hooks.md) | Registered events, session-state helpers, notifications, and optional utilities. |
+| [Agents](docs/agents.md) | Agent roles and when delegation is useful. |
+| [Skills](docs/skills.md) | Skill categories and conditional rule loading. |
+| [Codex adapter](adapters/codex/README.md) | Codex-specific configuration files. |
+| [Claude Code adapter](adapters/claude/README.md) | Claude-specific configuration files. |
+| [Hook package](shared/hooks/README.md) | Overview shipped with the hook scripts. |
+| [Repository instructions](AI-Instructions.md) | Rules for maintaining this repository. |
+
+Historical records, not current runbooks:
+
+- [Token-efficiency design](docs/superpowers/specs/2026-09-16-token-efficiency-design.md)
+- [Token-efficiency implementation plan](docs/superpowers/plans/2026-09-16-token-efficiency.md)
+
 ## Features
 
 - One shared source of truth for Codex and Claude Code.
