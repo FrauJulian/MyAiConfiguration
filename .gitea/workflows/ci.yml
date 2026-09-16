@@ -18,6 +18,10 @@ jobs:
         run: find scripts shared/hooks -name '*.sh' -print0 | xargs -0 -n1 bash -n
       - name: Build
         run: REQUIRE_CODEX_SCHEMA=true ./scripts/build.sh --summary
+      - name: Prompt budget
+        run: ./scripts/prompt-budget.sh --summary
+      - name: Repository context cache
+        run: ./scripts/repository-context.sh --summary
       - name: Doctor
         run: ./scripts/doctor.sh --summary
       - name: Platform package tests
