@@ -84,6 +84,7 @@
 
 ## Tests
 
+* Decide whether tests are needed using `general.md`'s Verification rules; this section governs tests that are selected, not a mandatory test run.
 * Existing relevant tests must continue to pass.
 * Update tests when internal structure changes make it necessary.
 * Do not delete valid tests merely because they fail after a refactoring.
