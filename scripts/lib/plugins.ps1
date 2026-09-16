@@ -2,12 +2,25 @@ function Invoke-PluginCommand {
     param(
         [Parameter(Mandatory=$true)][string]$Command,
         [Parameter(Mandatory=$true)][string[]]$Arguments,
-        [switch]$DryRun
+        [switch]$DryRun,
+        [switch]$Summary
     )
     $display = "$Command $($Arguments -join ' ')"
-    if ($DryRun) { Write-Output "DRYRUN $display"; return }
-    & $Command @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "Plugin command failed: $display" }
+    if ($DryRun) { if (-not $Summary) { Write-Output "DRYRUN $display" }; return }
+    $resolvedCommand = Get-Command $Command -ErrorAction Stop
+    if (-not $Summary) {
+        & $resolvedCommand @Arguments
+        if ($LASTEXITCODE -ne 0) { throw "Plugin command failed: $display" }
+        return
+    }
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $resolvedCommand @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $previousPreference }
+    $output | Where-Object { -not $Summary -or $exitCode -ne 0 -or $_ -is [System.Management.Automation.ErrorRecord] -or "$_" -match '(?i)warn|error|fail|deprecat' }
+    if ($exitCode -ne 0) { throw "Plugin command failed: $display" }
 }
 
 function Get-ConfiguredPluginEntries {
@@ -37,10 +50,11 @@ function Ensure-CodexMarketplace {
     param(
         [Parameter(Mandatory=$true)][string]$Source,
         [Parameter(Mandatory=$true)][string]$MarketplaceName,
-        [switch]$DryRun
+        [switch]$DryRun,
+        [switch]$Summary
     )
     if ($DryRun) {
-        Write-Output "DRYRUN codex plugin marketplace add $Source"
+        if (-not $Summary) { Write-Output "DRYRUN codex plugin marketplace add $Source" }
         return
     }
     $previousErrorActionPreference = $ErrorActionPreference
@@ -54,14 +68,14 @@ function Ensure-CodexMarketplace {
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
-    $output | ForEach-Object { Write-Output $_ }
+    $output | Where-Object { -not $Summary -or $exitCode -ne 0 -or $_ -is [System.Management.Automation.ErrorRecord] -or "$_" -match '(?i)warn|error|fail|deprecat' }
     if ($exitCode -eq 0) { return }
 
     $text = $output -join [Environment]::NewLine
     if ($text -match 'marketplace .* already added from a different source') {
         Write-Output "WARN Codex marketplace '$MarketplaceName' exists from another source; replacing it with: $Source"
-        Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','marketplace','remove',$MarketplaceName)
-        Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','marketplace','add',$Source)
+        Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','marketplace','remove',$MarketplaceName) -Summary:$Summary
+        Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','marketplace','add',$Source) -Summary:$Summary
         return
     }
     throw "Plugin command failed: codex plugin marketplace add $Source"
@@ -80,7 +94,7 @@ function Read-PluginToggleSelection {
             Write-Host ("  {0}) [{1}] {2}" -f ($i + 1), $mark, $Names[$i])
         }
         $answer = Read-Host 'Toggle number or "done"'
-        if ($answer -eq 'done') { return $state }
+        if ([string]::IsNullOrWhiteSpace($answer) -or $answer -eq 'done') { return $state }
         $index = 0
         if ([int]::TryParse($answer, [ref]$index) -and $index -ge 1 -and $index -le $Names.Count) {
             $state[$index - 1] = -not $state[$index - 1]
@@ -108,7 +122,7 @@ function Select-ConfiguredPlugins {
     if ($DryRun -or $toggleable.Count -eq 0) { return @{ Selected = $entries; Deselected = @() } }
 
     $referenceClient = if ($Client -eq 'Codex') { 'Codex' } else { 'Claude' }
-    $installed = @(Get-InstalledPlugins -Client $referenceClient)
+    $installed = if ($Mode -eq 'Update') { @(Get-InstalledPlugins -Client $referenceClient) } else { @() }
     $idField = if ($referenceClient -eq 'Claude') { 'id' } else { 'pluginId' }
     $checked = @($toggleable | ForEach-Object {
         if ($Mode -eq 'Install') { $true; return }
@@ -128,11 +142,12 @@ function Select-ConfiguredPlugins {
 
 function Uninstall-DeselectedPlugins {
     param(
-        [Parameter(Mandatory=$true)][object[]]$Entries,
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Entries,
         [ValidateSet('Codex','Claude','Both')][Parameter(Mandatory=$true)][string]$Client,
         [switch]$DryRun,
         [switch]$Summary
     )
+    if ($Entries.Count -eq 0 -and $PSBoundParameters.ContainsKey('Entries')) { return }
     $clients = if ($Client -eq 'Both') { @('Claude','Codex') } else { @($Client) }
     foreach ($selectedClient in $clients) {
         $installed = if ($DryRun) { @() } else { @(Get-InstalledPlugins -Client $selectedClient) }
@@ -144,9 +159,9 @@ function Uninstall-DeselectedPlugins {
             $isInstalled = [bool](@($installed | Where-Object { $_.$idField -eq $plugin }).Count)
             if (-not $isInstalled) { continue }
             if ($selectedClient -eq 'Claude') {
-                Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','uninstall',$plugin,'--scope','user') -DryRun:$DryRun
+                Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','uninstall',$plugin,'--scope','user') -DryRun:$DryRun -Summary:$Summary
             } else {
-                Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','remove',$plugin) -DryRun:$DryRun
+                Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','remove',$plugin) -DryRun:$DryRun -Summary:$Summary
             }
             if (-not $Summary) { Write-Output "PASS $selectedClient plugin removed: $plugin" }
             $removedCount++
@@ -164,7 +179,8 @@ function Install-ConfiguredPlugins {
         [switch]$Summary,
         [object[]]$Entries
     )
-    $entries = if ($Entries) { $Entries } else { @(Get-ConfiguredPluginEntries -RepositoryRoot $RepositoryRoot) }
+    $entries = if ($PSBoundParameters.ContainsKey('Entries')) { $Entries } else { @(Get-ConfiguredPluginEntries -RepositoryRoot $RepositoryRoot) }
+    if ($Entries.Count -eq 0 -and $PSBoundParameters.ContainsKey('Entries')) { return }
     $clients = if ($Client -eq 'Both') { @('Claude','Codex') } else { @($Client) }
 
     foreach ($selectedClient in $clients) {
@@ -185,7 +201,7 @@ function Install-ConfiguredPlugins {
                 } else {
                     throw "Unknown Codex install method '$($entry.codex_method)' for $($entry.name)."
                 }
-                Invoke-PluginCommand -Command 'npx' -Arguments $arguments -DryRun:$DryRun
+                Invoke-PluginCommand -Command 'npx' -Arguments $arguments -DryRun:$DryRun -Summary:$Summary
                 if (-not $Summary) { Write-Output "PASS Codex skill ensured: $($entry.name)" }
                 $tally.Ensured++
                 continue
@@ -193,16 +209,16 @@ function Install-ConfiguredPlugins {
 
             $installedItem = if ($selectedClient -eq 'Claude') { $installed | Where-Object { $_.id -eq $plugin } | Select-Object -First 1 } else { $installed | Where-Object { $_.pluginId -eq $plugin } | Select-Object -First 1 }
             if ($Update -and $selectedClient -eq 'Claude' -and $null -ne $installedItem) {
-                Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','update',$plugin) -DryRun:$DryRun
+                Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','update',$plugin) -DryRun:$DryRun -Summary:$Summary
                 if (-not $installedItem.enabled) {
-                    Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','enable',$plugin) -DryRun:$DryRun
+                    Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','enable',$plugin) -DryRun:$DryRun -Summary:$Summary
                 }
                 $tally.Updated++
                 continue
             }
             if (-not $Update -and $null -ne $installedItem) {
                 if ($selectedClient -eq 'Claude' -and -not $installedItem.enabled) {
-                    Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','enable',$plugin) -DryRun:$DryRun
+                    Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','enable',$plugin) -DryRun:$DryRun -Summary:$Summary
                 }
                 if (-not $Summary) { Write-Output "PASS $selectedClient plugin already installed: $plugin" }
                 $tally.AlreadyInstalled++
@@ -211,18 +227,18 @@ function Install-ConfiguredPlugins {
 
             if ($selectedClient -eq 'Claude') {
                 if (-not [string]::IsNullOrWhiteSpace($marketplace)) {
-                    Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','marketplace','add',$marketplace) -DryRun:$DryRun
+                    Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','marketplace','add',$marketplace) -DryRun:$DryRun -Summary:$Summary
                 }
-                Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','install',$plugin,'--scope','user') -DryRun:$DryRun
+                Invoke-PluginCommand -Command 'claude' -Arguments @('plugin','install',$plugin,'--scope','user') -DryRun:$DryRun -Summary:$Summary
             } else {
                 if (-not [string]::IsNullOrWhiteSpace($marketplace) -and $marketplace -ne 'openai-curated-remote') {
                     $marketplaceName = ($plugin -split '@')[-1]
-                    Ensure-CodexMarketplace -Source $marketplace -MarketplaceName $marketplaceName -DryRun:$DryRun
+                    Ensure-CodexMarketplace -Source $marketplace -MarketplaceName $marketplaceName -DryRun:$DryRun -Summary:$Summary
                 }
-                Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','add',$plugin) -DryRun:$DryRun
+                Invoke-PluginCommand -Command 'codex' -Arguments @('plugin','add',$plugin) -DryRun:$DryRun -Summary:$Summary
             }
             if (-not $Summary) { Write-Output "PASS $selectedClient plugin ensured: $plugin" }
-            $tally.Ensured++
+            if ($Update -and $null -ne $installedItem) { $tally.Updated++ } else { $tally.Ensured++ }
         }
         if ($Summary) { Write-Output ("PLUGINS {0}: {1} ensured, {2} already installed, {3} updated" -f $selectedClient, $tally.Ensured, $tally.AlreadyInstalled, $tally.Updated) }
     }

@@ -14,7 +14,17 @@ run_plugin_command() {
   local dry_run=$1
   shift
   if [ "$dry_run" = true ]; then
-    printf 'DRYRUN %s\n' "$*"
+    [ "${summary:-false}" = true ] || printf 'DRYRUN %s\n' "$*"
+    return 0
+  elif [ "${summary:-false}" = true ]; then
+    local output status
+    if output=$("$@"); then
+      printf '%s\n' "$output" | grep -Ei 'warn|error|fail|deprecat' || true
+    else
+      status=$?
+      printf '%s\n' "$output" >&2
+      return "$status"
+    fi
   else
     "$@"
   fi
@@ -23,7 +33,7 @@ run_plugin_command() {
 ensure_codex_marketplace() {
   local dry_run=$1 source=$2 marketplace_name=$3 output
   if [ "$dry_run" = true ]; then
-    printf 'DRYRUN codex plugin marketplace add %s\n' "$source"
+    [ "${summary:-false}" = true ] || printf 'DRYRUN codex plugin marketplace add %s\n' "$source"
     return 0
   fi
   if output=$(codex plugin marketplace add "$source" 2>&1); then
@@ -33,8 +43,8 @@ ensure_codex_marketplace() {
   printf '%s\n' "$output" >&2
   if printf '%s\n' "$output" | grep -Eiq 'marketplace .* already added from a different source'; then
     printf "WARN Codex marketplace '%s' exists from another source; replacing it with: %s\n" "$marketplace_name" "$source"
-    codex plugin marketplace remove "$marketplace_name"
-    codex plugin marketplace add "$source"
+    run_plugin_command false codex plugin marketplace remove "$marketplace_name"
+    run_plugin_command false codex plugin marketplace add "$source"
     return 0
   fi
   return 1
@@ -79,10 +89,10 @@ read_plugin_toggle_selection() {
       [ "${checked_ref[$i]}" = true ] && mark=x
       printf '  %d) [%s] %s\n' "$((i + 1))" "$mark" "${names_ref[$i]}"
     done
-    read -r -p 'Toggle number or "done" ' answer
-    [ "$answer" = done ] && return 0
+    read -r -p 'Toggle number or "done" ' answer || { printf 'Plugin selection cancelled: input closed.\n' >&2; return 1; }
+    { [ -z "$answer" ] || [ "$answer" = done ]; } && return 0
     if [[ "$answer" =~ ^[0-9]+$ ]] && [ "$answer" -ge 1 ] && [ "$answer" -le "${#names_ref[@]}" ]; then
-      i=$((answer - 1))
+      i=$((10#$answer - 1))
       if [ "${checked_ref[$i]}" = true ]; then checked_ref[$i]=false; else checked_ref[$i]=true; fi
     fi
   done
