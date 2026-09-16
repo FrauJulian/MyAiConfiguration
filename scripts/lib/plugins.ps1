@@ -9,14 +9,14 @@ function Invoke-PluginCommand {
     if ($DryRun) { if (-not $Summary) { Write-Output "DRYRUN $display" }; return }
     $resolvedCommand = Get-Command $Command -ErrorAction Stop
     if (-not $Summary) {
-        & $resolvedCommand @Arguments
+        if ($script:PluginNonInteractive) { $null | & $resolvedCommand @Arguments } else { & $resolvedCommand @Arguments }
         if ($LASTEXITCODE -ne 0) { throw "Plugin command failed: $display" }
         return
     }
     $previousPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        $output = @(& $resolvedCommand @Arguments 2>&1)
+        $output = if ($script:PluginNonInteractive) { @($null | & $resolvedCommand @Arguments 2>&1) } else { @(& $resolvedCommand @Arguments 2>&1) }
         $exitCode = $LASTEXITCODE
     } finally { $ErrorActionPreference = $previousPreference }
     if (-not $Summary -or $env:AI_CONFIG_VERBOSE -eq '1') { $output | Write-Output } elseif ($exitCode -eq 0) { $output | Where-Object { "$_" -match '(?i)warn|error|fail|deprecat' } }
@@ -60,7 +60,7 @@ function Ensure-CodexMarketplace {
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        $output = @(& codex plugin marketplace add $Source 2>&1)
+        $output = if ($script:PluginNonInteractive) { @($null | & codex plugin marketplace add $Source 2>&1) } else { @(& codex plugin marketplace add $Source 2>&1) }
         $exitCode = $LASTEXITCODE
     } catch {
         $output = @($_)

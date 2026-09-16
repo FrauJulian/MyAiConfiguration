@@ -2,12 +2,14 @@
 set -euo pipefail
 
 dry_run=false
+quick=false
 client=""
 platform=""
 summary=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) dry_run=true; shift ;;
+    --quick) quick=true; shift ;;
     --summary) summary=true; shift ;;
     --client) client=${2:?--client requires a value}; shift 2 ;;
     --platform) platform=${2:?--platform requires a value}; shift 2 ;;
@@ -19,11 +21,16 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$root/scripts/lib/plugins.sh"
 . "$root/scripts/lib/manifest.sh"
 . "$root/scripts/lib/install-targets.sh"
+. "$root/scripts/lib/selection-state.sh"
+
+home_path=${HOME:?HOME is required}
+selected_plugins=()
+deselected_plugins=()
+if [ "$quick" = true ]; then read_update_selection; fi
 
 platform=$(read_install_platform "$platform")
 client=$(read_install_client "$client")
 
-home_path=${HOME:?HOME is required}
 if [ "$dry_run" = false ]; then
   mapfile -t destinations < <(get_install_destinations "$home_path" "$client")
   if ! all_manifests_present "${destinations[@]}"; then
@@ -42,17 +49,24 @@ stamp=$(date +%Y%m%d-%H%M%S)
 shell_command=bash
 windows_shell_command='powershell -NoProfile -ExecutionPolicy Bypass -File'
 
+if [ "$quick" = false ]; then
+  select_configured_plugins "$root" "$client" Update "$dry_run" selected_plugins deselected_plugins
+fi
+
 while IFS='|' read -r source destination; do
   ai_config_root=$destination
   command -v cygpath >/dev/null && ai_config_root=$(cygpath -m "$destination")
   sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$windows_shell_command" "$dry_run" "$summary"
 done < <(get_install_targets "$generated" "$home_path" "$platform" "$client")
 
-selected_plugins=()
-deselected_plugins=()
-select_configured_plugins "$root" "$client" Update "$dry_run" selected_plugins deselected_plugins
-install_configured_plugins "$root" "$client" "$dry_run" true selected_plugins "$summary"
-uninstall_deselected_plugins "$root" "$client" "$dry_run" deselected_plugins "$summary"
+if [ "$quick" = true ]; then
+  CI=true install_configured_plugins "$root" "$client" "$dry_run" true selected_plugins "$summary" </dev/null
+  CI=true uninstall_deselected_plugins "$root" "$client" "$dry_run" deselected_plugins "$summary" </dev/null
+else
+  install_configured_plugins "$root" "$client" "$dry_run" true selected_plugins "$summary"
+  uninstall_deselected_plugins "$root" "$client" "$dry_run" deselected_plugins "$summary"
+fi
+if [ "$dry_run" = false ]; then save_update_selection; fi
 
 if [ "$summary" = true ]; then
   suffix=
