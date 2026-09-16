@@ -1,6 +1,6 @@
 # Token-Efficiency Improvements Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Historical implementation plan, retained for context. It is not a current runbook or authorization to execute its commands. Checkboxes do not represent current completion status. Later changes supersede its validation requirements and examples; use [AI-Instructions.md](../../../AI-Instructions.md) and the [README](../../../README.md) for current guidance. Commit steps below require explicit user authorization.
 
 **Goal:** Cut low-value tokens agents pay for in both Claude Code and Codex — chatty script output, always-loaded rule content that's rarely needed in full, duplicated instructions, and low-value delegation — without weakening correctness, security, or verification quality.
 
