@@ -19,6 +19,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$root/scripts/lib/plugins.sh"
 . "$root/scripts/lib/manifest.sh"
 . "$root/scripts/lib/install-targets.sh"
+. "$root/scripts/lib/selection-state.sh"
 
 platform=$(read_install_platform "$platform")
 client=$(read_install_client "$client")
@@ -52,6 +53,7 @@ selected_plugins=()
 deselected_plugins=()
 select_configured_plugins "$root" "$client" Install "$dry_run" selected_plugins deselected_plugins
 install_configured_plugins "$root" "$client" "$dry_run" false selected_plugins "$summary"
+if [ "$dry_run" = false ]; then save_update_selection; fi
 
 if [ "$summary" = true ]; then
   suffix=

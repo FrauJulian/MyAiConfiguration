@@ -10,6 +10,7 @@ $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'lib/plugins.ps1')
 . (Join-Path $PSScriptRoot 'lib/manifest.ps1')
 . (Join-Path $PSScriptRoot 'lib/install-targets.ps1')
+. (Join-Path $PSScriptRoot 'lib/selection-state.ps1')
 
 $Platform = Read-InstallPlatform -Platform $Platform
 $platform = $Platform.ToLowerInvariant()
@@ -38,5 +39,6 @@ foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath 
 
 $plugins = Select-ConfiguredPlugins -RepositoryRoot $root -Client $Client -Mode 'Install' -DryRun:$DryRun
 Install-ConfiguredPlugins -RepositoryRoot $root -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected
+if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Platform $Platform -Client $Client -Plugins $plugins }
 if ($Summary) { Write-Output "Install: PASS | $Client, $Platform$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' })) }
 exit 0
