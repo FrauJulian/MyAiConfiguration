@@ -22,40 +22,13 @@ run_plugin_command() {
       printf '%s\n' "$output" | grep -Ei 'warn|error|fail|deprecat' || true
     else
       status=$?
-      [ "${AI_CONFIG_VERBOSE:-}" = 1 ] && printf '%s\n' "$output" >&2
+      printf '%s\n' "$output" >&2
       printf 'Plugin command failed: %s\n' "$*" >&2
       return "$status"
     fi
   else
     "$@"
   fi
-}
-
-update_codex_marketplace() {
-  local dry_run=$1 marketplace_name=$2 source=$3
-  if ! run_plugin_command "$dry_run" codex plugin marketplace upgrade "$marketplace_name"; then
-    ensure_codex_marketplace "$dry_run" "$source" "$marketplace_name"
-  fi
-}
-
-ensure_codex_marketplace() {
-  local dry_run=$1 source=$2 marketplace_name=$3 output
-  if [ "$dry_run" = true ]; then
-    [ "${summary:-false}" = true ] || printf 'DRYRUN codex plugin marketplace add %s\n' "$source"
-    return 0
-  fi
-  if output=$(codex plugin marketplace add "$source" 2>&1); then
-    [ -z "$output" ] || printf '%s\n' "$output"
-    return 0
-  fi
-  printf '%s\n' "$output" >&2
-  if printf '%s\n' "$output" | grep -Eiq 'marketplace .* already added from a different source'; then
-    printf "WARN Codex marketplace '%s' exists from another source; replacing it with: %s\n" "$marketplace_name" "$source"
-    run_plugin_command false codex plugin marketplace remove "$marketplace_name"
-    run_plugin_command false codex plugin marketplace add "$source"
-    return 0
-  fi
-  return 1
 }
 
 get_plugin_names() {
@@ -80,9 +53,7 @@ plugin_field() {
 }
 
 plugin_toggleable() {
-  local root=$1 name=$2 client=$3
-  case "$client" in claude|both) return 0;; esac
-  [ "$(plugin_field "$root" "$name" codex_method)" = plugin ]
+  return 0
 }
 
 # read_plugin_toggle_selection <names-array-name> <checked-array-name>
@@ -138,7 +109,11 @@ select_configured_plugins() {
       continue
     fi
     if [ "$reference_client" = claude ]; then selector=$(plugin_field "$root" "$name" claude_plugin); else selector=$(plugin_field "$root" "$name" codex_plugin); fi
-    if plugin_installed "$reference_client" "$selector"; then checked+=(true); else checked+=(false); fi
+    if [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" != plugin ]; then
+      local skill_name
+      skill_name=$(plugin_field "$root" "$name" codex_skill)
+      if [ -d "$HOME/.agents/skills/$skill_name" ] || [ -d "$HOME/.codex/skills/$skill_name" ]; then checked+=(true); else checked+=(false); fi
+    elif plugin_installed "$reference_client" "$selector"; then checked+=(true); else checked+=(false); fi
   done
 
   read_plugin_toggle_selection toggle_names checked
@@ -150,118 +125,35 @@ select_configured_plugins() {
   selected_ref+=("${fixed_names[@]}")
 }
 
-# uninstall_deselected_plugins <root> <client> <dry_run> <deselected-array-name> [summary]
-uninstall_deselected_plugins() {
-  local root=$1 client_selection=$2 dry_run=$3
-  local -n names_ref=$4
-  local summary=${5:-false}
-  local clients=()
-  case "$client_selection" in
-    codex) clients=(codex);;
-    claude) clients=(claude);;
-    both) clients=(claude codex);;
-  esac
-  local client name plugin removed
-  for client in "${clients[@]}"; do
-    removed=0
-    for name in "${names_ref[@]}"; do
-      if [ "$client" = claude ]; then plugin=$(plugin_field "$root" "$name" claude_plugin); else plugin=$(plugin_field "$root" "$name" codex_plugin); fi
-      [ -n "$plugin" ] || continue
-      if [ "$dry_run" = false ] && plugin_installed "$client" "$plugin"; then
-        if [ "$client" = claude ]; then
-          run_plugin_command "$dry_run" claude plugin uninstall "$plugin" --scope user
-        else
-          run_plugin_command "$dry_run" codex plugin remove "$plugin"
-        fi
-        [ "$summary" = true ] || printf 'PASS %s plugin removed: %s\n' "$client" "$plugin"
-        removed=$((removed + 1))
-      fi
-    done
-    if [ "$summary" = true ] && [ "$removed" -gt 0 ]; then printf 'PLUGINS %s: %s removed\n' "$client" "$removed"; fi
-  done
+managed_extensions() {
+  local action=$1 root=$2 client=$3 home_path=$4 dry_run=$5 update=$6 selected_name=${7:-} summary=${8:-false}
+  local arguments=("$root/scripts/lib/managed-extensions.py" "$action" --home "$home_path" --manifest "$root/adapters/plugins.tsv" --client "$client")
+  [ "$dry_run" != true ] || arguments+=(--dry-run)
+  [ "$update" != true ] || arguments+=(--update)
+  [ "$summary" != true ] || arguments+=(--summary)
+  if [ -n "$selected_name" ]; then
+    local -n extension_names_ref=$selected_name
+    arguments+=(--selected "${extension_names_ref[@]}")
+  fi
+  python3 "${arguments[@]}"
 }
 
-# install_configured_plugins <root> <client> <dry_run> <update> [selected-names-array-name] [summary]
+sync_configured_plugins() {
+  managed_extensions sync "$@"
+}
+
 install_configured_plugins() {
-  local root=$1 client_selection=$2 dry_run=$3 update=$4 selected_name=${5:-} summary=${6:-false}
-  local manifest="$root/adapters/plugins.tsv"
-  [ -f "$manifest" ] || { printf 'Plugin manifest is missing: %s\n' "$manifest" >&2; return 1; }
-
-  local -A selected_set=()
+  local root=$1 client=$2 dry_run=$3 update=$4 selected_name=${5:-} summary=${6:-false} home_path=${7:-$HOME}
   if [ -n "$selected_name" ]; then
-    local -n selected_names_ref=$selected_name
-    local sn
-    for sn in "${selected_names_ref[@]}"; do selected_set[$sn]=1; done
+    local -n install_names_ref=$selected_name
+    [ "${#install_names_ref[@]}" -gt 0 ] || return 0
   fi
-  local ensured=0 already_installed=0 updated_count=0
+  managed_extensions install "$root" "$client" "$home_path" "$dry_run" "$update" "$selected_name" "$summary"
+}
 
-  local clients=()
-  case "$client_selection" in
-    codex) clients=(codex);;
-    claude) clients=(claude);;
-    both) clients=(claude codex);;
-    *) printf 'Unknown plugin client selection: %s\n' "$client_selection" >&2; return 1;;
-  esac
-
-  local client name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill marketplace plugin
-  for client in "${clients[@]}"; do
-    ensured=0 already_installed=0 updated_count=0
-    while IFS=$'\t' read -r name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill; do
-      [ "$name" = name ] && continue
-      [ -n "$name" ] || continue
-      [ -n "$selected_name" ] && [ -z "${selected_set[$name]+x}" ] && continue
-      [ "$claude_marketplace" = - ] && claude_marketplace=
-      [ "$codex_marketplace" = - ] && codex_marketplace=
-      if [ "$client" = claude ]; then marketplace=$claude_marketplace; plugin=$claude_plugin; else marketplace=$codex_marketplace; plugin=$codex_plugin; fi
-      [ -n "$plugin" ] || { printf 'Plugin selector missing for %s: %s\n' "$client" "$name" >&2; return 1; }
-      if [ "$client" = codex ] && [ "$codex_method" != plugin ]; then
-        case "$codex_method" in
-          skill)
-            if [ "$codex_skill" = - ]; then
-              run_plugin_command "$dry_run" npx -y skills add "$codex_source" --global --agent codex
-            else
-              run_plugin_command "$dry_run" npx -y skills add "$codex_source" --skill "$codex_skill" --global --agent codex
-            fi
-            ;;
-          impeccable)
-            run_plugin_command "$dry_run" npx -y impeccable install -y --providers=codex --scope=global
-            ;;
-          *) printf 'Unknown Codex install method for %s: %s\n' "$client" "$name" >&2; return 1;;
-        esac
-        [ "$summary" = true ] || printf 'PASS Codex skill ensured: %s\n' "$name"
-        ensured=$((ensured + 1))
-        continue
-      fi
-      if [ "$dry_run" = false ] && plugin_installed "$client" "$plugin"; then
-        if [ "$update" = true ] && [ "$client" = claude ]; then
-          run_plugin_command "$dry_run" claude plugin update "$plugin"
-          run_plugin_command "$dry_run" claude plugin enable "$plugin"
-          updated_count=$((updated_count + 1))
-        elif [ "$update" = true ] && [ "$client" = codex ]; then
-          [ -z "$marketplace" ] || [ "$marketplace" = openai-curated-remote ] || update_codex_marketplace "$dry_run" "${plugin##*@}" "$marketplace"
-          run_plugin_command "$dry_run" codex plugin add "$plugin"
-          updated_count=$((updated_count + 1))
-        else
-          [ "$summary" = true ] || printf 'PASS %s plugin already installed: %s\n' "$client" "$plugin"
-          already_installed=$((already_installed + 1))
-        fi
-        continue
-      fi
-      if [ "$client" = claude ]; then
-        [ -z "$marketplace" ] || run_plugin_command "$dry_run" claude plugin marketplace add "$marketplace"
-        run_plugin_command "$dry_run" claude plugin install "$plugin" --scope user
-      else
-        if [ -n "$marketplace" ] && [ "$marketplace" != openai-curated-remote ]; then
-          marketplace_name=${plugin##*@}
-          ensure_codex_marketplace "$dry_run" "$marketplace" "$marketplace_name"
-        fi
-        run_plugin_command "$dry_run" codex plugin add "$plugin"
-      fi
-      [ "$summary" = true ] || printf 'PASS %s plugin ensured: %s\n' "$client" "$plugin"
-      ensured=$((ensured + 1))
-    done < "$manifest"
-    if [ "$summary" = true ]; then
-      printf 'PLUGINS %s: %s ensured, %s already installed, %s updated\n' "$client" "$ensured" "$already_installed" "$updated_count"
-    fi
-  done
+uninstall_deselected_plugins() {
+  local root=$1 client=$2 dry_run=$3 selected_name=$4 summary=${5:-false} home_path=${6:-$HOME}
+  local -n removal_names_ref=$selected_name
+  [ "${#removal_names_ref[@]}" -gt 0 ] || return 0
+  managed_extensions remove "$root" "$client" "$home_path" "$dry_run" false "$selected_name" "$summary"
 }

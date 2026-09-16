@@ -30,26 +30,32 @@ $detailed = @(Invoke-PluginCommand -Command Test-PluginOutput -Arguments @('succ
 if ($detailed.Count -ne 2 -or $detailed[0] -ne 'download progress') { throw 'Detailed output must retain progress.' }
 $diagnostics = [System.Collections.Generic.List[string]]::new()
 $failed = $false
-$env:AI_CONFIG_VERBOSE = '1'
+$env:AI_CONFIG_VERBOSE = $null
 try { Invoke-PluginCommand -Command Test-PluginOutput -Arguments @('fail') -Summary | ForEach-Object { $diagnostics.Add("$_") } }
 catch { $failed = $true }
 $env:AI_CONFIG_VERBOSE = $null
 if (-not $failed -or $diagnostics -notcontains 'download progress' -or $diagnostics -notcontains 'WARN test warning') { throw 'Plugin failure must retain full diagnostics and fail.' }
 $global:LASTEXITCODE = 0
-function codex { '{"installed":[{"pluginId":"ponytail@ponytail"},{"pluginId":"i-have-adhd@i-have-adhd"},{"pluginId":"superpowers@openai-curated-remote"},{"pluginId":"context7@context7-marketplace"},{"pluginId":"caveman@thinkhome-caveman"}],"available":[]}' }
+function codex { $script:observedCodexHome = $env:CODEX_HOME; $script:observedProfile = $env:USERPROFILE; '{"installed":[{"pluginId":"ponytail@ponytail"},{"pluginId":"i-have-adhd@i-have-adhd"},{"pluginId":"superpowers@openai-curated-remote"},{"pluginId":"context7@context7-marketplace"},{"pluginId":"caveman@thinkhome-caveman"}],"available":[]}' }
+$previousCodexHome = $env:CODEX_HOME
+$previousProfile = $env:USERPROFILE
+$null = Get-InstalledPlugins -Client Codex -HomePath 'C:/temporary profile'
+if ($observedCodexHome -ne (Join-Path 'C:/temporary profile' '.codex') -or $observedProfile -ne 'C:/temporary profile') { throw 'Plugin inspection must use the requested user home.' }
+if ($env:CODEX_HOME -ne $previousCodexHome -or $env:USERPROFILE -ne $previousProfile) { throw 'Plugin inspection must restore the process environment.' }
 $script:answers.Enqueue('done')
 $selection = Select-ConfiguredPlugins -RepositoryRoot (Split-Path $PSScriptRoot -Parent) -Client Codex -Mode Update
-if ($selection.Deselected.Count -ne 0 -or $selection.Selected.Count -ne 8) { throw 'All installed Codex plugins must start checked when updating.' }
+if (@($selection.Selected | Where-Object { $_.codex_method -eq 'plugin' }).Count -ne 5) { throw 'All installed Codex plugins must start checked when updating.' }
 $script:answers.Enqueue('4')
 $script:answers.Enqueue('done')
 $selection = Select-ConfiguredPlugins -RepositoryRoot (Split-Path $PSScriptRoot -Parent) -Client Codex -Mode Update
-if ($selection.Deselected.Count -ne 1 -or $selection.Deselected[0].name -ne 'Context7') { throw 'Only the explicitly unchecked installed plugin must be deselected.' }
-function Get-InstalledPlugins { [pscustomobject]@{ pluginId = 'test@market' } }
-$script:commands = @()
-function Invoke-PluginCommand { param($Command, $Arguments, [switch]$DryRun, [switch]$Summary) $script:commands += "$Command $($Arguments -join ' ')" }
+if (@($selection.Deselected | Where-Object { $_.name -eq 'Context7' }).Count -ne 1) { throw 'Only the explicitly unchecked installed plugin must be deselected.' }
+$script:managedArguments = @()
+function python { $script:managedArguments = @($args); $global:LASTEXITCODE = 0 }
 $entry = [pscustomobject]@{ name = 'Test'; codex_method = 'plugin'; codex_marketplace = '-'; codex_plugin = 'test@market' }
-$updated = @(Install-ConfiguredPlugins -RepositoryRoot (Split-Path $PSScriptRoot -Parent) -Client Codex -Update -Summary -Entries @($entry))
-if ($commands.Count -ne 1 -or $commands[0] -ne 'codex plugin add test@market' -or $updated[0] -ne 'PLUGINS Codex: 0 ensured, 0 already installed, 1 updated') { throw 'Updating an installed Codex plugin must report one update.' }
+Sync-ConfiguredPlugins -RepositoryRoot (Split-Path $PSScriptRoot -Parent) -Client Codex -HomePath 'C:/temporary home' -Update -Summary -Entries @($entry)
+if ($managedArguments -notcontains 'sync' -or $managedArguments -notcontains '--update' -or $managedArguments -notcontains 'Test' -or $managedArguments -notcontains 'C:/temporary home') { throw 'Managed reconciliation must receive selection, home, and update mode.' }
+Sync-ConfiguredPlugins -RepositoryRoot (Split-Path $PSScriptRoot -Parent) -Client Codex -Entries @()
+if ($managedArguments[-1] -ne '--selected') { throw 'Empty selection must reach reconciliation for managed cleanup.' }
 function Get-InstalledPlugins { throw 'Empty selection must not query installed plugins.' }
 function Invoke-PluginCommand { throw 'Empty selection must not run plugin commands.' }
 Install-ConfiguredPlugins -RepositoryRoot (Split-Path $PSScriptRoot -Parent) -Client Both -Entries @()
