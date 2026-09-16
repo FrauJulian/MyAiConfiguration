@@ -78,6 +78,22 @@ sync_managed_destination() {
     else
       new_hash=$(sha256_of_file "$source_file")
     fi
+    if [ "$relative" = config.toml ] && [ -f "$target" ]; then
+      local plugin_tables
+      plugin_tables=$(awk '
+        /^[ \t]*\[/ { preserve = ($0 ~ /^[ \t]*\[(plugins|marketplaces)(\.|\])/) }
+        preserve { print }
+      ' "$target")
+      if [ -n "$plugin_tables" ]; then
+        if printf '%s\n' "$content" | grep -Eq '^[[:blank:]]*\[(plugins|marketplaces)(\.|\])'; then
+          printf 'Cannot overwrite local plugin configuration with generated plugin tables.\n' >&2
+          return 1
+        fi
+        content="$content"$'\n\n'"$plugin_tables"$'\n'
+        needs_sub=true
+        new_hash=$(sha256_of_string "$content")
+      fi
+    fi
     new_manifest[$relative]=$new_hash
 
     exists=false

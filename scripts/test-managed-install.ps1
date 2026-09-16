@@ -44,6 +44,29 @@ try {
     if (Compare-Object $beforeDry $afterDry) { throw 'A dry run must not change the destination at all.' }
     if (@($outDry | Where-Object { $_ -match 'DRYRUN REMOVE.*a\.md' }).Count -ne 1) { throw "Dry run should report the planned removal without performing it: $($outDry -join '; ')" }
 
+    $configPath = Join-Path $destination 'config.toml'
+    $pluginState = @'
+  [marketplaces.ponytail]
+    source_type = "git"
+    source = "https://github.com/DietrichGebert/ponytail.git"
+  [plugins."ponytail@ponytail"]
+    enabled = true
+  [plugins."disabled@market"]
+    enabled = false
+'@
+    [System.IO.File]::WriteAllText((Join-Path $source 'config.toml'), "model = 'new'`n")
+    [System.IO.File]::WriteAllText($configPath, "model = 'old'`n$pluginState`n[other]`nvalue = true`n")
+    $originalConfig = [System.IO.File]::ReadAllText($configPath)
+    $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'plugins-dry' -DryRun
+    if ([System.IO.File]::ReadAllText($configPath) -ne $originalConfig) { throw 'Dry run must preserve plugin configuration.' }
+    $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'plugins'
+    $mergedConfig = [System.IO.File]::ReadAllText($configPath)
+    if (-not $mergedConfig.Contains($pluginState)) { throw 'Updating config.toml must preserve local marketplace and plugin tables, including disabled plugins.' }
+    if (-not $mergedConfig.Contains("model = 'new'") -or $mergedConfig.Contains('[other]')) { throw 'Managed configuration must still be updated.' }
+    if ([System.IO.File]::ReadAllText((Join-Path $destination 'backups/plugins/config.toml')) -ne $originalConfig) { throw 'Original plugin configuration must be backed up.' }
+    $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'plugins-repeat'
+    if ([System.IO.File]::ReadAllText($configPath) -ne $mergedConfig -or (Test-Path (Join-Path $destination 'backups/plugins-repeat'))) { throw 'Preserving plugin configuration must be idempotent.' }
+
     $outSummary = @(Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'summary' -Summary)
     if (@($outSummary | Where-Object { $_ -like 'CREATE*' -or $_ -like 'UPDATE*' -or $_ -like 'UNCHANGED*' -or $_ -like 'BACKUP*' }).Count -ne 0) { throw "Summary mode must not print per-file lines: $($outSummary -join '; ')" }
     if (@($outSummary | Where-Object { $_ -match '^SYNC .* unchanged' }).Count -ne 1) { throw "Summary mode must print exactly one SYNC tally line: $($outSummary -join '; ')" }

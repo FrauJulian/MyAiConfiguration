@@ -51,6 +51,26 @@ after_dry=$(find "$destination" -type f | sort)
 [ "$before_dry" = "$after_dry" ] || { printf 'A dry run must not change the destination at all.\n' >&2; exit 1; }
 printf '%s\n' "$out_dry" | grep -q '^DRYRUN REMOVE .*a\.md$' || { printf 'Dry run should report the planned removal without performing it:\n%s\n' "$out_dry" >&2; exit 1; }
 
+plugin_state='  [marketplaces.ponytail]
+    source_type = "git"
+    source = "https://github.com/DietrichGebert/ponytail.git"
+  [plugins."ponytail@ponytail"]
+    enabled = true
+  [plugins."disabled@market"]
+    enabled = false'
+printf "model = 'new'\n" > "$source_dir/config.toml"
+printf "model = 'old'\n%s\n[other]\nvalue = true\n" "$plugin_state" > "$destination/config.toml"
+original_config=$(cat "$destination/config.toml")
+sync_managed_destination "$source_dir" "$destination" plugins-dry "" "" "" true > /dev/null
+[ "$(cat "$destination/config.toml")" = "$original_config" ] || { printf 'Dry run changed plugin configuration.\n' >&2; exit 1; }
+sync_managed_destination "$source_dir" "$destination" plugins "" "" "" false > /dev/null
+merged_config=$(cat "$destination/config.toml")
+[[ "$merged_config" == *"$plugin_state"* ]] || { printf 'Updating config.toml must preserve local marketplace and plugin tables, including disabled plugins.\n' >&2; exit 1; }
+[[ "$merged_config" == *"model = 'new'"* && "$merged_config" != *'[other]'* ]] || { printf 'Managed configuration must still be updated.\n' >&2; exit 1; }
+[ "$(cat "$destination/backups/plugins/config.toml")" = "$original_config" ] || { printf 'Original plugin configuration must be backed up.\n' >&2; exit 1; }
+sync_managed_destination "$source_dir" "$destination" plugins-repeat "" "" "" false > /dev/null
+[ "$(cat "$destination/config.toml")" = "$merged_config" ] && [ ! -d "$destination/backups/plugins-repeat" ] || { printf 'Preserving plugin configuration must be idempotent.\n' >&2; exit 1; }
+
 out_summary=$(sync_managed_destination "$source_dir" "$destination" "summary" "" "" "" false true)
 if printf '%s\n' "$out_summary" | grep -Eq '^(CREATE|UPDATE|UNCHANGED|BACKUP) '; then
   printf 'Summary mode must not print per-file lines: %s\n' "$out_summary" >&2

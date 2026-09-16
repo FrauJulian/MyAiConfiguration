@@ -77,6 +77,18 @@ function Sync-ManagedDestination {
         } else {
             $newBytes = [System.IO.File]::ReadAllBytes($_.FullName)
         }
+        if ($relative -eq 'config.toml' -and (Test-Path -LiteralPath $target)) {
+            $localConfig = [System.IO.File]::ReadAllText($target)
+            $pluginTables = [regex]::Matches($localConfig, '(?m)^[ \t]*\[(?:plugins|marketplaces)(?:\.|\])[\s\S]*?(?=^[ \t]*\[|\z)')
+            if ($pluginTables.Count -gt 0) {
+                $content = [System.Text.Encoding]::UTF8.GetString($newBytes).TrimEnd([char[]]"`r`n")
+                if ($content -match '(?m)^[ \t]*\[(?:plugins|marketplaces)(?:\.|\])') {
+                    throw 'Cannot overwrite local plugin configuration with generated plugin tables.'
+                }
+                $preserved = ($pluginTables | ForEach-Object { $_.Value.TrimEnd([char[]]"`r`n") }) -join "`n"
+                $newBytes = [System.Text.Encoding]::UTF8.GetBytes("$content`n`n$preserved`n")
+            }
+        }
         $newHash = Get-Sha256HashOfBytes $newBytes
         $newManifest[$relative] = $newHash
 
