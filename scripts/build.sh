@@ -38,7 +38,7 @@ while IFS=$'\t' read -r rule_file skill_name trigger; do
   [ -n "$rule_file" ] || continue
   [ -n "$skill_name" ] || { printf 'Missing skill_name in rule-skill manifest row for %s.\n' "$rule_file" >&2; exit 1; }
   [ -n "$trigger" ] || { printf 'Missing trigger in rule-skill manifest row for %s.\n' "$rule_file" >&2; exit 1; }
-  [ -f "$shared/rules/$rule_file" ] || { printf 'Rule-skill manifest references a missing rule file: %s\n' "$rule_file" >&2; exit 1; }
+  [ -f "$shared/rules/$rule_file" ] || [ -d "$shared/rules/$rule_file" ] || { printf 'Rule-skill manifest references a missing rule file: %s\n' "$rule_file" >&2; exit 1; }
   [ -z "${rule_skill_seen[$skill_name]+x}" ] || { printf 'Duplicate rule-skill name in manifest: %s\n' "$skill_name" >&2; exit 1; }
   rule_skill_seen[$skill_name]=1
   rule_skill_files+=("$rule_file")
@@ -99,11 +99,11 @@ Load rule files when their subject applies:
 - rules/security-network.md for network access, URLs, TLS, proxies, or SSRF.
 - rules/security-crypto.md for cryptography, secrets, credentials, keys, or tokens.
 - rules/security-supply-chain.md for dependencies, packages, plugins, builds, deployments, or CI.
-- rules/angular.md for Angular work.
+- rules/angular/index.md for Angular work.
 - rules/typescript.md for TypeScript work.
 - rules/csharp.md for C# or .NET work.
-- rules/wpf.md for WPF work.
-- rules/ui-ux.md for UI or UX decisions.
+- rules/wpf/index.md for WPF work.
+- rules/ui-ux/index.md for UI or UX decisions.
 - rules/microsoft.md for Microsoft 365, Azure DevOps, or Teams work.
 - rules/git.md for Git operations.
 - rules/refactoring.md for refactoring work.
@@ -131,9 +131,15 @@ for i in "${!rule_skill_names[@]}"; do
   rule_file=${rule_skill_files[$i]}
   skill_name=${rule_skill_names[$i]}
   trigger=${rule_skill_triggers[$i]}
+  rule_source="$shared/rules/$rule_file"
+  rule_body="$rule_source"
+  [ -d "$rule_source" ] && rule_body="$rule_source/index.md"
   skill_dir="$output/claude-$platform/skills/rules/$skill_name"
   mkdir -p "$skill_dir"
-  { printf -- '---\nname: %s\ndescription: Use for %s.\n---\n\n' "$skill_name" "$trigger"; cat "$shared/rules/$rule_file"; } > "$skill_dir/SKILL.md"
+  { printf -- '---\nname: %s\ndescription: Use for %s.\n---\n\n' "$skill_name" "$trigger"; cat "$rule_body"; } > "$skill_dir/SKILL.md"
+  if [ -d "$rule_source/references" ]; then
+    copy_directory "$rule_source/references" "$skill_dir/references"
+  fi
   claude_rule_loading_list="${claude_rule_loading_list}- ${skill_name} for ${trigger}.
 "
 done

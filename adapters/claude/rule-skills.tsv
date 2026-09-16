@@ -1,5 +1,5 @@
 rule_file	skill_name	trigger
-angular.md	rules-angular	Angular component, template, or RxJS/signal work
+angular	rules-angular	Angular component, template, or RxJS/signal work
 csharp.md	rules-csharp	C# or .NET implementation, review, or refactoring work
 decision-rule.md	rules-decision-rule	evaluating requirements, ambiguous behavior, or technical choices that need a decision
 definition-of-done.md	rules-definition-of-done	validating that a task is complete or ready for review
@@ -16,5 +16,5 @@ security-network.md	rules-security-network	network, URL fetch, proxy, outbound r
 security-crypto.md	rules-security-crypto	cryptography, secrets, credentials, key, or token work
 security-supply-chain.md	rules-security-supply-chain	dependency, package, plugin, build, deployment, or CI supply-chain work
 typescript.md	rules-typescript	TypeScript or modern ECMAScript implementation work
-ui-ux.md	rules-ui-ux	UI or UX design and interaction decisions
-wpf.md	rules-wpf	WPF, XAML, or MVVM desktop UI work
+ui-ux	rules-ui-ux	UI or UX design and interaction decisions
+wpf	rules-wpf	WPF, XAML, or MVVM desktop UI work

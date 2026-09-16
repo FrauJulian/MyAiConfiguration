@@ -109,11 +109,11 @@ Load rule files when their subject applies:
 - rules/security-network.md for network access, URLs, TLS, proxies, or SSRF.
 - rules/security-crypto.md for cryptography, secrets, credentials, keys, or tokens.
 - rules/security-supply-chain.md for dependencies, packages, plugins, builds, deployments, or CI.
-- rules/angular.md for Angular work.
+- rules/angular/index.md for Angular work.
 - rules/typescript.md for TypeScript work.
 - rules/csharp.md for C# or .NET work.
-- rules/wpf.md for WPF work.
-- rules/ui-ux.md for UI or UX decisions.
+- rules/wpf/index.md for WPF work.
+- rules/ui-ux/index.md for UI or UX decisions.
 - rules/microsoft.md for Microsoft 365, Azure DevOps, or Teams work.
 - rules/git.md for Git operations.
 - rules/refactoring.md for refactoring work.
@@ -140,11 +140,18 @@ foreach ($platform in @('windows','linux')) {
 
     $claudeRuleSkillLines = @()
     foreach ($entry in $ruleSkillEntries) {
+        $ruleSourcePath = Join-Path $shared "rules/$($entry.rule_file)"
+        $isDirectory = Test-Path -LiteralPath $ruleSourcePath -PathType Container
+        $ruleBodyPath = if ($isDirectory) { Join-Path $ruleSourcePath 'index.md' } else { $ruleSourcePath }
         $skillDir = Join-Path $output "claude-$platform/skills/rules/$($entry.skill_name)"
         New-Item $skillDir -ItemType Directory -Force | Out-Null
-        $ruleContent = Get-Content (Join-Path $shared "rules/$($entry.rule_file)") -Raw
+        $ruleContent = Get-Content $ruleBodyPath -Raw
         $skillBody = "---`r`nname: $($entry.skill_name)`r`ndescription: Use for $($entry.trigger).`r`n---`r`n`r`n$ruleContent"
         Set-Content (Join-Path $skillDir 'SKILL.md') $skillBody -Encoding UTF8
+        if ($isDirectory) {
+            $referencesSource = Join-Path $ruleSourcePath 'references'
+            if (Test-Path -LiteralPath $referencesSource) { Copy-Directory $referencesSource (Join-Path $skillDir 'references') }
+        }
         $claudeRuleSkillLines += "- $($entry.skill_name) for $($entry.trigger)."
     }
     $claudeRuleLoading = "Always apply ``rules/general.md`` before starting any task, embedded below.`r`n`r`nDetect the languages, frameworks, tools, and change areas from the repository and the requested work. Invoke every matching rule skill before editing. Invoke all matching rule skills when multiple technologies apply.`r`n`r`nInvoke rule skills when their subject applies:`r`n`r`n" + ($claudeRuleSkillLines -join "`r`n")
