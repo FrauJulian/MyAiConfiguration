@@ -190,7 +190,9 @@ foreach ($platform in @('windows','linux')) {
         $script = if ($platform -eq 'windows') { 'flashbang.ps1' } else { 'flashbang.sh' }
         $statusLineScript = if ($platform -eq 'windows') { 'statusline.ps1' } else { 'statusline.sh' }
         $content = Get-Content -LiteralPath $path -Raw
-        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__WINDOWS_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__WINDOWS_HOOK_SCRIPT__', $script).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript)
+        $compactScript = if ($platform -eq 'windows') { 'Record-Compact.ps1' } else { 'record-compact.sh' }
+        $pointerScript = if ($platform -eq 'windows') { 'Show-SessionStatePointer.ps1' } else { 'show-session-state-pointer.sh' }
+        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__WINDOWS_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__WINDOWS_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript)
         Set-Content -LiteralPath $path -Value $content -Encoding UTF8
     }
 

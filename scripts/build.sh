@@ -188,10 +188,14 @@ for client in codex claude; do
   command=bash
   script=flashbang.sh
   statusline_script=statusline.sh
+  compact_script=record-compact.sh
+  pointer_script=show-session-state-pointer.sh
   if [ "$platform" = windows ]; then
     command='powershell -NoProfile -ExecutionPolicy Bypass -File'
     script=flashbang.ps1
     statusline_script=statusline.ps1
+    compact_script=Record-Compact.ps1
+    pointer_script=Show-SessionStatePointer.ps1
   fi
   path="$output/$client-$platform/$file"
   content=$(<"$path")
@@ -199,6 +203,8 @@ for client in codex claude; do
   content=${content//__WINDOWS_HOOK_COMMAND__/$command}
   content=${content//__HOOK_SCRIPT__/$script}
   content=${content//__WINDOWS_HOOK_SCRIPT__/$script}
+  content=${content//__COMPACT_SCRIPT__/$compact_script}
+  content=${content//__SESSION_POINTER_SCRIPT__/$pointer_script}
   content=${content//__STATUSLINE_COMMAND__/$command}
   content=${content//__STATUSLINE_SCRIPT__/$statusline_script}
   printf '%s\n' "$content" > "$path"
