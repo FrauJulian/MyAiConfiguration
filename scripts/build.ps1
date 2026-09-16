@@ -79,7 +79,7 @@ function Test-CodexSchema($configPath) {
     }
 }
 
-& (Join-Path $root 'shared/hooks/scripts/Test-SessionConfig.ps1') -RepositoryRoot $root
+& (Join-Path $root 'shared/hooks/scripts/Test-SessionConfig.ps1') -RepositoryRoot $root | Where-Object { -not $Summary -or $_ -ne 'PASS session configuration' }
 
 $sourceAgentDirs = @(Get-ChildItem (Join-Path $shared 'agents') -Directory | Sort-Object Name)
 if ($sourceAgentDirs.Count -eq 0) { throw 'No agents found under shared/agents.' }
@@ -119,7 +119,7 @@ Load rule files when their subject applies:
 - rules/git.md for Git operations.
 - rules/refactoring.md for refactoring work.
 - rules/definition-of-done.md when validating completion.
-- rules/decision-rule.md when requirements, behavior, or technical choices need to be evaluated.
+- rules/decision-rule.md when requirements are unresolved, behavior is ambiguous, or a meaningful technical choice remains.
 '@
 
 foreach ($platform in @('windows','linux')) {
@@ -132,12 +132,8 @@ foreach ($platform in @('windows','linux')) {
     Copy-Directory (Join-Path $shared 'hooks') (Join-Path $output "claude-$platform/hooks")
     Copy-Directory (Join-Path $shared 'statusline') (Join-Path $output "claude-$platform/statusline")
 
-    # Claude: general.md stays a plain, always-applied rule file. Every technology- or
-    # situation-specific rule becomes a skill instead, so only its name and description
-    # sit permanently in context; the full text loads only when the skill is invoked.
     $claudeRulesDir = Join-Path $output "claude-$platform/rules"
     New-Item $claudeRulesDir -ItemType Directory -Force | Out-Null
-    Copy-Item (Join-Path $shared 'rules/general.md') (Join-Path $claudeRulesDir 'general.md') -Force
 
     $claudeRuleSkillLines = @()
     foreach ($entry in $ruleSkillEntries) {
@@ -147,7 +143,7 @@ foreach ($platform in @('windows','linux')) {
         $skillDir = Join-Path $output "claude-$platform/skills/rules/$($entry.skill_name)"
         New-Item $skillDir -ItemType Directory -Force | Out-Null
         $ruleContent = Get-Content $ruleBodyPath -Raw
-        $skillBody = "---`r`nname: $($entry.skill_name)`r`ndescription: Use for $($entry.trigger).`r`n---`r`n`r`n$ruleContent"
+        $skillBody = "---`r`nname: $($entry.skill_name)`r`ndescription: $(Quote-Toml "Use for $($entry.trigger).")`r`n---`r`n`r`n$ruleContent"
         Set-Content (Join-Path $skillDir 'SKILL.md') $skillBody -Encoding UTF8
         if ($isDirectory) {
             $referencesSource = Join-Path $ruleSourcePath 'references'
@@ -155,7 +151,7 @@ foreach ($platform in @('windows','linux')) {
         }
         $claudeRuleSkillLines += "- $($entry.skill_name) for $($entry.trigger)."
     }
-    $claudeRuleLoading = "Always apply ``rules/general.md`` before starting any task, embedded below.`r`n`r`nDetect the languages, frameworks, tools, and change areas from the repository and the requested work. Invoke every matching rule skill before editing. Invoke all matching rule skills when multiple technologies apply.`r`n`r`nInvoke rule skills when their subject applies:`r`n`r`n" + ($claudeRuleSkillLines -join "`r`n")
+    $claudeRuleLoading = "General rules are embedded below.`r`n`r`nDetect the languages, frameworks, tools, and change areas from the repository and the requested work. Invoke every matching rule skill before editing. Invoke all matching rule skills when multiple technologies apply.`r`n`r`nInvoke rule skills when their subject applies:`r`n`r`n" + ($claudeRuleSkillLines -join "`r`n")
 
     $sharedTemplate = Get-Content (Join-Path $shared 'global-instructions.md') -Raw
     $generalContent = Get-Content (Join-Path $shared 'rules/general.md') -Raw
@@ -214,5 +210,5 @@ $leftoverPlaceholders = @(Get-ChildItem $output -File -Recurse | ForEach-Object 
 })
 if ($leftoverPlaceholders.Count) { throw "Unresolved template placeholders in: $($leftoverPlaceholders -join ', ')" }
 
-Write-Output 'PASS build: codex-windows, claude-windows, codex-linux, claude-linux'
+if ($Summary) { Write-Output 'Build: PASS | 4 packages' } else { Write-Output 'PASS build: codex-windows, claude-windows, codex-linux, claude-linux' }
 exit 0
