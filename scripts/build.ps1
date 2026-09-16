@@ -90,10 +90,11 @@ foreach ($agentDir in $sourceAgentDirs) {
     $agentNames += $name
 }
 
-# Codex keeps the original rule-loading text unchanged: every rule ships as a plain
-# file and AGENTS.md tells Codex to load the matching one by path.
+# Codex: general.md is embedded directly into AGENTS.md, the same way Claude embeds
+# it into CLAUDE.md, instead of only being referenced by path — guaranteed present
+# either way, and safe even if a subagent's AGENTS.md inheritance is not guaranteed.
 $codexRuleLoading = @'
-Always load and apply `rules/general.md` before starting any task.
+General rules are embedded below.
 
 When programming, always load and apply `rules/security.md`. This includes implementing, modifying, debugging, reviewing, testing, and configuring software, scripts, hooks, infrastructure, and integrations.
 
@@ -157,9 +158,12 @@ foreach ($platform in @('windows','linux')) {
     $claudeRuleLoading = "Always apply ``rules/general.md`` before starting any task, embedded below.`r`n`r`nDetect the languages, frameworks, tools, and change areas from the repository and the requested work. Invoke every matching rule skill before editing. Invoke all matching rule skills when multiple technologies apply.`r`n`r`nInvoke rule skills when their subject applies:`r`n`r`n" + ($claudeRuleSkillLines -join "`r`n")
 
     $sharedTemplate = Get-Content (Join-Path $shared 'global-instructions.md') -Raw
-    Set-Content (Join-Path $output "codex-$platform/AGENTS.md") ($sharedTemplate.Replace('__RULE_LOADING__', $codexRuleLoading)) -Encoding UTF8
-
     $generalContent = Get-Content (Join-Path $shared 'rules/general.md') -Raw
+
+    $agentsContent = $sharedTemplate.Replace('__RULE_LOADING__', $codexRuleLoading)
+    $agentsContent = $agentsContent.TrimEnd() + "`r`n`r`n---`r`n`r`n$generalContent"
+    Set-Content (Join-Path $output "codex-$platform/AGENTS.md") $agentsContent -Encoding UTF8
+
     $claudeContent = $sharedTemplate.Replace('__RULE_LOADING__', $claudeRuleLoading)
     $claudeContent = $claudeContent.TrimEnd() + "`r`n`r`n---`r`n`r`n$generalContent"
     Set-Content (Join-Path $output "claude-$platform/CLAUDE.md") $claudeContent -Encoding UTF8

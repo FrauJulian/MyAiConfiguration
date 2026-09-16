@@ -80,10 +80,11 @@ for agent_dir in "${agent_dirs[@]}"; do
   agent_seen[$name]=1
 done
 
-# Codex keeps the original rule-loading text unchanged: every rule ships as a plain
-# file and AGENTS.md tells Codex to load the matching one by path.
+# Codex: general.md is embedded directly into AGENTS.md, the same way Claude embeds
+# it into CLAUDE.md, instead of only being referenced by path — guaranteed present
+# either way, and safe even if a subagent's AGENTS.md inheritance is not guaranteed.
 read -r -d '' codex_rule_loading <<'BLOCK' || true
-Always load and apply `rules/general.md` before starting any task.
+General rules are embedded below.
 
 When programming, always load and apply `rules/security.md`. This includes implementing, modifying, debugging, reviewing, testing, and configuring software, scripts, hooks, infrastructure, and integrations.
 
@@ -152,10 +153,11 @@ Invoke rule skills when their subject applies:
 ${claude_rule_loading_list%$'\n'}"
 
 shared_template=$(<"$shared/global-instructions.md")
-agents_content=${shared_template//__RULE_LOADING__/$codex_rule_loading}
-printf '%s\n' "$agents_content" > "$output/codex-$platform/AGENTS.md"
-
 general_content=$(<"$shared/rules/general.md")
+
+agents_content=${shared_template//__RULE_LOADING__/$codex_rule_loading}
+printf '%s\n\n---\n\n%s\n' "${agents_content%$'\n'}" "$general_content" > "$output/codex-$platform/AGENTS.md"
+
 claude_content=${shared_template//__RULE_LOADING__/$claude_rule_loading}
 printf '%s\n\n---\n\n%s\n' "${claude_content%$'\n'}" "$general_content" > "$output/claude-$platform/CLAUDE.md"
 
