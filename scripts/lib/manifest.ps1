@@ -56,13 +56,15 @@ function Sync-ManagedDestination {
         [string]$AiConfigRoot,
         [string]$ShellCommand,
         [string]$WindowsShellCommand,
-        [switch]$DryRun
+        [switch]$DryRun,
+        [switch]$Summary
     )
     Write-Output "SOURCE $Source -> $Destination"
     $manifestPath = Get-ManagedManifestPath $Destination
     $oldManifest = Read-ManagedManifest $manifestPath
     $newManifest = @{}
     $backupRoot = Join-Path $Destination "backups/$Stamp"
+    $tally = @{ Created = 0; Updated = 0; Unchanged = 0; Removed = 0; Warned = 0 }
 
     Get-ChildItem $Source -File -Recurse | ForEach-Object {
         $relative = $_.FullName.Substring($Source.Length).TrimStart([char[]]@('\','/')).Replace('\','/')
@@ -79,38 +81,42 @@ function Sync-ManagedDestination {
         $newManifest[$relative] = $newHash
 
         $exists = Test-Path -LiteralPath $target
-        if ($exists -and (Get-Sha256Hash $target) -eq $newHash) { Write-Output "UNCHANGED $target"; return }
+        if ($exists -and (Get-Sha256Hash $target) -eq $newHash) { $tally.Unchanged++; if (-not $Summary) { Write-Output "UNCHANGED $target" }; return }
 
         $action = if ($exists) { 'UPDATE' } else { 'CREATE' }
-        if ($DryRun) { Write-Output "DRYRUN $action $target"; return }
+        if ($DryRun) { if (-not $Summary) { Write-Output "DRYRUN $action $target" }; if ($action -eq 'CREATE') { $tally.Created++ } else { $tally.Updated++ }; return }
         if ($exists) {
             $wasManaged = $oldManifest.ContainsKey($relative)
             $backup = Join-Path $backupRoot $relative
             New-Item (Split-Path $backup -Parent) -ItemType Directory -Force | Out-Null
             Copy-Item -LiteralPath $target $backup -Force
-            Write-Output "BACKUP $target -> $backup"
-            if (-not $wasManaged) { Write-Output "WARN $target existed before this installation but was not tracked by a previous run; it was backed up before being overwritten." }
+            if (-not $Summary) { Write-Output "BACKUP $target -> $backup" }
+            if (-not $wasManaged) { Write-Output "WARN $target existed before this installation but was not tracked by a previous run; it was backed up before being overwritten."; $tally.Warned++ }
         }
         New-Item (Split-Path $target -Parent) -ItemType Directory -Force | Out-Null
         [System.IO.File]::WriteAllBytes($target, $newBytes)
-        Write-Output "$action $target"
+        if (-not $Summary) { Write-Output "$action $target" }
+        if ($action -eq 'CREATE') { $tally.Created++ } else { $tally.Updated++ }
     }
 
     foreach ($relative in @($oldManifest.Keys | Where-Object { -not $newManifest.ContainsKey($_) })) {
         $target = Join-Path $Destination $relative
         if (-not (Test-Path -LiteralPath $target)) { continue }
-        if ($DryRun) { Write-Output "DRYRUN REMOVE $target"; continue }
+        if ($DryRun) { if (-not $Summary) { Write-Output "DRYRUN REMOVE $target" }; $tally.Removed++; continue }
         $backup = Join-Path $backupRoot $relative
         New-Item (Split-Path $backup -Parent) -ItemType Directory -Force | Out-Null
         Copy-Item -LiteralPath $target $backup -Force
-        Write-Output "BACKUP $target -> $backup"
+        if (-not $Summary) { Write-Output "BACKUP $target -> $backup" }
         if ((Get-Sha256Hash $target) -eq $oldManifest[$relative]) {
             Remove-Item -LiteralPath $target -Force
-            Write-Output "REMOVE $target"
+            if (-not $Summary) { Write-Output "REMOVE $target" }
+            $tally.Removed++
         } else {
             Write-Output "WARN $target was managed by a previous installation and has changed locally; it was backed up but left in place instead of being removed."
+            $tally.Warned++
         }
     }
 
     if (-not $DryRun) { Write-ManagedManifest $manifestPath $newManifest }
+    if ($Summary) { Write-Output ("SYNC {0}: {1} created, {2} updated, {3} unchanged, {4} removed, {5} warnings" -f $Destination, $tally.Created, $tally.Updated, $tally.Unchanged, $tally.Removed, $tally.Warned) }
 }

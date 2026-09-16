@@ -44,6 +44,10 @@ try {
     if (Compare-Object $beforeDry $afterDry) { throw 'A dry run must not change the destination at all.' }
     if (@($outDry | Where-Object { $_ -match 'DRYRUN REMOVE.*a\.md' }).Count -ne 1) { throw "Dry run should report the planned removal without performing it: $($outDry -join '; ')" }
 
+    $outSummary = @(Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'summary' -Summary)
+    if (@($outSummary | Where-Object { $_ -like 'CREATE*' -or $_ -like 'UPDATE*' -or $_ -like 'UNCHANGED*' -or $_ -like 'BACKUP*' }).Count -ne 0) { throw "Summary mode must not print per-file lines: $($outSummary -join '; ')" }
+    if (@($outSummary | Where-Object { $_ -match '^SYNC .* unchanged' }).Count -ne 1) { throw "Summary mode must print exactly one SYNC tally line: $($outSummary -join '; ')" }
+
     Write-Output 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free'
 } finally {
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue

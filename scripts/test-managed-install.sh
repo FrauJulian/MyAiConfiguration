@@ -44,4 +44,14 @@ after_dry=$(find "$destination" -type f | sort)
 [ "$before_dry" = "$after_dry" ] || { printf 'A dry run must not change the destination at all.\n' >&2; exit 1; }
 printf '%s\n' "$out_dry" | grep -q '^DRYRUN REMOVE .*a\.md$' || { printf 'Dry run should report the planned removal without performing it:\n%s\n' "$out_dry" >&2; exit 1; }
 
+out_summary=$(sync_managed_destination "$source_dir" "$destination" "summary" "" "" "" false true)
+if printf '%s\n' "$out_summary" | grep -Eq '^(CREATE|UPDATE|UNCHANGED|BACKUP) '; then
+  printf 'Summary mode must not print per-file lines: %s\n' "$out_summary" >&2
+  exit 1
+fi
+if [ "$(printf '%s\n' "$out_summary" | grep -c '^SYNC .* unchanged')" -ne 1 ]; then
+  printf 'Summary mode must print exactly one SYNC tally line: %s\n' "$out_summary" >&2
+  exit 1
+fi
+
 printf 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free\n'

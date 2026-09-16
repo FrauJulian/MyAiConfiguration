@@ -49,9 +49,9 @@ write_managed_manifest() {
   } > "$path"
 }
 
-# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <windows-shell-command> <dry-run: true|false>
+# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <windows-shell-command> <dry-run: true|false> [summary: true|false]
 sync_managed_destination() {
-  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 windows_shell_command=$6 dry_run=$7
+  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 windows_shell_command=$6 dry_run=$7 summary=${8:-false}
   printf 'SOURCE %s -> %s\n' "$source" "$destination"
   local manifest
   manifest=$(manifest_path "$destination")
@@ -59,6 +59,7 @@ sync_managed_destination() {
   read_managed_manifest "$manifest" old_manifest
   declare -A new_manifest
   local backup_root="$destination/backups/$stamp"
+  local created=0 updated=0 unchanged=0 removed=0 warned=0
 
   while IFS= read -r -d '' source_file; do
     local relative target content needs_sub new_hash exists current_hash action backup
@@ -84,7 +85,8 @@ sync_managed_destination() {
     if [ "$exists" = true ]; then
       current_hash=$(sha256_of_file "$target")
       if [ "$current_hash" = "$new_hash" ]; then
-        printf 'UNCHANGED %s\n' "$target"
+        unchanged=$((unchanged + 1))
+        [ "$summary" = true ] || printf 'UNCHANGED %s\n' "$target"
         continue
       fi
       action=UPDATE
@@ -92,15 +94,20 @@ sync_managed_destination() {
       action=CREATE
     fi
 
-    if [ "$dry_run" = true ]; then printf 'DRYRUN %s %s\n' "$action" "$target"; continue; fi
+    if [ "$dry_run" = true ]; then
+      [ "$summary" = true ] || printf 'DRYRUN %s %s\n' "$action" "$target"
+      [ "$action" = CREATE ] && created=$((created + 1)) || updated=$((updated + 1))
+      continue
+    fi
 
     if [ "$exists" = true ]; then
       backup="$backup_root/$relative"
       mkdir -p "$(dirname -- "$backup")"
       cp -- "$target" "$backup"
-      printf 'BACKUP %s -> %s\n' "$target" "$backup"
+      [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"
       if [ -z "${old_manifest[$relative]+x}" ]; then
         printf 'WARN %s existed before this installation but was not tracked by a previous run; it was backed up before being overwritten.\n' "$target"
+        warned=$((warned + 1))
       fi
     fi
     mkdir -p "$(dirname -- "$target")"
@@ -109,7 +116,8 @@ sync_managed_destination() {
     else
       cp -- "$source_file" "$target"
     fi
-    printf '%s %s\n' "$action" "$target"
+    [ "$summary" = true ] || printf '%s %s\n' "$action" "$target"
+    [ "$action" = CREATE ] && created=$((created + 1)) || updated=$((updated + 1))
   done < <(find "$source" -type f -print0)
 
   local relative target current_hash backup
@@ -117,19 +125,28 @@ sync_managed_destination() {
     [ -z "${new_manifest[$relative]+x}" ] || continue
     target="$destination/$relative"
     [ -f "$target" ] || continue
-    if [ "$dry_run" = true ]; then printf 'DRYRUN REMOVE %s\n' "$target"; continue; fi
+    if [ "$dry_run" = true ]; then
+      [ "$summary" = true ] || printf 'DRYRUN REMOVE %s\n' "$target"
+      removed=$((removed + 1))
+      continue
+    fi
     backup="$backup_root/$relative"
     mkdir -p "$(dirname -- "$backup")"
     cp -- "$target" "$backup"
-    printf 'BACKUP %s -> %s\n' "$target" "$backup"
+    [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"
     current_hash=$(sha256_of_file "$target")
     if [ "$current_hash" = "${old_manifest[$relative]}" ]; then
       rm -f -- "$target"
-      printf 'REMOVE %s\n' "$target"
+      [ "$summary" = true ] || printf 'REMOVE %s\n' "$target"
+      removed=$((removed + 1))
     else
       printf 'WARN %s was managed by a previous installation and has changed locally; it was backed up but left in place instead of being removed.\n' "$target"
+      warned=$((warned + 1))
     fi
   done
 
   if [ "$dry_run" != true ]; then write_managed_manifest "$manifest" new_manifest; fi
+  if [ "$summary" = true ]; then
+    printf 'SYNC %s: %s created, %s updated, %s unchanged, %s removed, %s warnings\n' "$destination" "$created" "$updated" "$unchanged" "$removed" "$warned"
+  fi
 }
