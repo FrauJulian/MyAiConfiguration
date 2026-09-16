@@ -17,20 +17,29 @@ jobs:
       - name: Bash syntax
         run: find scripts shared/hooks -name '*.sh' -print0 | xargs -0 -n1 bash -n
       - name: Build
-        run: REQUIRE_CODEX_SCHEMA=true ./scripts/build.sh
+        run: REQUIRE_CODEX_SCHEMA=true ./scripts/build.sh --summary
       - name: Doctor
-        run: ./scripts/doctor.sh
+        run: ./scripts/doctor.sh --summary
       - name: Platform package tests
-        run: ./scripts/test-platform-packages.sh
+        run: ./scripts/test-platform-packages.sh --summary
       - name: Managed manifest tests
-        run: ./scripts/test-managed-install.sh
+        run: ./scripts/test-managed-install.sh --summary
       - name: Build validation tests
-        run: ./scripts/test-build-validation.sh
+        run: ./scripts/test-build-validation.sh --summary
+      - name: Install guard tests
+        run: ./scripts/test-install-guards.sh --summary
+      - name: Plugin selection tests
+        run: ./scripts/test-plugin-selection.sh --summary
       - name: Install dry run
         run: |
           export HOME="$RUNNER_TEMP/isolated-home"
           mkdir -p "$HOME"
-          ./scripts/install.sh --dry-run --client both --platform linux
+          ./scripts/install.sh --summary --dry-run --client both --platform linux
+      - name: Update dry run
+        run: |
+          export HOME="$RUNNER_TEMP/isolated-home"
+          mkdir -p "$HOME"
+          ./scripts/update.sh --summary --dry-run --client both --platform linux
 
 #  windows:
 #    runs-on: windows-latest
@@ -65,6 +74,15 @@ jobs:
 #      - name: Build validation tests
 #        shell: powershell
 #        run: .\scripts\test-build-validation.ps1
+#      - name: Install guard tests
+#        shell: powershell
+#        run: .\scripts\test-install-guards.ps1
+#      - name: Plugin selection tests
+#        shell: powershell
+#        run: .\scripts\test-plugin-selection.ps1
 #      - name: Install dry run
 #        shell: powershell
 #        run: .\scripts\install.ps1 -DryRun -Client Both -Platform Windows
+#      - name: Update dry run
+#        shell: powershell
+#        run: .\scripts\update.ps1 -DryRun -Client Both -Platform Windows
