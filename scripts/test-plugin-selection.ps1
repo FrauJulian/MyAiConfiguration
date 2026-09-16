@@ -36,6 +36,14 @@ catch { $failed = $true }
 $env:AI_CONFIG_VERBOSE = $null
 if (-not $failed -or $diagnostics -notcontains 'download progress' -or $diagnostics -notcontains 'WARN test warning') { throw 'Plugin failure must retain full diagnostics and fail.' }
 $global:LASTEXITCODE = 0
+function codex { '{"installed":[{"pluginId":"ponytail@ponytail"},{"pluginId":"i-have-adhd@i-have-adhd"},{"pluginId":"superpowers@openai-curated-remote"},{"pluginId":"context7@context7-marketplace"},{"pluginId":"caveman@thinkhome-caveman"}],"available":[]}' }
+$script:answers.Enqueue('done')
+$selection = Select-ConfiguredPlugins -RepositoryRoot (Split-Path $PSScriptRoot -Parent) -Client Codex -Mode Update
+if ($selection.Deselected.Count -ne 0 -or $selection.Selected.Count -ne 8) { throw 'All installed Codex plugins must start checked when updating.' }
+$script:answers.Enqueue('4')
+$script:answers.Enqueue('done')
+$selection = Select-ConfiguredPlugins -RepositoryRoot (Split-Path $PSScriptRoot -Parent) -Client Codex -Mode Update
+if ($selection.Deselected.Count -ne 1 -or $selection.Deselected[0].name -ne 'Context7') { throw 'Only the explicitly unchecked installed plugin must be deselected.' }
 function Get-InstalledPlugins { [pscustomobject]@{ pluginId = 'test@market' } }
 $script:commands = @()
 function Invoke-PluginCommand { param($Command, $Arguments, [switch]$DryRun, [switch]$Summary) $script:commands += "$Command $($Arguments -join ' ')" }
