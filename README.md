@@ -25,9 +25,11 @@ into platform-specific packages that can be inspected before they are installed.
   or deleting them.
 - Dry-run support (no writes, no backups, no plugin changes) and timestamped, per-run backup directories.
 - Shared safety, notification, validation, and status-line hooks.
-- User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, Humanizer, Impeccable,
-  and Anthropic Frontend Design; updates only with
-  `-UpdatePlugins`/`--update-plugins`.
+- Separate install and update scripts: install refuses to run against an already-installed destination, update refuses
+  to run against one that is not installed yet.
+- User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, Humanizer, Impeccable, and
+  Anthropic Frontend Design, with an interactive per-plugin toggle during both install and update; update pre-checks
+  plugins that are already installed, so unchecking one uninstalls it and checking one installs or updates it.
 
 ## Architecture
 
@@ -40,7 +42,7 @@ shared definitions -> client adapters -> generated packages -> user installation
 | `shared/` | Client-independent rules, agents, skills, hooks, status lines, and global instructions. |
 | `adapters/` | Codex and Claude Code formats, settings, templates, and the plugin manifest. |
 | `generated/` | Reproducible Windows and Linux packages. This directory is ignored by Git. |
-| `scripts/` | Build, installation, diagnosis, and platform validation entry points. |
+| `scripts/` | Build, installation, update, diagnosis, and platform validation entry points. |
 | `docs/` | Focused documentation about the configuration design. |
 
 The build creates:
@@ -82,9 +84,10 @@ Every repository change must pass the build before completion. Building only wri
 
 ## Installation
 
-The installer runs a fresh build and then asks for the target platform and client, unless they are passed as
-parameters. Selecting Linux or Windows chooses the generated package format; installation always targets the current
-user's home directory.
+The installer asks for the target platform and client, unless they are passed as parameters, then refuses to continue
+if any selected destination is already installed (`Already installed, use the update script.`). Selecting Linux or
+Windows chooses the generated package format; installation always targets the current user's home directory. This
+check is skipped for a dry run, so previewing always works regardless of prior install state.
 
 Preview an installation without changing user files, backups, or plugins:
 
@@ -131,11 +134,30 @@ and left in place with a warning instead. A file the installer never tracked is 
 same name is now part of the package. Backups land in a single timestamped directory per run under
 `backups/<timestamp>/` inside each destination.
 
-Selecting Codex also installs shared skills to `.agents/skills`. A normal installation only installs plugins that are
-missing; add `-UpdatePlugins`/`--update-plugins` to also update and enable plugins that are already installed.
+Selecting Codex also installs shared skills to `.agents/skills`. Before plugins are installed, an interactive list lets
+you toggle each configured plugin on or off (all checked by default); unchecked plugins are skipped. This step is also
+skipped for a dry run.
 
-Run the same installation command whenever the repository configuration should be updated. There is no separate update
-script.
+## Update
+
+Once a destination is installed, use the update script (not the installer) to refresh its files and plugins. It refuses
+to continue if any selected destination is not installed yet (`Not installed, use the install script.`), also skipped
+for a dry run.
+
+Powershell: (Windows)
+```powershell
+.\scripts\update.ps1
+```
+
+Bash: (Linux)
+```bash
+./scripts/update.sh
+```
+
+It accepts the same `-DryRun`/`--dry-run`, `-Client`/`--client`, and `-Platform`/`--platform` parameters as the
+installer, re-syncs every managed file the same way, and shows the same plugin toggle list — but pre-checks plugins
+that are already installed. Checking a plugin that is not installed installs it; checking one that is installed
+updates it; unchecking an installed plugin uninstalls it.
 
 ## Doctor
 
@@ -151,7 +173,8 @@ Bash: (Linux)
 ./scripts/doctor.sh
 ```
 
-The doctor reports concise `PASS`, `WARN`, and `FAIL` results without reading or printing credentials.
+Use `-Summary` (PowerShell) or `--summary` (Bash) with build, doctor, install, update, and test scripts for compact output.
+Omit the flag for detailed output. Warnings and failure diagnostics remain visible in both modes.
 
 ## Configuration
 
@@ -159,8 +182,8 @@ Codex receives global instructions, rules, skills, agent TOML files, hooks, and 
 workspace-scoped and use automatic review for eligible escalation requests. Every rule ships as a plain file under
 `rules/`, and `AGENTS.md` tells Codex to load the matching one by path.
 
-Claude Code receives the equivalent global instructions, agents, hooks, and `settings.json`. Only `general.md` ships as
-an always-applied rule file (its content is also embedded directly in `CLAUDE.md`); every technology- or
+Claude Code receives the equivalent global instructions, agents, hooks, and `settings.json`. General rules are embedded
+once in `CLAUDE.md` (and in Codex's `AGENTS.md`); every technology- or
 situation-specific rule (`adapters/claude/rule-skills.tsv`) is generated as a skill under `skills/rules/` instead, so
 only its name and description are permanently visible and the full rule text loads only when Claude invokes it. Its
 generated settings use the supported automatic permission mode where available.
