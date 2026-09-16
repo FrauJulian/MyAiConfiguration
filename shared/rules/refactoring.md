@@ -94,9 +94,9 @@
 
 After a refactoring:
 
-* Build the affected project or solution.
-* Run relevant tests.
-* Check for new warnings.
+* Choose verification using `general.md`'s Verification rules, based on the affected behavior and callers.
+* Build or run tests when they add needed confidence; a full solution build or test suite is not automatic.
+* Investigate new warnings from the selected checks.
 * Verify affected code paths.
 * Review the diff for accidental behavior changes.
 * Check that unrelated files were not modified unnecessarily.
