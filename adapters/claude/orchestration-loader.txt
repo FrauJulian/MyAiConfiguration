@@ -1,0 +1,1 @@
+Read skills/rules/rules-orchestration/SKILL.md from your installed configuration before acting as a subagent.

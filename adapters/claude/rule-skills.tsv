@@ -5,6 +5,7 @@ decision-rule.md	rules-decision-rule	unresolved requirements, ambiguous behavior
 definition-of-done.md	rules-definition-of-done	validating that a task is complete or ready for review
 git.md	rules-git	Git operations such as commits, branches, or merges
 microsoft.md	rules-microsoft	Microsoft 365, Azure DevOps, or Teams operations
+orchestration.md	rules-orchestration	delegation, subagent work, or long-running task state
 refactoring.md	rules-refactoring	refactoring existing code without changing behavior
 security.md	rules-security	any software development task: implementing, modifying, debugging, reviewing, testing, or configuring code, scripts, hooks, or infrastructure
 security-auth.md	rules-security-auth	authentication, authorization, sessions, tokens, permissions, or tenant-boundary work

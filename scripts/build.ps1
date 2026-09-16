@@ -116,23 +116,24 @@ Load rule files when their subject applies:
 - rules/wpf/index.md for WPF work.
 - rules/ui-ux/index.md for UI or UX decisions.
 - rules/microsoft.md for Microsoft 365, Azure DevOps, or Teams work.
+- rules/orchestration.md for delegation, subagent work, or long-running task state.
 - rules/git.md for Git operations.
 - rules/refactoring.md for refactoring work.
 - rules/definition-of-done.md when validating completion.
 - rules/decision-rule.md when requirements are unresolved, behavior is ambiguous, or a meaningful technical choice remains.
 '@
 
-foreach ($platform in @('windows','linux')) {
-    New-Item (Join-Path $output "codex-$platform") -ItemType Directory -Force | Out-Null
-    New-Item (Join-Path $output "claude-$platform") -ItemType Directory -Force | Out-Null
-    Copy-Directory (Join-Path $shared 'skills') (Join-Path $output "codex-$platform/skills")
-    Copy-Directory (Join-Path $shared 'skills') (Join-Path $output "claude-$platform/skills")
-    Copy-Directory (Join-Path $shared 'rules') (Join-Path $output "codex-$platform/rules")
-    Copy-Directory (Join-Path $shared 'hooks') (Join-Path $output "codex-$platform/hooks")
-    Copy-Directory (Join-Path $shared 'hooks') (Join-Path $output "claude-$platform/hooks")
-    Copy-Directory (Join-Path $shared 'statusline') (Join-Path $output "claude-$platform/statusline")
+foreach ($shell in @('powershell','bash')) {
+    New-Item (Join-Path $output "codex-$shell") -ItemType Directory -Force | Out-Null
+    New-Item (Join-Path $output "claude-$shell") -ItemType Directory -Force | Out-Null
+    Copy-Directory (Join-Path $shared 'skills') (Join-Path $output "codex-$shell/skills")
+    Copy-Directory (Join-Path $shared 'skills') (Join-Path $output "claude-$shell/skills")
+    Copy-Directory (Join-Path $shared 'rules') (Join-Path $output "codex-$shell/rules")
+    Copy-Directory (Join-Path $shared 'hooks') (Join-Path $output "codex-$shell/hooks")
+    Copy-Directory (Join-Path $shared 'hooks') (Join-Path $output "claude-$shell/hooks")
+    Copy-Directory (Join-Path $shared 'statusline') (Join-Path $output "claude-$shell/statusline")
 
-    $claudeRulesDir = Join-Path $output "claude-$platform/rules"
+    $claudeRulesDir = Join-Path $output "claude-$shell/rules"
     New-Item $claudeRulesDir -ItemType Directory -Force | Out-Null
 
     $claudeRuleSkillLines = @()
@@ -140,7 +141,7 @@ foreach ($platform in @('windows','linux')) {
         $ruleSourcePath = Join-Path $shared "rules/$($entry.rule_file)"
         $isDirectory = Test-Path -LiteralPath $ruleSourcePath -PathType Container
         $ruleBodyPath = if ($isDirectory) { Join-Path $ruleSourcePath 'index.md' } else { $ruleSourcePath }
-        $skillDir = Join-Path $output "claude-$platform/skills/rules/$($entry.skill_name)"
+        $skillDir = Join-Path $output "claude-$shell/skills/rules/$($entry.skill_name)"
         New-Item $skillDir -ItemType Directory -Force | Out-Null
         $ruleContent = Get-Content $ruleBodyPath -Raw
         $skillBody = "---`r`nname: $($entry.skill_name)`r`ndescription: $(Quote-Toml "Use for $($entry.trigger).")`r`n---`r`n`r`n$ruleContent"
@@ -158,23 +159,24 @@ foreach ($platform in @('windows','linux')) {
 
     $agentsContent = $sharedTemplate.Replace('__RULE_LOADING__', $codexRuleLoading)
     $agentsContent = $agentsContent.TrimEnd() + "`r`n`r`n---`r`n`r`n$generalContent"
-    Set-Content (Join-Path $output "codex-$platform/AGENTS.md") $agentsContent -Encoding UTF8
+    Set-Content (Join-Path $output "codex-$shell/AGENTS.md") $agentsContent -Encoding UTF8
 
     $claudeContent = $sharedTemplate.Replace('__RULE_LOADING__', $claudeRuleLoading)
     $claudeContent = $claudeContent.TrimEnd() + "`r`n`r`n---`r`n`r`n$generalContent"
-    Set-Content (Join-Path $output "claude-$platform/CLAUDE.md") $claudeContent -Encoding UTF8
+    Set-Content (Join-Path $output "claude-$shell/CLAUDE.md") $claudeContent -Encoding UTF8
 
-    Copy-Item (Join-Path $root 'adapters/codex/config/config.toml') (Join-Path $output "codex-$platform/config.toml") -Force
-    Copy-Item (Join-Path $root 'adapters/claude/config/settings.json') (Join-Path $output "claude-$platform/settings.json") -Force
+    Copy-Item (Join-Path $root 'adapters/codex/config/config.toml') (Join-Path $output "codex-$shell/config.toml") -Force
+    Copy-Item (Join-Path $root 'adapters/claude/config/settings.json') (Join-Path $output "claude-$shell/settings.json") -Force
 
     foreach ($client in @('codex','claude')) {
-        $agentsOutput = Join-Path $output "$client-$platform/agents"
+        $agentsOutput = Join-Path $output "$client-$shell/agents"
         New-Item $agentsOutput -ItemType Directory -Force | Out-Null
         foreach ($agentDir in $sourceAgentDirs) {
             $metadata = Join-Path $agentDir.FullName 'agent.yml'
             $name = Read-Field $metadata 'name'
             $description = Read-Field $metadata 'description'
-            $instructions = Get-Content (Join-Path $agentDir.FullName 'instructions.md') -Raw
+            $loader = (Get-Content (Join-Path $root "adapters/$client/orchestration-loader.txt") -Raw -Encoding UTF8).Trim()
+            $instructions = $loader + "`n`n" + (Get-Content (Join-Path $agentDir.FullName 'instructions.md') -Raw -Encoding UTF8)
             if ($client -eq 'codex') {
                 Set-Content (Join-Path $agentsOutput "$name.toml") "name = $(Quote-Toml $name)`r`ndescription = $(Quote-Toml $description)`r`ndeveloper_instructions = $(Quote-Toml $instructions)" -Encoding UTF8
             } else {
@@ -185,21 +187,21 @@ foreach ($platform in @('windows','linux')) {
 
     foreach ($client in @('codex','claude')) {
         $file = if ($client -eq 'codex') { 'config.toml' } else { 'settings.json' }
-        $path = Join-Path $output "$client-$platform/$file"
-        $command = if ($platform -eq 'windows') { 'powershell -NoProfile -ExecutionPolicy Bypass -File' } else { 'bash' }
-        $script = if ($platform -eq 'windows') { 'flashbang.ps1' } else { 'flashbang.sh' }
-        $statusLineScript = if ($platform -eq 'windows') { 'statusline.ps1' } else { 'statusline.sh' }
+        $path = Join-Path $output "$client-$shell/$file"
+        $command = if ($shell -eq 'powershell') { '__POWERSHELL_COMMAND__' } else { 'bash' }
+        $script = if ($shell -eq 'powershell') { 'flashbang.ps1' } else { 'flashbang.sh' }
+        $statusLineScript = if ($shell -eq 'powershell') { 'statusline.ps1' } else { 'statusline.sh' }
         $content = Get-Content -LiteralPath $path -Raw
-        $compactScript = if ($platform -eq 'windows') { 'Record-Compact.ps1' } else { 'record-compact.sh' }
-        $pointerScript = if ($platform -eq 'windows') { 'Show-SessionStatePointer.ps1' } else { 'show-session-state-pointer.sh' }
-        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__WINDOWS_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__WINDOWS_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript)
+        $compactScript = if ($shell -eq 'powershell') { 'Record-Compact.ps1' } else { 'record-compact.sh' }
+        $pointerScript = if ($shell -eq 'powershell') { 'Show-SessionStatePointer.ps1' } else { 'show-session-state-pointer.sh' }
+        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__POWERSHELL_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__POWERSHELL_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript)
         Set-Content -LiteralPath $path -Value $content -Encoding UTF8
     }
 
-    $tomlPath = Join-Path $output "codex-$platform/config.toml"
-    $settingsPath = Join-Path $output "claude-$platform/settings.json"
+    $tomlPath = Join-Path $output "codex-$shell/config.toml"
+    $settingsPath = Join-Path $output "claude-$shell/settings.json"
     & python (Join-Path $root 'scripts/validate-config.py') $tomlPath $settingsPath
-    if ($LASTEXITCODE -ne 0) { throw "Generated configuration validation failed for $platform." }
+    if ($LASTEXITCODE -ne 0) { throw "Generated configuration validation failed for $shell." }
     Test-CodexSchema $tomlPath
 }
 
@@ -207,10 +209,10 @@ $leftoverPlaceholders = @(Get-ChildItem $output -File -Recurse | ForEach-Object 
     # __AI_CONFIG_ROOT__ is resolved at install time, once the destination is known; it is
     # expected to remain in generated output. -cmatch keeps this case-sensitive so Python
     # dunder names (__main__, __name__) in flashbang.sh are not mistaken for placeholders.
-    $content = (Get-Content -LiteralPath $_.FullName -Raw) -replace '__AI_CONFIG_ROOT__', ''
+    $content = (Get-Content -LiteralPath $_.FullName -Raw) -replace '__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__', ''
     if ($content -cmatch '__[A-Z0-9_]+__') { $_.FullName }
 })
 if ($leftoverPlaceholders.Count) { throw "Unresolved template placeholders in: $($leftoverPlaceholders -join ', ')" }
 
-if ($Summary) { Write-Output 'Build: PASS | 4 packages' } else { Write-Output 'PASS build: codex-windows, claude-windows, codex-linux, claude-linux' }
+if ($Summary) { Write-Output 'Build: PASS | 4 packages' } else { Write-Output 'PASS build: codex-powershell, claude-powershell, codex-bash, claude-bash' }
 exit 0

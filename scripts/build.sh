@@ -112,22 +112,23 @@ Load rule files when their subject applies:
 - rules/wpf/index.md for WPF work.
 - rules/ui-ux/index.md for UI or UX decisions.
 - rules/microsoft.md for Microsoft 365, Azure DevOps, or Teams work.
+- rules/orchestration.md for delegation, subagent work, or long-running task state.
 - rules/git.md for Git operations.
 - rules/refactoring.md for refactoring work.
 - rules/definition-of-done.md when validating completion.
 - rules/decision-rule.md when requirements are unresolved, behavior is ambiguous, or a meaningful technical choice remains.
 BLOCK
 
-for platform in windows linux; do
-mkdir -p "$output/codex-$platform" "$output/claude-$platform"
-copy_directory "$shared/skills" "$output/codex-$platform/skills"
-copy_directory "$shared/skills" "$output/claude-$platform/skills"
-copy_directory "$shared/rules" "$output/codex-$platform/rules"
-copy_directory "$shared/hooks" "$output/codex-$platform/hooks"
-copy_directory "$shared/hooks" "$output/claude-$platform/hooks"
-copy_directory "$shared/statusline" "$output/claude-$platform/statusline"
+for shell in powershell bash; do
+mkdir -p "$output/codex-$shell" "$output/claude-$shell"
+copy_directory "$shared/skills" "$output/codex-$shell/skills"
+copy_directory "$shared/skills" "$output/claude-$shell/skills"
+copy_directory "$shared/rules" "$output/codex-$shell/rules"
+copy_directory "$shared/hooks" "$output/codex-$shell/hooks"
+copy_directory "$shared/hooks" "$output/claude-$shell/hooks"
+copy_directory "$shared/statusline" "$output/claude-$shell/statusline"
 
-mkdir -p "$output/claude-$platform/rules"
+mkdir -p "$output/claude-$shell/rules"
 
 claude_rule_loading_list=""
 for i in "${!rule_skill_names[@]}"; do
@@ -137,7 +138,7 @@ for i in "${!rule_skill_names[@]}"; do
   rule_source="$shared/rules/$rule_file"
   rule_body="$rule_source"
   [ -d "$rule_source" ] && rule_body="$rule_source/index.md"
-  skill_dir="$output/claude-$platform/skills/rules/$skill_name"
+  skill_dir="$output/claude-$shell/skills/rules/$skill_name"
   mkdir -p "$skill_dir"
   { printf -- '---\nname: %s\ndescription: %s\n---\n\n' "$skill_name" "$(quote_toml "Use for $trigger.")"; cat "$rule_body"; } > "$skill_dir/SKILL.md"
   if [ -d "$rule_source/references" ]; then
@@ -158,22 +159,22 @@ shared_template=$(<"$shared/global-instructions.md")
 general_content=$(<"$shared/rules/general.md")
 
 agents_content=${shared_template//__RULE_LOADING__/$codex_rule_loading}
-printf '%s\n\n---\n\n%s\n' "${agents_content%$'\n'}" "$general_content" > "$output/codex-$platform/AGENTS.md"
+printf '%s\n\n---\n\n%s\n' "${agents_content%$'\n'}" "$general_content" > "$output/codex-$shell/AGENTS.md"
 
 claude_content=${shared_template//__RULE_LOADING__/$claude_rule_loading}
-printf '%s\n\n---\n\n%s\n' "${claude_content%$'\n'}" "$general_content" > "$output/claude-$platform/CLAUDE.md"
+printf '%s\n\n---\n\n%s\n' "${claude_content%$'\n'}" "$general_content" > "$output/claude-$shell/CLAUDE.md"
 
-cp "$root/adapters/codex/config/config.toml" "$output/codex-$platform/config.toml"
-cp "$root/adapters/claude/config/settings.json" "$output/claude-$platform/settings.json"
+cp "$root/adapters/codex/config/config.toml" "$output/codex-$shell/config.toml"
+cp "$root/adapters/claude/config/settings.json" "$output/claude-$shell/settings.json"
 
 for client in codex claude; do
-  agents_output="$output/$client-$platform/agents"
+  agents_output="$output/$client-$shell/agents"
   mkdir -p "$agents_output"
   for agent_dir in "${agent_dirs[@]}"; do
     metadata="${agent_dir}agent.yml"
     name=$(read_field "$metadata" name)
     description=$(read_field "$metadata" description)
-    instructions=$(<"${agent_dir}instructions.md")
+    instructions=$(<"$root/adapters/$client/orchestration-loader.txt")$'\n\n'$(<"${agent_dir}instructions.md")
     if [ "$client" = codex ]; then
       printf 'name = %s\ndescription = %s\ndeveloper_instructions = %s\n' "$(quote_toml "$name")" "$(quote_toml "$description")" "$(quote_toml "$instructions")" > "$agents_output/$name.toml"
     else
@@ -190,19 +191,19 @@ for client in codex claude; do
   statusline_script=statusline.sh
   compact_script=record-compact.sh
   pointer_script=show-session-state-pointer.sh
-  if [ "$platform" = windows ]; then
-    command='powershell -NoProfile -ExecutionPolicy Bypass -File'
+  if [ "$shell" = powershell ]; then
+    command='__POWERSHELL_COMMAND__'
     script=flashbang.ps1
     statusline_script=statusline.ps1
     compact_script=Record-Compact.ps1
     pointer_script=Show-SessionStatePointer.ps1
   fi
-  path="$output/$client-$platform/$file"
+  path="$output/$client-$shell/$file"
   content=$(<"$path")
   content=${content//__HOOK_COMMAND__/$command}
-  content=${content//__WINDOWS_HOOK_COMMAND__/$command}
+  content=${content//__POWERSHELL_HOOK_COMMAND__/$command}
   content=${content//__HOOK_SCRIPT__/$script}
-  content=${content//__WINDOWS_HOOK_SCRIPT__/$script}
+  content=${content//__POWERSHELL_HOOK_SCRIPT__/$script}
   content=${content//__COMPACT_SCRIPT__/$compact_script}
   content=${content//__SESSION_POINTER_SCRIPT__/$pointer_script}
   content=${content//__STATUSLINE_COMMAND__/$command}
@@ -210,8 +211,8 @@ for client in codex claude; do
   printf '%s\n' "$content" > "$path"
 done
 
-toml_path="$output/codex-$platform/config.toml"
-settings_path="$output/claude-$platform/settings.json"
+toml_path="$output/codex-$shell/config.toml"
+settings_path="$output/claude-$shell/settings.json"
 python3 "$root/scripts/validate-config.py" "$toml_path" "$settings_path"
 if command -v codex >/dev/null; then
   schema_home=$(mktemp -d)
@@ -229,11 +230,11 @@ done
 # __AI_CONFIG_ROOT__ is resolved at install time, once the destination is known; it is
 # expected to remain in generated output, so it is excluded from the leftover check. A
 # single tree-wide grep (rather than one process per file) keeps this fast.
-leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$output" 2>/dev/null | sort -u | grep -v '^__AI_CONFIG_ROOT__$' || true)
+leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$output" 2>/dev/null | sort -u | grep -Ev '^(__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__)$' || true)
 if [ -n "$leftover_tokens" ]; then
   offending_files=$(grep -RlE '__[A-Z0-9_]+__' "$output" 2>/dev/null | tr '\n' ' ')
   printf 'Unresolved template placeholders (%s) in: %s\n' "$(printf '%s' "$leftover_tokens" | tr '\n' ' ')" "$offending_files" >&2
   exit 1
 fi
 
-if [ "$summary" = true ]; then printf 'Build: PASS | 4 packages\n'; else printf 'PASS build: codex-windows, claude-windows, codex-linux, claude-linux\n'; fi
+if [ "$summary" = true ]; then printf 'Build: PASS | 4 packages\n'; else printf 'PASS build: codex-powershell, claude-powershell, codex-bash, claude-bash\n'; fi
