@@ -29,7 +29,7 @@ result() {
 for tool in codex claude; do
   if command -v "$tool" >/dev/null; then result PASS "$tool available ($($tool --version 2>&1 | head -n 1))"; else result WARN "$tool unavailable"; fi
 done
-command -v jq >/dev/null && result PASS 'jq available for Claude status line' || result WARN 'jq unavailable; Claude status line is disabled'
+command -v jq >/dev/null && result PASS 'jq available for Claude Bash status line' || result WARN 'jq unavailable; Claude Bash status line is disabled'
 
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md 2>/dev/null | wc -l)
@@ -37,20 +37,20 @@ rule_skill_manifest="$root/adapters/claude/rule-skills.tsv"
 rule_skill_count=0
 [ -f "$rule_skill_manifest" ] && rule_skill_count=$(($(wc -l < "$rule_skill_manifest") - 1))
 
-for platform in windows linux; do
-  [ -f "$root/generated/codex-$platform/AGENTS.md" ] && result PASS "generated output present ($platform)" || result FAIL "generated output missing ($platform); run build"
-  [ -f "$root/generated/codex-$platform/hooks/scripts/Validate-CommandSafety.ps1" ] && [ -f "$root/generated/codex-$platform/hooks/scripts/validate-command-safety.sh" ] && [ -f "$root/generated/claude-$platform/hooks/scripts/Validate-CommandSafety.ps1" ] && [ -f "$root/generated/claude-$platform/hooks/scripts/validate-command-safety.sh" ] && result PASS "generated hooks present ($platform)" || result FAIL "generated hooks missing ($platform); run build"
+for shell in powershell bash; do
+  [ -f "$root/generated/codex-$shell/AGENTS.md" ] && result PASS "generated output present ($shell)" || result FAIL "generated output missing ($shell); run build"
+  [ -f "$root/generated/codex-$shell/hooks/scripts/Validate-CommandSafety.ps1" ] && [ -f "$root/generated/codex-$shell/hooks/scripts/validate-command-safety.sh" ] && [ -f "$root/generated/claude-$shell/hooks/scripts/Validate-CommandSafety.ps1" ] && [ -f "$root/generated/claude-$shell/hooks/scripts/validate-command-safety.sh" ] && result PASS "generated hooks present ($shell)" || result FAIL "generated hooks missing ($shell); run build"
   for client in codex claude; do
-    package="$root/generated/$client-$platform"
+    package="$root/generated/$client-$shell"
     [ -d "$package" ] || continue
     agent_count=$(find "$package/agents" -type f 2>/dev/null | wc -l)
-    if [ "$agent_count" -eq "$source_agent_count" ]; then result PASS "$client-$platform agent count matches source ($agent_count)"; else result FAIL "$client-$platform agent count $agent_count does not match source ($source_agent_count)"; fi
+    if [ "$agent_count" -eq "$source_agent_count" ]; then result PASS "$client-$shell agent count matches source ($agent_count)"; else result FAIL "$client-$shell agent count $agent_count does not match source ($source_agent_count)"; fi
     expected_skill_count=$source_skill_count
     [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
     skill_count=$(find "$package/skills" -name SKILL.md 2>/dev/null | wc -l)
-    if [ "$skill_count" -eq "$expected_skill_count" ]; then result PASS "$client-$platform skill count matches source ($skill_count)"; else result FAIL "$client-$platform skill count $skill_count does not match source ($expected_skill_count)"; fi
-    leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$package" 2>/dev/null | sort -u | grep -v '^__AI_CONFIG_ROOT__$' || true)
-    if [ -n "$leftover_tokens" ]; then result FAIL "$client-$platform has unresolved placeholders"; else result PASS "$client-$platform has no unresolved placeholders"; fi
+    if [ "$skill_count" -eq "$expected_skill_count" ]; then result PASS "$client-$shell skill count matches source ($skill_count)"; else result FAIL "$client-$shell skill count $skill_count does not match source ($expected_skill_count)"; fi
+    leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$package" 2>/dev/null | sort -u | grep -Ev '^(__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__)$' || true)
+    if [ -n "$leftover_tokens" ]; then result FAIL "$client-$shell has unresolved placeholders"; else result PASS "$client-$shell has no unresolved placeholders"; fi
   done
 done
 

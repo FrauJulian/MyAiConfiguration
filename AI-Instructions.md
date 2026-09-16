@@ -1,4 +1,4 @@
-﻿# AI instructions
+# AI instructions
 
 This file contains maintenance instructions for this repository only. It is not
 part of the generated Codex or Claude Code configuration and must not be read
@@ -20,12 +20,14 @@ Keep the architecture as:
 
 ## Portability
 
-- Design scripts, hooks, generated configuration, and installation behavior for both Windows and Linux.
-- Use cross-platform tools and paths where practical.
-- When platform-specific behavior is necessary, provide an equivalent implementation or a safe no-op for the other supported platform.
+- Design scripts, hooks, generated configuration, and installation behavior for both PowerShell and Bash.
+- Name configuration choices and generated packages after their shell, not the operating system.
+- Use portable tools and paths where practical.
+- When shell-specific behavior is necessary, provide an equivalent implementation or a safe no-op for the other supported shell.
 - Provide equivalent native Bash (`.sh`) and PowerShell (`.ps1`) entry points for every script and hook.
-- Support Windows PowerShell 5.1 and newer on Windows, and PowerShell 7 (`pwsh`) on Linux. Keep shared PowerShell syntax compatible with 5.1; Windows must not require PowerShell 7.
-- Validate relevant changes on both supported platforms when practical.
+- Keep shared PowerShell syntax compatible with 5.1 and support PowerShell 7 (`pwsh`) as well.
+- Preserve operating-system API names and upstream schema keys when their exact spelling is required.
+- Validate relevant changes with both supported shells when practical.
 
 ## Language
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Linux equivalent of flashbang.ps1. The visual overlay is implemented with
+# Bash equivalent of flashbang.ps1. The visual overlay is implemented with
 # Python's standard tkinter module because Bash itself cannot create windows.
 # No third-party Python package is required.
 

@@ -25,9 +25,9 @@ expected_status_output=$'Test Model \xc2\xb7 Effort high \xc2\xb7 TestRepo @ '"$
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
 rule_skill_count=$(($(wc -l < "$root/adapters/claude/rule-skills.tsv") - 1))
-for platform in windows linux; do
+for shell in powershell bash; do
   for client in codex claude; do
-    package="$root/generated/$client-$platform"
+    package="$root/generated/$client-$shell"
     file=config.toml
     [ "$client" != claude ] || file=settings.json
     test -f "$package/$file"
@@ -35,8 +35,8 @@ for platform in windows linux; do
     expected_skill_count=$source_skill_count
     [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
     test "$(find "$package/skills" -name SKILL.md | wc -l)" -eq "$expected_skill_count"
-    if [ "$platform" = windows ]; then
-      grep -q 'powershell .*flashbang.ps1' "$package/$file"
+    if [ "$shell" = powershell ]; then
+      grep -q '__POWERSHELL_COMMAND__ .*flashbang.ps1' "$package/$file"
       ! grep -Eq 'WindowStyle[[:space:]]+Hidden' "$package/$file"
     else
       grep -q 'bash .*flashbang.sh' "$package/$file"
@@ -48,21 +48,21 @@ for platform in windows linux; do
       grep -q 'approvals_reviewer[[:space:]]*=[[:space:]]*"auto_review"' "$package/$file"
       grep -Fq 'status_line = ["model", "reasoning", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]' "$package/$file"
     else
-      [ "$(awk '/^  "hooks": \{/{inside=1; next} inside && /^  \}/{inside=0} inside && /^    "[^"]+": \[$/{gsub(/^    "|": \[$/, ""); print}' "$package/$file")" = Stop ]
+      python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); assert set(settings["hooks"]) == {"PreCompact", "SessionStart", "Stop"}' "$package/$file"
       ! grep -q 'flashbang-if-input' "$package/$file"
       ! grep -q '"async"[[:space:]]*:[[:space:]]*true' "$package/$file"
       grep -q '"defaultMode"[[:space:]]*:[[:space:]]*"auto"' "$package/$file"
       statusline_extension=sh
-      [ "$platform" != windows ] || statusline_extension=ps1
+      [ "$shell" != powershell ] || statusline_extension=ps1
       test -f "$package/statusline/statusline.$statusline_extension"
       grep -q "statusline.$statusline_extension" "$package/$file"
     fi
-    if grep -Eq '__HOOK_|__WINDOWS_HOOK_' "$package/$file"; then exit 1; fi
+    if grep -Eq '__HOOK_|__POWERSHELL_HOOK_' "$package/$file"; then exit 1; fi
     doc_file=AGENTS.md
     [ "$client" != claude ] || doc_file=CLAUDE.md
     doc_content=$(cat "$package/$doc_file")
     occurrences=$(printf '%s' "$doc_content" | grep -o 'Apply instructions in this order' | wc -l)
-    [ "$occurrences" -eq 1 ] || { printf '%s-%s must embed the priority rule exactly once\n' "$client" "$platform" >&2; exit 1; }
+    [ "$occurrences" -eq 1 ] || { printf '%s-%s must embed the priority rule exactly once\n' "$client" "$shell" >&2; exit 1; }
     if [ "$client" = codex ] && printf '%s' "$doc_content" | grep -q 'Always load and apply `rules/general\.md`'; then
       printf '%s must not still instruct loading general.md by path\n' "$package" >&2
       exit 1
@@ -84,14 +84,14 @@ for platform in windows linux; do
     done
   done
 done
-for platform_selection in 1 2; do
+for shell_selection in 1 2; do
   for client_selection in 1 2 3; do
-    output=$(printf '%s\n%s\n' "$platform_selection" "$client_selection" | bash "$root/scripts/install.sh" --dry-run 2>&1) || { printf '%s\n' "$output" >&2; exit 1; }
+    output=$(printf '%s\n%s\n' "$shell_selection" "$client_selection" | bash "$root/scripts/install.sh" --dry-run 2>&1) || { printf '%s\n' "$output" >&2; exit 1; }
     printf '%s\n' "$output" | grep -E 'WARN|FAIL|WARNING|ERROR' || true
     [[ "$output" == *'PASS install dry-run'* ]]
-    platform=windows
-    [ "$platform_selection" != 2 ] || platform=linux
-    [[ "$output" == *"-$platform"* ]]
+    shell=powershell
+    [ "$shell_selection" != 2 ] || shell=bash
+    [[ "$output" == *"-$shell"* ]]
   done
 done
 doctor_summary_output=$(bash "$root/scripts/doctor.sh" --summary)
@@ -104,7 +104,7 @@ if ! printf '%s\n' "$doctor_summary_output" | grep -Eq '^Doctor: PASS \| [0-9]+ 
   exit 1
 fi
 for entry_point in install update; do
-  preview=$(bash "$root/scripts/$entry_point.sh" --summary --dry-run --client both --platform linux)
+  preview=$(bash "$root/scripts/$entry_point.sh" --summary --dry-run --client both --shell bash)
   if printf '%s\n' "$preview" | grep -Eq '^(SOURCE|CREATE|UPDATE|UNCHANGED|BACKUP|DRYRUN|PASS) '; then
     printf '%s summary leaked per-item output.\n' "$entry_point" >&2
     exit 1
@@ -112,4 +112,4 @@ for entry_point in install update; do
   printf '%s\n' "$preview" | grep -Eiq "^$entry_point: PASS"
 done
 printf '%s\n' "$doctor_summary_output" | grep '^WARN ' || true
-if [ "$summary" = true ]; then printf 'Tests: PASS | platform packages\n'; else printf 'PASS four platform packages and six Bash selections\n'; fi
+if [ "$summary" = true ]; then printf 'Tests: PASS | shell packages\n'; else printf 'PASS four shell packages and six Bash selections\n'; fi
