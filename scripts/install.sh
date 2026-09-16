@@ -32,7 +32,9 @@ if [ "$dry_run" = false ]; then
   fi
 fi
 
-bash "$root/scripts/build.sh"
+build_args=()
+[ "$summary" = false ] || build_args+=(--summary)
+bash "$root/scripts/build.sh" "${build_args[@]}"
 generated="$root/generated"
 [ -d "$generated" ] || { printf 'Generated output is missing after a successful build.\n' >&2; exit 1; }
 
@@ -51,4 +53,8 @@ deselected_plugins=()
 select_configured_plugins "$root" "$client" Install "$dry_run" selected_plugins deselected_plugins
 install_configured_plugins "$root" "$client" "$dry_run" false selected_plugins "$summary"
 
-if "$dry_run"; then printf 'PASS install dry-run\n'; else printf 'PASS install\n'; fi
+if [ "$summary" = true ]; then
+  suffix=
+  [ "$dry_run" = false ] || suffix=', dry-run'
+  printf 'Install: PASS | %s, %s%s\n' "$client" "$platform" "$suffix"
+elif "$dry_run"; then printf 'PASS install dry-run\n'; else printf 'PASS install\n'; fi

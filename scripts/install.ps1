@@ -21,7 +21,7 @@ if (-not $DryRun -and (Test-AnyManifestPresent (Get-InstallDestinations -HomePat
 }
 
 $buildScript = Join-Path $PSScriptRoot 'build.ps1'
-& $buildScript
+& $buildScript -Summary:$Summary
 if (-not $?) { throw 'Build failed. Installation was not started.' }
 $generated = Join-Path $root 'generated'
 if (-not (Test-Path $generated)) { throw 'Generated output is missing after a successful build.' }
@@ -38,5 +38,5 @@ foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath 
 
 $plugins = Select-ConfiguredPlugins -RepositoryRoot $root -Client $Client -Mode 'Install' -DryRun:$DryRun
 Install-ConfiguredPlugins -RepositoryRoot $root -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected
-Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' }))
+if ($Summary) { Write-Output "Install: PASS | $Client, $Platform$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' })) }
 exit 0

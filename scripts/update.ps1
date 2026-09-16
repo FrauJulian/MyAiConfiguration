@@ -21,7 +21,7 @@ if (-not $DryRun -and -not (Test-AllManifestsPresent (Get-InstallDestinations -H
 }
 
 $buildScript = Join-Path $PSScriptRoot 'build.ps1'
-& $buildScript
+& $buildScript -Summary:$Summary
 if (-not $?) { throw 'Build failed. Update was not started.' }
 $generated = Join-Path $root 'generated'
 if (-not (Test-Path $generated)) { throw 'Generated output is missing after a successful build.' }
@@ -39,5 +39,5 @@ foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath 
 $plugins = Select-ConfiguredPlugins -RepositoryRoot $root -Client $Client -Mode 'Update' -DryRun:$DryRun
 Install-ConfiguredPlugins -RepositoryRoot $root -Client $Client -DryRun:$DryRun -Update -Summary:$Summary -Entries $plugins.Selected
 Uninstall-DeselectedPlugins -Entries $plugins.Deselected -Client $Client -DryRun:$DryRun -Summary:$Summary
-Write-Output ($(if ($DryRun) { 'PASS update dry-run' } else { 'PASS update' }))
+if ($Summary) { Write-Output "Update: PASS | $Client, $Platform$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS update dry-run' } else { 'PASS update' })) }
 exit 0
