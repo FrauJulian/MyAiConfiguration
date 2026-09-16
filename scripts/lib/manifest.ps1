@@ -11,7 +11,7 @@ function Get-Sha256Hash {
 }
 
 function Get-Sha256HashOfBytes {
-    param([Parameter(Mandatory=$true)][byte[]]$Bytes)
+    param([Parameter(Mandatory=$true)][AllowEmptyCollection()][byte[]]$Bytes)
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try { return ([System.BitConverter]::ToString($sha256.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant() }
     finally { $sha256.Dispose() }
@@ -55,7 +55,8 @@ function Sync-ManagedDestination {
         [Parameter(Mandatory=$true)][string]$Stamp,
         [string]$AiConfigRoot,
         [string]$ShellCommand,
-        [string]$WindowsShellCommand,
+        [string]$PowerShellCommand,
+        [bool]$FlashbangEnabled = $true,
         [switch]$DryRun,
         [switch]$Summary
     )
@@ -69,10 +70,15 @@ function Sync-ManagedDestination {
     Get-ChildItem $Source -File -Recurse | ForEach-Object {
         $relative = $_.FullName.Substring($Source.Length).TrimStart([char[]]@('\','/')).Replace('\','/')
         $target = Join-Path $Destination $relative
-        $rawContent = Get-Content -LiteralPath $_.FullName -Raw
-        $needsSubstitution = $rawContent.Contains('__AI_CONFIG_ROOT__') -or $rawContent.Contains('__HOOK_COMMAND__') -or $rawContent.Contains('__WINDOWS_HOOK_COMMAND__')
+        $rawContent = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
+        $filterFlashbang = -not $FlashbangEnabled -and $relative -in @('settings.json', 'config.toml')
+        if ($filterFlashbang) {
+            $rawContent = (& python (Join-Path $PSScriptRoot 'install-options.py') filter --path $_.FullName --flashbang false | Out-String)
+            if ($LASTEXITCODE -ne 0) { throw 'Could not configure Flashbang.' }
+        }
+        $needsSubstitution = $filterFlashbang -or $rawContent.Contains('__AI_CONFIG_ROOT__') -or $rawContent.Contains('__HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_COMMAND__')
         if ($needsSubstitution) {
-            $finalContent = $rawContent.Replace('__AI_CONFIG_ROOT__', $AiConfigRoot).Replace('__HOOK_COMMAND__', $ShellCommand).Replace('__WINDOWS_HOOK_COMMAND__', $WindowsShellCommand).Replace('__HOOK_SCRIPT__', 'flashbang.ps1').Replace('__WINDOWS_HOOK_SCRIPT__', 'flashbang.ps1')
+            $finalContent = $rawContent.Replace('__AI_CONFIG_ROOT__', $AiConfigRoot).Replace('__HOOK_COMMAND__', $ShellCommand).Replace('__POWERSHELL_HOOK_COMMAND__', $PowerShellCommand).Replace('__POWERSHELL_COMMAND__', $PowerShellCommand).Replace('__HOOK_SCRIPT__', 'flashbang.ps1').Replace('__POWERSHELL_HOOK_SCRIPT__', 'flashbang.ps1')
             $newBytes = [System.Text.Encoding]::UTF8.GetBytes($finalContent)
         } else {
             $newBytes = [System.IO.File]::ReadAllBytes($_.FullName)

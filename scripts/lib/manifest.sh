@@ -49,9 +49,9 @@ write_managed_manifest() {
   } > "$path"
 }
 
-# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <windows-shell-command> <dry-run: true|false> [summary: true|false]
+# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <powershell-command> <dry-run: true|false> [summary: true|false]
 sync_managed_destination() {
-  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 windows_shell_command=$6 dry_run=$7 summary=${8:-false}
+  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 powershell_command=$6 dry_run=$7 summary=${8:-false} flashbang_enabled=${9:-true}
   [ "$summary" = true ] || printf 'SOURCE %s -> %s\n' "$source" "$destination"
   local manifest
   manifest=$(manifest_path "$destination")
@@ -67,13 +67,18 @@ sync_managed_destination() {
     target="$destination/$relative"
     content=$(<"$source_file")
     needs_sub=false
-    if [[ "$content" == *'__AI_CONFIG_ROOT__'* || "$content" == *'__HOOK_COMMAND__'* || "$content" == *'__WINDOWS_HOOK_COMMAND__'* ]]; then
+    if [ "$flashbang_enabled" = false ] && [[ "$relative" = settings.json || "$relative" = config.toml ]]; then
+      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter --path "$source_file" --flashbang false) || return
+      needs_sub=true
+    fi
+    if [[ "$needs_sub" = true || "$content" == *'__AI_CONFIG_ROOT__'* || "$content" == *'__HOOK_COMMAND__'* || "$content" == *'__POWERSHELL_HOOK_COMMAND__'* || "$content" == *'__POWERSHELL_COMMAND__'* ]]; then
       needs_sub=true
       content=${content//__AI_CONFIG_ROOT__/$ai_config_root}
       content=${content//__HOOK_COMMAND__/$shell_command}
-      content=${content//__WINDOWS_HOOK_COMMAND__/$windows_shell_command}
+      content=${content//__POWERSHELL_HOOK_COMMAND__/$powershell_command}
+      content=${content//__POWERSHELL_COMMAND__/$powershell_command}
       content=${content//__HOOK_SCRIPT__/flashbang.sh}
-      content=${content//__WINDOWS_HOOK_SCRIPT__/flashbang.sh}
+      content=${content//__POWERSHELL_HOOK_SCRIPT__/flashbang.sh}
       new_hash=$(sha256_of_string "$content")
     else
       new_hash=$(sha256_of_file "$source_file")

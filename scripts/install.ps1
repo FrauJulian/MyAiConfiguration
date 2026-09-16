@@ -2,7 +2,7 @@
 param(
     [switch]$DryRun,
     [ValidateSet('Codex','Claude','Both')][string]$Client,
-    [ValidateSet('Windows','Linux')][string]$Platform,
+    [ValidateSet('PowerShell','Bash')][string]$Shell,
     [switch]$Summary
 )
 $ErrorActionPreference = 'Stop'
@@ -11,15 +11,18 @@ $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'lib/manifest.ps1')
 . (Join-Path $PSScriptRoot 'lib/install-targets.ps1')
 . (Join-Path $PSScriptRoot 'lib/selection-state.ps1')
+. (Join-Path $PSScriptRoot 'lib/install-options.ps1')
 
-$Platform = Read-InstallPlatform -Platform $Platform
-$platform = $Platform.ToLowerInvariant()
+$Shell = Read-InstallShell -Shell $Shell
+$shell = $Shell.ToLowerInvariant()
 $Client = Read-InstallClient -Client $Client
 
 $homePath = [Environment]::GetFolderPath('UserProfile')
 if (-not $DryRun -and (Test-AnyManifestPresent (Get-InstallDestinations -HomePath $homePath -Client $Client))) {
     throw 'Already installed, use the update script.'
 }
+
+$options = Read-InstallOptions -HomePath $homePath -RepositoryRoot $root -Client $Client -DryRun:$DryRun
 
 $buildScript = Join-Path $PSScriptRoot 'build.ps1'
 & $buildScript -Summary:$Summary
@@ -28,17 +31,18 @@ $generated = Join-Path $root 'generated'
 if (-not (Test-Path $generated)) { throw 'Generated output is missing after a successful build.' }
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$shellCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File'
-$windowsShellCommand = 'powershell -NoProfile -ExecutionPolicy Bypass -File'
-if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { $shellCommand = $windowsShellCommand }
+$powerShellCommand = if (Get-Command powershell -ErrorAction SilentlyContinue) { 'powershell -NoProfile -ExecutionPolicy Bypass -File' } else { 'pwsh -NoProfile -ExecutionPolicy Bypass -File' }
+$shellCommand = if ($Shell -eq 'PowerShell') { $powerShellCommand } else { 'bash' }
 
-foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath -Platform $platform -Client $Client)) {
+$plugins = Select-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -Mode 'Install' -DryRun:$DryRun
+if ($options.update_agents) { Update-SelectedAgentClis -Client $Client -DryRun:$DryRun -Summary:$Summary }
+
+foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath -Shell $shell -Client $Client)) {
     Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp $stamp `
-        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -WindowsShellCommand $windowsShellCommand -DryRun:$DryRun -Summary:$Summary
+        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -FlashbangEnabled $options.flashbang -DryRun:$DryRun -Summary:$Summary
 }
 
-$plugins = Select-ConfiguredPlugins -RepositoryRoot $root -Client $Client -Mode 'Install' -DryRun:$DryRun
-Install-ConfiguredPlugins -RepositoryRoot $root -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected
-if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Platform $Platform -Client $Client -Plugins $plugins }
-if ($Summary) { Write-Output "Install: PASS | $Client, $Platform$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' })) }
+Sync-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected
+if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Shell $Shell -Client $Client -Plugins $plugins -UpdateAgents $options.update_agents -Flashbang $options.flashbang }
+if ($Summary) { Write-Output "Install: PASS | $Client, $Shell$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' })) }
 exit 0

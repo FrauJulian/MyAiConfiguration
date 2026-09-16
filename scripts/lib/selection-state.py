@@ -7,11 +7,19 @@ import sys
 import tempfile
 
 
-def validate(state):
-    if not isinstance(state, dict) or state.get('version') != 1:
+def validate(state, allow_legacy=False):
+    if isinstance(state, dict) and state.get('version') == 1:
+        if not allow_legacy:
+            raise ValueError('Saved selection predates install options. Run update once without Quick.')
+        state = dict(state, version=2, shell={'windows': 'powershell', 'linux': 'bash'}.get(state.get('platform')),
+                     update_agents=False, flashbang=True)
+        state.pop('platform', None)
+    if not isinstance(state, dict) or state.get('version') != 2:
         raise ValueError('Unsupported saved selection.')
-    if state.get('platform') not in ('windows', 'linux') or state.get('client') not in ('codex', 'claude', 'both'):
-        raise ValueError('Invalid saved platform or client.')
+    if state.get('shell') not in ('powershell', 'bash') or state.get('client') not in ('codex', 'claude', 'both'):
+        raise ValueError('Invalid saved shell or client.')
+    if any(type(state.get(key)) is not bool for key in ('update_agents', 'flashbang')):
+        raise ValueError('Invalid saved install options. Run update once without Quick.')
     for key in ('selected', 'deselected'):
         values = state.get(key)
         if not isinstance(values, list) or any(not isinstance(value, str) or not value or any(ord(c) < 32 for c in value) for value in values):
@@ -29,7 +37,10 @@ def main():
     parser.add_argument('--home', required=True)
     parser.add_argument('--manifest', required=True)
     parser.add_argument('--format', choices=('json', 'tsv'), default='json')
-    parser.add_argument('--platform')
+    parser.add_argument('--shell')
+    parser.add_argument('--allow-legacy', action='store_true')
+    parser.add_argument('--update-agents', choices=('true', 'false'))
+    parser.add_argument('--flashbang', choices=('true', 'false'))
     parser.add_argument('--client')
     parser.add_argument('--selected', nargs='*', default=[])
     parser.add_argument('--deselected', nargs='*', default=[])
@@ -40,19 +51,23 @@ def main():
     if args.action == 'read':
         if not path.is_file():
             raise ValueError('No saved selection. Run install or update once without Quick.')
-        state = validate(json.loads(path.read_text(encoding='utf-8-sig')))
+        state = validate(json.loads(path.read_text(encoding='utf-8-sig')), args.allow_legacy)
         for key in ('selected', 'deselected'):
             state[key] = [name for name in state[key] if name in names]
         if args.format == 'json':
             print(json.dumps(state))
         else:
-            print('platform\t' + state['platform'])
+            print('shell\t' + state['shell'])
             print('client\t' + state['client'])
+            for key in ('update_agents', 'flashbang'):
+                print(key + '\t' + str(state[key]).lower())
             for key in ('selected', 'deselected'):
                 for name in state[key]:
                     print(key + '\t' + name)
         return
-    state = validate(dict(version=1, platform=args.platform, client=args.client,
+    state = validate(dict(version=2, shell=args.shell, client=args.client,
+                          update_agents=None if args.update_agents is None else args.update_agents == 'true',
+                          flashbang=None if args.flashbang is None else args.flashbang == 'true',
                           selected=args.selected, deselected=args.deselected))
     if (set(state['selected']) | set(state['deselected'])) - names:
         raise ValueError('Unknown plugin in selection.')

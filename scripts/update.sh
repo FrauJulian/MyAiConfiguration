@@ -4,7 +4,7 @@ set -euo pipefail
 dry_run=false
 quick=false
 client=""
-platform=""
+shell=""
 summary=false
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -12,7 +12,7 @@ while [ $# -gt 0 ]; do
     --quick) quick=true; shift ;;
     --summary) summary=true; shift ;;
     --client) client=${2:?--client requires a value}; shift 2 ;;
-    --platform) platform=${2:?--platform requires a value}; shift 2 ;;
+    --shell) shell=${2:?--shell requires a value}; shift 2 ;;
     *) printf 'Unknown argument: %s\n' "$1" >&2; exit 1 ;;
   esac
 done
@@ -22,13 +22,14 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$root/scripts/lib/manifest.sh"
 . "$root/scripts/lib/install-targets.sh"
 . "$root/scripts/lib/selection-state.sh"
+. "$root/scripts/lib/install-options.sh"
 
 home_path=${HOME:?HOME is required}
 selected_plugins=()
 deselected_plugins=()
 if [ "$quick" = true ]; then read_update_selection; fi
 
-platform=$(read_install_platform "$platform")
+shell=$(read_install_shell "$shell")
 client=$(read_install_client "$client")
 
 if [ "$dry_run" = false ]; then
@@ -39,6 +40,8 @@ if [ "$dry_run" = false ]; then
   fi
 fi
 
+if [ "$quick" = false ]; then read_install_options; fi
+
 build_args=()
 [ "$summary" = false ] || build_args+=(--summary)
 bash "$root/scripts/build.sh" "${build_args[@]}"
@@ -46,30 +49,32 @@ generated="$root/generated"
 [ -d "$generated" ] || { printf 'Generated output is missing after a successful build.\n' >&2; exit 1; }
 
 stamp=$(date +%Y%m%d-%H%M%S)
+powershell_command='pwsh -NoProfile -ExecutionPolicy Bypass -File'
+if command -v powershell >/dev/null; then powershell_command='powershell -NoProfile -ExecutionPolicy Bypass -File'; fi
 shell_command=bash
-windows_shell_command='powershell -NoProfile -ExecutionPolicy Bypass -File'
+[ "$shell" != powershell ] || shell_command=$powershell_command
 
 if [ "$quick" = false ]; then
   select_configured_plugins "$root" "$client" Update "$dry_run" selected_plugins deselected_plugins
 fi
 
+[ "$update_agents" = false ] || update_selected_agent_clis
+
 while IFS='|' read -r source destination; do
   ai_config_root=$destination
   command -v cygpath >/dev/null && ai_config_root=$(cygpath -m "$destination")
-  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$windows_shell_command" "$dry_run" "$summary"
-done < <(get_install_targets "$generated" "$home_path" "$platform" "$client")
+  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang"
+done < <(get_install_targets "$generated" "$home_path" "$shell" "$client")
 
 if [ "$quick" = true ]; then
-  CI=true install_configured_plugins "$root" "$client" "$dry_run" true selected_plugins "$summary" </dev/null
-  CI=true uninstall_deselected_plugins "$root" "$client" "$dry_run" deselected_plugins "$summary" </dev/null
+  CI=true sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" true selected_plugins "$summary" </dev/null
 else
-  install_configured_plugins "$root" "$client" "$dry_run" true selected_plugins "$summary"
-  uninstall_deselected_plugins "$root" "$client" "$dry_run" deselected_plugins "$summary"
+  sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" true selected_plugins "$summary"
 fi
 if [ "$dry_run" = false ]; then save_update_selection; fi
 
 if [ "$summary" = true ]; then
   suffix=
   [ "$dry_run" = false ] || suffix=', dry-run'
-  printf 'Update: PASS | %s, %s%s\n' "$client" "$platform" "$suffix"
+  printf 'Update: PASS | %s, %s%s\n' "$client" "$shell" "$suffix"
 elif "$dry_run"; then printf 'PASS update dry-run\n'; else printf 'PASS update\n'; fi

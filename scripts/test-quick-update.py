@@ -25,7 +25,7 @@ class SelectionTests(unittest.TestCase):
                               capture_output=True, text=True, timeout=10)
 
     def save(self, *arguments):
-        result = self.run_state('write', '--platform', 'windows', '--client', 'both', *arguments)
+        result = self.run_state('write', '--shell', 'powershell', '--update-agents', 'false', '--flashbang', 'false', '--client', 'both', *arguments)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_selection_fails_without_creating_state(self):
@@ -38,7 +38,7 @@ class SelectionTests(unittest.TestCase):
         self.save('--selected', 'Superpowers', 'Anthropic Frontend Design', '--deselected', 'Context7')
         original = self.path.read_bytes()
         state = json.loads(self.run_state('read').stdout)
-        self.assertEqual(state['platform'], 'windows')
+        self.assertEqual(state['shell'], 'powershell')
         self.assertEqual(state['client'], 'both')
         self.assertEqual(state['selected'], ['Superpowers', 'Anthropic Frontend Design'])
         self.assertEqual(state['deselected'], ['Context7'])
@@ -51,10 +51,30 @@ class SelectionTests(unittest.TestCase):
         self.save()
         self.assertEqual(json.loads(self.run_state('read').stdout)['selected'], [])
 
+    def test_legacy_state_requires_normal_update_and_can_supply_defaults(self):
+        self.path.parent.mkdir()
+        self.path.write_text(json.dumps(dict(version=1, platform='windows', client='both', selected=[], deselected=[])))
+        result = self.run_state('read')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('without Quick', result.stderr)
+        migrated = json.loads(self.run_state('read', '--allow-legacy').stdout)
+        self.assertEqual(migrated['shell'], 'powershell')
+        self.assertFalse(migrated['update_agents'])
+        self.assertTrue(migrated['flashbang'])
+
+    def test_boolean_options_are_required_and_preserved(self):
+        self.save()
+        state = json.loads(self.run_state('read').stdout)
+        self.assertFalse(state['update_agents'])
+        self.assertFalse(state['flashbang'])
+        state['flashbang'] = 'false'
+        self.path.write_text(json.dumps(state))
+        self.assertNotEqual(self.run_state('read').returncode, 0)
+
     def test_invalid_write_preserves_last_selection(self):
         self.save('--selected', 'Superpowers')
         original = self.path.read_bytes()
-        result = self.run_state('write', '--platform', 'linux', '--client', 'codex', '--selected', 'Unknown')
+        result = self.run_state('write', '--shell', 'bash', '--update-agents', 'false', '--flashbang', 'true', '--client', 'codex', '--selected', 'Unknown')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.path.read_bytes(), original)
 
@@ -80,7 +100,7 @@ class SelectionTests(unittest.TestCase):
         save = subprocess.run([shell, '-NoProfile', '-Command',
                                "$ErrorActionPreference = 'Stop'; . (Join-Path $env:TEST_REPOSITORY_ROOT 'scripts/lib/selection-state.ps1'); "
                                "Save-UpdateSelection -HomePath $env:TEST_SELECTION_HOME -RepositoryRoot $env:TEST_REPOSITORY_ROOT "
-                               "-Platform Windows -Client Both -Plugins @{ Selected = @([pscustomobject]@{name='Superpowers'}); Deselected = @() }"],
+                               "-Shell PowerShell -Client Both -UpdateAgents $false -Flashbang $false -Plugins @{ Selected = @([pscustomobject]@{name='Superpowers'}); Deselected = @() }"],
                               env=environment, capture_output=True, text=True, timeout=10)
         self.assertEqual(save.returncode, 0, save.stdout + save.stderr)
         original = self.path.read_bytes()
@@ -95,8 +115,8 @@ class SelectionTests(unittest.TestCase):
                                 env=environment, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn('Select plugins', result.stdout)
-        self.assertIn('codex plugin add superpowers@openai-curated-remote', result.stdout)
-        self.assertNotIn('codex plugin add context7', result.stdout)
+        self.assertIn('DRYRUN ensure codex plugin: Superpowers', result.stdout)
+        self.assertNotIn('DRYRUN ensure codex plugin: Context7', result.stdout)
         self.assertEqual(self.path.read_bytes(), original)
         self.assertFalse((self.home / '.codex').exists())
         failed = subprocess.run([shell, '-NoProfile', '-File', str(entry), '-Quick'], env=environment,
@@ -112,7 +132,7 @@ class SelectionTests(unittest.TestCase):
         if not shell:
             self.skipTest('Bash unavailable')
         save = subprocess.run([shell, '-c',
-                               'set -euo pipefail; root=$1; home_path=$2; platform=windows; client=both; '
+                               'set -euo pipefail; root=$1; home_path=$2; shell=powershell; client=both; update_agents=false; flashbang=false; '
                                'selected_plugins=(Superpowers); deselected_plugins=(); '
                                '. "$root/scripts/lib/selection-state.sh"; save_update_selection',
                                'test', ROOT.as_posix(), self.home.as_posix()],
@@ -124,8 +144,8 @@ class SelectionTests(unittest.TestCase):
                                 env=environment, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn('Select plugins', result.stdout)
-        self.assertIn('codex plugin add superpowers@openai-curated-remote', result.stdout)
-        self.assertNotIn('codex plugin add context7', result.stdout)
+        self.assertIn('DRYRUN ensure codex plugin: Superpowers', result.stdout)
+        self.assertNotIn('DRYRUN ensure codex plugin: Context7', result.stdout)
         self.assertEqual(self.path.read_bytes(), original)
         self.assertFalse((self.home / '.codex').exists())
 
