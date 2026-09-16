@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([switch]$Summary)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $shared = Join-Path $root 'shared'

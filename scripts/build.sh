@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+summary=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --summary) summary=true; shift ;;
+    *) printf 'Unknown argument: %s\n' "$1" >&2; exit 1 ;;
+  esac
+done
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 shared="$root/shared"
