@@ -1,6 +1,6 @@
 # Token-Efficiency Improvements — Design
 
-Status: approved by user (chat), 2026-09-16. Implementation via writing-plans.
+Historical design approved on 2026-09-16, retained to explain the original decisions. It is not a description of every current behavior. Later changes supersede its blanket validation steps; see [AI-Instructions.md](../../../AI-Instructions.md), [Configuration](../../configuration.md), and the [README](../../../README.md) for current guidance.
 
 ## Goal
 
