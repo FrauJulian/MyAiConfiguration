@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
+summary=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --summary) summary=true; shift ;;
+    *) printf 'Unknown argument: %s\n' "$1" >&2; exit 1 ;;
+  esac
+done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 grep -Eq '\$HoldMs[[:space:]]*=[[:space:]]*250' "$root/shared/hooks/flashbang.ps1"
 grep -Eq '\$FadeMs[[:space:]]*=[[:space:]]*250' "$root/shared/hooks/flashbang.ps1"
 [ "$(grep -c 'default=250' "$root/shared/hooks/flashbang.sh")" -ge 2 ]
 branch=$(git -C "$root" branch --show-current)
 build_summary_output=$(bash "$root/scripts/build.sh" --summary)
-if ! printf '%s\n' "$build_summary_output" | grep -qx 'PASS build: codex-windows, claude-windows, codex-linux, claude-linux'; then
+if ! printf '%s\n' "$build_summary_output" | grep -qx 'Build: PASS | 4 packages'; then
   printf 'build.sh --summary must still print the PASS line: %s\n' "$build_summary_output" >&2
   exit 1
 fi
+[ "$build_summary_output" = 'Build: PASS | 4 packages' ]
 status_output=$(printf '{"model":{"display_name":"Test Model"},"effort":{"level":"high"},"workspace":{"current_dir":"%s","repo":{"name":"TestRepo"}},"context_window":{"context_window_size":200000,"used_percentage":8.5,"total_input_tokens":15500,"total_output_tokens":1200}}' "$root" | bash "$root/shared/statusline/statusline.sh")
 plain_status_output=$(printf '%s' "$status_output" | sed -E $'s/\x1b\\[[0-9;]*m//g')
 expected_status_output=$'Test Model \xc2\xb7 high\nTestRepo on '"$branch"$'  \xc2\xb7  9% ctx (16.7k tok)'
@@ -59,6 +67,10 @@ for platform in windows linux; do
       printf '%s must not still instruct loading general.md by path\n' "$package" >&2
       exit 1
     fi
+    if [ "$client" = claude ] && [ -f "$package/rules/general.md" ]; then
+      printf 'Claude must not automatically load a second copy of general rules.\n' >&2
+      exit 1
+    fi
     for split_rule in angular wpf ui-ux; do
       if [ "$client" = codex ]; then
         references_dir="$package/rules/$split_rule/references"
@@ -74,7 +86,8 @@ for platform in windows linux; do
 done
 for platform_selection in 1 2; do
   for client_selection in 1 2 3; do
-    output=$(printf '%s\n%s\n' "$platform_selection" "$client_selection" | bash "$root/scripts/install.sh" --dry-run)
+    output=$(printf '%s\n%s\n' "$platform_selection" "$client_selection" | bash "$root/scripts/install.sh" --dry-run 2>&1) || { printf '%s\n' "$output" >&2; exit 1; }
+    printf '%s\n' "$output" | grep -E 'WARN|FAIL|WARNING|ERROR' || true
     [[ "$output" == *'PASS install dry-run'* ]]
     platform=windows
     [ "$platform_selection" != 2 ] || platform=linux
@@ -90,5 +103,14 @@ if ! printf '%s\n' "$doctor_summary_output" | grep -Eq '^Doctor: PASS \| [0-9]+ 
   printf "Doctor summary mode must print one 'Doctor: PASS | N checks' line: %s\n" "$doctor_summary_output" >&2
   exit 1
 fi
-printf 'PASS four platform packages and six Bash selections\n'
+for entry_point in install update; do
+  preview=$(bash "$root/scripts/$entry_point.sh" --summary --dry-run --client both --platform linux)
+  if printf '%s\n' "$preview" | grep -Eq '^(SOURCE|CREATE|UPDATE|UNCHANGED|BACKUP|DRYRUN|PASS) '; then
+    printf '%s summary leaked per-item output.\n' "$entry_point" >&2
+    exit 1
+  fi
+  printf '%s\n' "$preview" | grep -Eiq "^$entry_point: PASS"
+done
+printf '%s\n' "$doctor_summary_output" | grep '^WARN ' || true
+if [ "$summary" = true ]; then printf 'Tests: PASS | platform packages\n'; else printf 'PASS four platform packages and six Bash selections\n'; fi
 
