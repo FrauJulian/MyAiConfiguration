@@ -1,4 +1,5 @@
 generated/
+.superpowers/
 *.log
 *.tmp
 *.bak
