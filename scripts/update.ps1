@@ -16,13 +16,13 @@ $platform = $Platform.ToLowerInvariant()
 $Client = Read-InstallClient -Client $Client
 
 $homePath = [Environment]::GetFolderPath('UserProfile')
-if (-not $DryRun -and (Test-AnyManifestPresent (Get-InstallDestinations -HomePath $homePath -Client $Client))) {
-    throw 'Already installed, use the update script.'
+if (-not $DryRun -and -not (Test-AllManifestsPresent (Get-InstallDestinations -HomePath $homePath -Client $Client))) {
+    throw 'Not installed, use the install script.'
 }
 
 $buildScript = Join-Path $PSScriptRoot 'build.ps1'
 & $buildScript
-if (-not $?) { throw 'Build failed. Installation was not started.' }
+if (-not $?) { throw 'Build failed. Update was not started.' }
 $generated = Join-Path $root 'generated'
 if (-not (Test-Path $generated)) { throw 'Generated output is missing after a successful build.' }
 
@@ -36,7 +36,8 @@ foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath 
         -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -WindowsShellCommand $windowsShellCommand -DryRun:$DryRun -Summary:$Summary
 }
 
-$plugins = Select-ConfiguredPlugins -RepositoryRoot $root -Client $Client -Mode 'Install' -DryRun:$DryRun
-Install-ConfiguredPlugins -RepositoryRoot $root -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected
-Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' }))
+$plugins = Select-ConfiguredPlugins -RepositoryRoot $root -Client $Client -Mode 'Update' -DryRun:$DryRun
+Install-ConfiguredPlugins -RepositoryRoot $root -Client $Client -DryRun:$DryRun -Update -Summary:$Summary -Entries $plugins.Selected
+Uninstall-DeselectedPlugins -Entries $plugins.Deselected -Client $Client -DryRun:$DryRun -Summary:$Summary
+Write-Output ($(if ($DryRun) { 'PASS update dry-run' } else { 'PASS update' }))
 exit 0

@@ -26,8 +26,8 @@ client=$(read_install_client "$client")
 home_path=${HOME:?HOME is required}
 if [ "$dry_run" = false ]; then
   mapfile -t destinations < <(get_install_destinations "$home_path" "$client")
-  if any_manifest_present "${destinations[@]}"; then
-    printf 'Already installed, use the update script.\n' >&2
+  if ! all_manifests_present "${destinations[@]}"; then
+    printf 'Not installed, use the install script.\n' >&2
     exit 1
   fi
 fi
@@ -48,7 +48,8 @@ done < <(get_install_targets "$generated" "$home_path" "$platform" "$client")
 
 selected_plugins=()
 deselected_plugins=()
-select_configured_plugins "$root" "$client" Install "$dry_run" selected_plugins deselected_plugins
-install_configured_plugins "$root" "$client" "$dry_run" false selected_plugins "$summary"
+select_configured_plugins "$root" "$client" Update "$dry_run" selected_plugins deselected_plugins
+install_configured_plugins "$root" "$client" "$dry_run" true selected_plugins "$summary"
+uninstall_deselected_plugins "$root" "$client" "$dry_run" deselected_plugins "$summary"
 
-if "$dry_run"; then printf 'PASS install dry-run\n'; else printf 'PASS install\n'; fi
+if "$dry_run"; then printf 'PASS update dry-run\n'; else printf 'PASS update\n'; fi
