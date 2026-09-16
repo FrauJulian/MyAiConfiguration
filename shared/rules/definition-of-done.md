@@ -7,10 +7,9 @@ A task is only considered done when all applicable requirements below are fulfil
 * The implementation fully satisfies the requested behavior.
 * All relevant acceptance criteria are implemented.
 * The work item description is fully addressed.
-* The code builds successfully.
-* Relevant tests pass.
-* New or changed behavior is covered by tests where appropriate.
-* No known errors, warnings, regressions, or broken behavior remain.
+* Verification is sufficient for the change's risk and scope, following `general.md`'s Verification rules. A build, test run, new test, or independent review is not required for every change.
+* Checks selected on that basis, and checks explicitly required by the user or project, have passed. Material gaps and pre-existing failures are reported without claiming unverified success.
+* No known unresolved defects or regressions introduced by the change remain.
 * The implementation follows the project's coding, architecture, security, and performance guidelines.
 * No unrelated changes are included.
 * No temporary code, debug output, commented-out code, placeholders, or TODOs remain unless explicitly intended.
@@ -39,7 +38,7 @@ Before declaring a task complete:
 * Re-read all acceptance criteria.
 * Compare each requirement against the implemented result.
 * Verify the relevant code paths.
-* Run applicable builds and tests.
+* Choose and complete the smallest sufficient verification; expand only when evidence or risk warrants it.
 * Check for incomplete or unrelated changes.
 * Confirm that the final state matches the requested outcome.
 
