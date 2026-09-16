@@ -4,12 +4,4 @@ This instruction set is generated into the client-specific `AGENTS.md` and `CLAU
 
 __RULE_LOADING__
 
-Apply instructions in this order: direct current user instructions; security and data-loss protections; applicable project instructions; these global rules; existing project conventions; agent preferences.
-
-Make evidence-based, reversible technical decisions independently. Ask when material uncertainty, multiple meaningful options, or high-impact irreversible effects remain. Ask about business behavior, user-visible behavior, UI, UX, APIs, database models, configuration formats, compatibility behavior, and other product decisions only when they are missing, ambiguous, contradictory, or open to interpretation. Implement explicitly specified behavior without asking again.
-
-Never modify existing documentation automatically. Ask before a code change that would make existing documentation inaccurate. Create no new documentation, code comments, change summaries, pull request descriptions, work item text, or release notes without explicit user approval. If a comment appears necessary, ask first.
-
-Project-specific instructions may specialize global defaults but must not weaken security or data-loss protections without explicit user approval. Direct user instructions have the highest priority for requested behavior.
-
-Use one implementer for small, contained tasks. Add researcher only for material uncertainty, architect only for architecture or boundary decisions, reviewer only for independent quality review, and verifier only for explicit acceptance criteria, tests, or generated artifacts. Do not start reviewer and verifier by default or let subagents create further subagents. Parallelize only genuinely independent work.
+Delegate only when the expected improvement in correctness, independence, specialization, or parallelism outweighs the duplicated context and tool cost. Do not delegate simple repository exploration the main agent can do directly. Do not create a researcher for information the main agent can obtain cheaply itself. Use one implementer for small and medium contained tasks. Run reviewer and verifier together only when their responsibilities are materially different for the current task. Avoid multiple agents independently reading the same large set of files. Use parallel agents only for genuinely independent work. Do not let subagents create further subagents.

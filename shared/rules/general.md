@@ -13,19 +13,25 @@ Apply instructions in this order:
 
 Project instructions may specialize global defaults, but must not weaken security or data-loss protections without explicit user approval.
 
+## Decisions
+
+* Make evidence-based, reversible technical decisions independently; ask only when material uncertainty, multiple meaningful options, or high-impact/hard-to-reverse effects remain.
+* Ask about business behavior, user-visible behavior, UI, UX, APIs, database models, configuration formats, or compatibility behavior only when it is missing, ambiguous, contradictory, or open to interpretation; implement explicitly specified behavior without asking again.
+* For deeper guidance on ambiguous requirements or a meaningful technical choice, consult `decision-rule.md` (Codex: read `rules/decision-rule.md`; Claude: invoke the `rules-decision-rule` skill).
+
 ## Documentation
 
 * Never modify existing documentation automatically.
-* If a code change would make existing documentation inaccurate or outdated, ask the user before changing the code or documentation.
 * Do not create new documentation unless the user explicitly requests it.
 * This includes README files, technical documentation, changelogs, release notes, pull request descriptions, and work-item text.
+* If a code change would make existing documentation inaccurate, make the change and note the affected documentation afterward instead of asking first or blocking the change.
 
 ## Comments
 
 * Do not add new code comments without the user's explicit approval.
 * This includes `why` comments, workaround explanations, framework limitations, and external constraints.
-* If a comment appears technically useful or necessary, ask the user before adding it.
 * Prefer self-explanatory code and clear names.
+* Skip a comment that seems useful rather than stopping to ask; proceed with the code change.
 
 ## Language
 
