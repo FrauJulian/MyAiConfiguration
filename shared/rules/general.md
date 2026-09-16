@@ -19,6 +19,17 @@ Project instructions may specialize global defaults, but must not weaken securit
 * Ask about business behavior, user-visible behavior, UI, UX, APIs, database models, configuration formats, or compatibility behavior only when it is missing, ambiguous, contradictory, or open to interpretation; implement explicitly specified behavior without asking again.
 * For deeper guidance on ambiguous requirements or a meaningful technical choice, consult `decision-rule.md` (Codex: read `rules/decision-rule.md`; Claude: invoke the `rules-decision-rule` skill).
 
+## Verification
+
+* Decide independently whether and how much verification the change needs. Use the smallest set of checks that provides sufficient confidence, based on changed behavior, affected callers, failure impact, reversibility, and remaining uncertainty.
+* A focused inspection can be sufficient for a small, low-risk change. Do not automatically run builds or tests, add tests, or request a separate review for every change.
+* When execution adds useful evidence, start with a targeted syntax/type check, affected project build, focused test, or manual check. Choose the check that can detect the likely failure; these are alternatives, not a mandatory sequence.
+* Expand to integration tests, a full application build, a wider test suite, or an independent review when cross-component effects, security or data-loss risks, failures, or unresolved uncertainty justify the cost. Change size alone does not determine risk.
+* Add or update tests when they protect meaningful changed behavior or a plausible regression. Avoid tests that only mirror implementation details or assert wording and formatting.
+* Stop once the relevant risks are covered. Repeat or broaden successful checks only after changes that affect their results, new failures, or new evidence of risk.
+* Explicit user requests and applicable project or CI requirements remain binding. Generic skill workflows requiring review, builds, tests, or test-first development for every change do not override this proportional approach; no permission is needed to skip unnecessary workflow steps.
+* Report the checks actually performed and material limitations concisely. Inspection is not a passing build or test run; do not claim evidence you did not obtain or hide unresolved failures.
+
 ## Documentation
 
 * Never modify existing documentation automatically.
