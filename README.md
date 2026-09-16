@@ -16,15 +16,14 @@ into platform-specific packages that can be inspected before they are installed.
 - One shared source of truth for Codex and Claude Code.
 - Separate generated packages for Windows and Linux.
 - Native PowerShell 5.1 and Bash scripts.
-- Interactive or non-interactive (`-Client`/`-Platform`) installation for Codex, Claude Code, or both.
+- Installation for Codex, Claude Code, or both, with explicit target parameters and an interactive plugin selection.
 - Claude Code loads technology- and situation-specific rules as skills, so only their name and description sit
   permanently in context; the full rule text loads only when the skill is invoked. Codex keeps loading rules as plain
   files, unchanged.
-- A managed-file manifest (path and SHA-256 per destination) makes installation idempotent, detects files this setup
-  previously installed but no longer ships, and protects files a user changed locally instead of silently overwriting
-  or deleting them.
-- Dry-run support (no writes, no backups, no plugin changes) and timestamped, per-run backup directories.
-- Shared safety, notification, validation, and status-line hooks.
+- A managed-file manifest tracks unchanged and stale files. Replaced files are backed up; locally modified stale
+  files are retained with a warning.
+- Dry-run support (no destination writes, backups, or plugin changes) and timestamped backup directories.
+- Finish notifications, Claude session-state hooks, optional safety utilities, and compact status displays.
 - Separate install and update scripts: install refuses to run against an already-installed destination, update refuses
   to run against one that is not installed yet.
 - User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, Humanizer, Impeccable, and
@@ -58,7 +57,10 @@ generated/
 ## Requirements
 
 - Windows PowerShell 5.1 or newer on Windows.
-- Bash on Linux.
+- Bash 4.3 or newer on Linux, with standard utilities such as `awk`, `sed`, and `sha256sum`.
+- Python 3.11 or newer for configuration validation (`python` for PowerShell scripts, `python3` for Bash scripts).
+- Git for marketplace installation and branch display; Node.js/npm (`npx`) for Codex's external skill installers.
+- `jq` for Claude's Bash status line; without it, that status line produces no output.
 - The Codex and Claude Code CLIs for the clients that should be installed or diagnosed.
 - Network access for plugin installation and updates.
 
@@ -79,8 +81,9 @@ Bash: (Linux)
 ./scripts/build.sh
 ```
 
-Every repository change must pass the build before completion. Building only writes reproducible files below
-`generated/`; it does not modify global user configuration.
+Rebuild when shared definitions, adapters, or generation logic change. Choose other verification according to the
+change's risk; documentation-only edits do not require a build. Building writes reproducible packages below
+`generated/` and may use temporary validation files; it does not install global user configuration.
 
 ## Installation
 
@@ -93,50 +96,43 @@ Preview an installation without changing user files, backups, or plugins:
 
 Powershell: (Windows)
 ```powershell
-.\scripts\install.ps1 -DryRun
+.\scripts\install.ps1 -DryRun 
 ```
 
 Bash: (Linux)
 ```bash
-./scripts/install.sh --dry-run
+./scripts/install.sh --dry-run 
 ```
 
 Install the selected configuration interactively:
 
 Powershell: (Windows)
 ```powershell
-.\scripts\install.ps1
+.\scripts\install.ps1 
 ```
 
 Bash: (Linux)
 ```bash
-./scripts/install.sh
+./scripts/install.sh 
 ```
 
-Install non-interactively, for scripting or CI:
+Omitting either target parameter opens its selection prompt. There is no automatic platform default.
+For a noninteractive preview, supply both target parameters together with `-DryRun` or `--dry-run`.
 
-Powershell: (Windows)
-```powershell
-.\scripts\install.ps1 -Client Both -Platform Windows
-```
+Every installed file is tracked in a per-destination manifest (`.ai-config-manifest.tsv`). On update, unchanged files
+are not written or backed up. Files still shipped by the package are replaced when their content differs, including
+local edits; the previous content is backed up first. An untracked file at a package target path is also backed up
+and replaced, with a warning. Untracked files outside package target paths are left alone.
 
-Bash: (Linux)
-```bash
-./scripts/install.sh --client both --platform linux
-```
-
-`-Platform`/`--platform` defaults to the current platform when omitted together with `-Client`/`--client`.
-
-Every installed file is tracked in a per-destination manifest (`.ai-config-manifest.tsv`). A second run of the same
-installation is a no-op for unchanged files (no write, no backup). A file this setup installed before but no longer
-ships is backed up and removed, unless it was changed locally since the last install, in which case it is backed up
-and left in place with a warning instead. A file the installer never tracked is never touched, even if a file of the
-same name is now part of the package. Backups land in a single timestamped directory per run under
-`backups/<timestamp>/` inside each destination.
+Previously managed files no longer shipped are backed up and removed if unchanged. If locally modified, they are
+backed up and retained with a warning. Backups are stored under `backups/<timestamp>/` in each destination.
+Local Codex `plugins` and `marketplaces` tables are preserved when syncing `config.toml`; other local settings are
+not generally merged. Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
 Selecting Codex also installs shared skills to `.agents/skills`. Before plugins are installed, an interactive list lets
 you toggle each configured plugin on or off (all checked by default); unchecked plugins are skipped. This step is also
-skipped for a dry run.
+skipped for a dry run. Codex-only selection omits Humanizer, Impeccable, and Anthropic Frontend Design because they
+use separate skill installers and are always ensured. See [Plugins](docs/plugins.md) for client-specific behavior.
 
 ## Update
 
@@ -146,18 +142,19 @@ for a dry run.
 
 Powershell: (Windows)
 ```powershell
-.\scripts\update.ps1
+.\scripts\update.ps1 
 ```
 
 Bash: (Linux)
 ```bash
-./scripts/update.sh
+./scripts/update.sh 
 ```
 
 It accepts the same `-DryRun`/`--dry-run`, `-Client`/`--client`, and `-Platform`/`--platform` parameters as the
 installer, re-syncs every managed file the same way, and shows the same plugin toggle list — but pre-checks plugins
 that are already installed. Checking a plugin that is not installed installs it; checking one that is installed
-updates it; unchecking an installed plugin uninstalls it.
+updates it; unchecking an installed plugin uninstalls it. Selection happens before managed files are synchronized.
+For `Both`, the initial selection follows Claude's installed plugins, not the union of both clients.
 
 ## Doctor
 
@@ -165,16 +162,17 @@ Check client availability, generated packages, source directories, hooks, and in
 
 Powershell: (Windows)
 ```powershell
-.\scripts\doctor.ps1
+.\scripts\doctor.ps1 
 ```
 
 Bash: (Linux)
 ```bash
-./scripts/doctor.sh
+./scripts/doctor.sh 
 ```
 
 Use `-Summary` (PowerShell) or `--summary` (Bash) with build, doctor, install, update, and test scripts for compact output.
-Omit the flag for detailed output. Warnings and failure diagnostics remain visible in both modes.
+Omit the flag for detailed output. Summary mode retains warnings and failure status, but can suppress captured
+plugin-command output on failure. Set `AI_CONFIG_VERBOSE=1` when full plugin failure output is needed.
 
 ## Configuration
 
@@ -199,6 +197,14 @@ Both clients receive the same logical agent roles:
 Agent use is proportional to the task. Small changes can stay with the implementer, while additional roles are available
 when research, design, independent review, or focused verification adds value.
 
+Verification is also proportional: the agent selects checks based on changed behavior, affected callers, risk,
+and uncertainty. A small change may need only focused inspection; builds, tests, and separate reviews are not
+automatic. Explicit user and project requirements still apply.
+
+Both status displays include model, effort, repository, branch, context-window size, context used, and tokens used.
+Claude uses two colored lines, with context usage turning yellow at 60% and red at 85%. Codex uses its native status
+items and rendering. See [Configuration](docs/configuration.md) for details and limitations.
+
 ## Extending the Configuration
 
 ### Add a rule
@@ -206,7 +212,8 @@ when research, design, independent review, or focused verification adds value.
 Create a focused Markdown file in `shared/rules/`. For a rule that applies only to a language, framework, tool, or
 change area, add a row to `adapters/claude/rule-skills.tsv` (Claude generates it as a skill) and add its loading
 condition to the Codex rule-loading text in `scripts/build.ps1`/`scripts/build.sh` (Codex loads it as a plain file, by
-path — unchanged from before). A rule that should always apply, like `general.md`, needs neither.
+path). Put always-applicable guidance in `general.md`, which the build embeds for both clients; a new rule file is
+not automatically embedded.
 
 ### Add a skill
 
