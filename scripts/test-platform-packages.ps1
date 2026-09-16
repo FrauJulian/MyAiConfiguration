@@ -5,6 +5,8 @@ $bashHook = Get-Content -LiteralPath (Join-Path $root 'shared/hooks/flashbang.sh
 if ($powerShellHook -notmatch '\$HoldMs\s*=\s*250' -or $powerShellHook -notmatch '\$FadeMs\s*=\s*250' -or ([regex]::Matches($bashHook, 'default=250').Count -lt 2)) { throw 'Flashbang defaults must total 500 milliseconds on Windows and Linux.' }
 $statusInput = '{"model":{"display_name":"Test Model"},"effort":{"level":"high"},"workspace":{"current_dir":"' + $root.Replace('\','\\') + '","repo":{"name":"TestRepo"}},"context_window":{"context_window_size":200000,"used_percentage":8.5,"total_input_tokens":15500,"total_output_tokens":1200}}'
 $branch = & git -C $root branch --show-current
+$buildSummaryOutput = & (Join-Path $root 'scripts/build.ps1') -Summary
+if (@($buildSummaryOutput | Where-Object { $_ -eq 'PASS build: codex-windows, claude-windows, codex-linux, claude-linux' }).Count -ne 1) { throw "build.ps1 -Summary must still print the PASS line: $($buildSummaryOutput -join '; ')" }
 $statusOutput = ($statusInput | & (Join-Path $root 'shared/statusline/statusline.ps1')) -join "`n"
 $plainStatusOutput = [regex]::Replace($statusOutput, [char]27 + '\[[0-9;]*m', '')
 $expectedStatusOutput = "Test Model $([char]0x00B7) high`nTestRepo on $branch  $([char]0x00B7)  9% ctx (16.7k tok)"
@@ -35,6 +37,14 @@ foreach ($platform in @('windows','linux')) {
             throw "Claude auto permission mode is missing in $package"
         } elseif (-not (Test-Path -LiteralPath (Join-Path $package "statusline/statusline.$(if ($platform -eq 'windows') { 'ps1' } else { 'sh' })")) -or $settings.statusLine.command -notmatch "statusline\.$(if ($platform -eq 'windows') { 'ps1' } else { 'sh' })") {
             throw "Claude status line is incorrect in $package"
+        }
+        $docFile = if ($client -eq 'codex') { 'AGENTS.md' } else { 'CLAUDE.md' }
+        $docContent = Get-Content -LiteralPath (Join-Path $package $docFile) -Raw
+        if (([regex]::Matches($docContent, [regex]::Escape('Apply instructions in this order'))).Count -ne 1) { throw "$client-$platform must embed the priority rule exactly once" }
+        if ($client -eq 'codex' -and $docContent -match 'Always load and apply `rules/general\.md`') { throw "$package must not still instruct loading general.md by path" }
+        foreach ($splitRule in @('angular','wpf','ui-ux')) {
+            $referencesDir = if ($client -eq 'codex') { Join-Path $package "rules/$splitRule/references" } else { Join-Path $package "skills/rules/rules-$splitRule/references" }
+            if (-not (Test-Path $referencesDir) -or (Get-ChildItem $referencesDir -Filter '*.md').Count -eq 0) { throw "$package is missing reference files for $splitRule" }
         }
     }
 }

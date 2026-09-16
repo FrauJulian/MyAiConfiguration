@@ -5,6 +5,11 @@ grep -Eq '\$HoldMs[[:space:]]*=[[:space:]]*250' "$root/shared/hooks/flashbang.ps
 grep -Eq '\$FadeMs[[:space:]]*=[[:space:]]*250' "$root/shared/hooks/flashbang.ps1"
 [ "$(grep -c 'default=250' "$root/shared/hooks/flashbang.sh")" -ge 2 ]
 branch=$(git -C "$root" branch --show-current)
+build_summary_output=$(bash "$root/scripts/build.sh" --summary)
+if ! printf '%s\n' "$build_summary_output" | grep -qx 'PASS build: codex-windows, claude-windows, codex-linux, claude-linux'; then
+  printf 'build.sh --summary must still print the PASS line: %s\n' "$build_summary_output" >&2
+  exit 1
+fi
 status_output=$(printf '{"model":{"display_name":"Test Model"},"effort":{"level":"high"},"workspace":{"current_dir":"%s","repo":{"name":"TestRepo"}},"context_window":{"context_window_size":200000,"used_percentage":8.5,"total_input_tokens":15500,"total_output_tokens":1200}}' "$root" | bash "$root/shared/statusline/statusline.sh")
 plain_status_output=$(printf '%s' "$status_output" | sed -E $'s/\x1b\\[[0-9;]*m//g')
 expected_status_output=$'Test Model \xc2\xb7 high\nTestRepo on '"$branch"$'  \xc2\xb7  9% ctx (16.7k tok)'
@@ -45,6 +50,26 @@ for platform in windows linux; do
       grep -q "statusline.$statusline_extension" "$package/$file"
     fi
     if grep -Eq '__HOOK_|__WINDOWS_HOOK_' "$package/$file"; then exit 1; fi
+    doc_file=AGENTS.md
+    [ "$client" != claude ] || doc_file=CLAUDE.md
+    doc_content=$(cat "$package/$doc_file")
+    occurrences=$(printf '%s' "$doc_content" | grep -o 'Apply instructions in this order' | wc -l)
+    [ "$occurrences" -eq 1 ] || { printf '%s-%s must embed the priority rule exactly once\n' "$client" "$platform" >&2; exit 1; }
+    if [ "$client" = codex ] && printf '%s' "$doc_content" | grep -q 'Always load and apply `rules/general\.md`'; then
+      printf '%s must not still instruct loading general.md by path\n' "$package" >&2
+      exit 1
+    fi
+    for split_rule in angular wpf ui-ux; do
+      if [ "$client" = codex ]; then
+        references_dir="$package/rules/$split_rule/references"
+      else
+        references_dir="$package/skills/rules/rules-$split_rule/references"
+      fi
+      if [ ! -d "$references_dir" ] || [ -z "$(find "$references_dir" -maxdepth 1 -name '*.md' -print -quit)" ]; then
+        printf '%s is missing reference files for %s\n' "$package" "$split_rule" >&2
+        exit 1
+      fi
+    done
   done
 done
 for platform_selection in 1 2; do
