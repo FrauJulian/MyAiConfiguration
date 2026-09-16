@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+summary=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --summary) summary=true; shift ;;
+    *) printf 'Unknown argument: %s\n' "$1" >&2; exit 1 ;;
+  esac
+done
+
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$root/scripts/lib/manifest.sh"
 home_path=${HOME:?HOME is required}
 failed=false
+check_count=0
 
 result() {
-  printf '%s %s\n' "$1" "$2"
+  check_count=$((check_count + 1))
   [ "$1" != FAIL ] || failed=true
+  if [ "$summary" = false ] || [ "$failed" = true ] || [ "$1" != PASS ]; then printf '%s %s\n' "$1" "$2"; fi
 }
 
 for tool in codex claude; do
@@ -85,5 +95,10 @@ for path in shared/rules shared/skills shared/agents shared/hooks/scripts; do
   [ -e "$root/$path" ] && result PASS "source $path" || result FAIL "missing $path"
 done
 
-"$failed" && exit 1
-printf 'PASS doctor\n'
+if [ "$summary" = true ]; then
+  if [ "$failed" = true ]; then printf 'Doctor: FAIL | %s checks\n' "$check_count"; exit 1; fi
+  printf 'Doctor: PASS | %s checks\n' "$check_count"
+else
+  [ "$failed" = false ] || exit 1
+  printf 'PASS doctor\n'
+fi

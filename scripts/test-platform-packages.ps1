@@ -5,8 +5,10 @@ $bashHook = Get-Content -LiteralPath (Join-Path $root 'shared/hooks/flashbang.sh
 if ($powerShellHook -notmatch '\$HoldMs\s*=\s*250' -or $powerShellHook -notmatch '\$FadeMs\s*=\s*250' -or ([regex]::Matches($bashHook, 'default=250').Count -lt 2)) { throw 'Flashbang defaults must total 500 milliseconds on Windows and Linux.' }
 $statusInput = '{"model":{"display_name":"Test Model"},"effort":{"level":"high"},"workspace":{"current_dir":"' + $root.Replace('\','\\') + '","repo":{"name":"TestRepo"}},"context_window":{"context_window_size":200000,"used_percentage":8.5,"total_input_tokens":15500,"total_output_tokens":1200}}'
 $branch = & git -C $root branch --show-current
-$statusOutput = $statusInput | & (Join-Path $root 'shared/statusline/statusline.ps1')
-if ($statusOutput -ne "Model: Test Model | Effort: high | Repo: TestRepo | Branch: $branch | Max Context: 200000 | Used Context: 9% | Used Tokens: 16700") { throw 'PowerShell status line output is incorrect.' }
+$statusOutput = ($statusInput | & (Join-Path $root 'shared/statusline/statusline.ps1')) -join "`n"
+$plainStatusOutput = [regex]::Replace($statusOutput, [char]27 + '\[[0-9;]*m', '')
+$expectedStatusOutput = "Test Model $([char]0x00B7) high`nTestRepo on $branch  $([char]0x00B7)  9% ctx (16.7k tok)"
+if ($plainStatusOutput -ne $expectedStatusOutput) { throw 'PowerShell status line output is incorrect.' }
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory).Count
 $sourceSkillCount = @(Get-ChildItem (Join-Path $root 'shared/skills') -Filter 'SKILL.md' -Recurse).Count
 $ruleSkillCount = @(Import-Csv -LiteralPath (Join-Path $root 'adapters/claude/rule-skills.tsv') -Delimiter ([char]9)).Count
@@ -48,6 +50,9 @@ foreach ($platformSelection in @('1','2')) {
         if (($output -join "`n") -notmatch "-$platform") { throw 'Incorrect selected package.' }
     }
 }
+$doctorSummaryOutput = & (Join-Path $root 'scripts/doctor.ps1') -Summary
+if (@($doctorSummaryOutput | Where-Object { $_ -match '^PASS ' }).Count -ne 0) { throw 'Doctor summary mode must not print individual PASS lines.' }
+if (@($doctorSummaryOutput | Where-Object { $_ -match '^Doctor: PASS \| \d+ checks$' }).Count -ne 1) { throw "Doctor summary mode must print one 'Doctor: PASS | N checks' line: $($doctorSummaryOutput -join '; ')" }
 Write-Output 'PASS four platform packages and six PowerShell selections'
 exit 0
 

@@ -6,7 +6,9 @@ grep -Eq '\$FadeMs[[:space:]]*=[[:space:]]*250' "$root/shared/hooks/flashbang.ps
 [ "$(grep -c 'default=250' "$root/shared/hooks/flashbang.sh")" -ge 2 ]
 branch=$(git -C "$root" branch --show-current)
 status_output=$(printf '{"model":{"display_name":"Test Model"},"effort":{"level":"high"},"workspace":{"current_dir":"%s","repo":{"name":"TestRepo"}},"context_window":{"context_window_size":200000,"used_percentage":8.5,"total_input_tokens":15500,"total_output_tokens":1200}}' "$root" | bash "$root/shared/statusline/statusline.sh")
-[ "$status_output" = "Model: Test Model | Effort: high | Repo: TestRepo | Branch: $branch | Max Context: 200000 | Used Context: 9% | Used Tokens: 16700" ]
+plain_status_output=$(printf '%s' "$status_output" | sed -E $'s/\x1b\\[[0-9;]*m//g')
+expected_status_output=$'Test Model \xc2\xb7 high\nTestRepo on '"$branch"$'  \xc2\xb7  9% ctx (16.7k tok)'
+[ "$plain_status_output" = "$expected_status_output" ]
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
 rule_skill_count=$(($(wc -l < "$root/adapters/claude/rule-skills.tsv") - 1))
@@ -54,5 +56,14 @@ for platform_selection in 1 2; do
     [[ "$output" == *"-$platform"* ]]
   done
 done
+doctor_summary_output=$(bash "$root/scripts/doctor.sh" --summary)
+if printf '%s\n' "$doctor_summary_output" | grep -q '^PASS '; then
+  printf 'Doctor summary mode must not print individual PASS lines.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$doctor_summary_output" | grep -Eq '^Doctor: PASS \| [0-9]+ checks$'; then
+  printf "Doctor summary mode must print one 'Doctor: PASS | N checks' line: %s\n" "$doctor_summary_output" >&2
+  exit 1
+fi
 printf 'PASS four platform packages and six Bash selections\n'
 

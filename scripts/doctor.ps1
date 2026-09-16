@@ -1,11 +1,16 @@
 [CmdletBinding()]
-param()
+param([switch]$Summary)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'lib/manifest.ps1')
 $homePath = [Environment]::GetFolderPath('UserProfile')
-$fail = $false
-function Result($state, $message) { Write-Output ("$state $message"); if ($state -eq 'FAIL') { $script:fail = $true } }
+$script:fail = $false
+$script:checkCount = 0
+function Result($state, $message) {
+    $script:checkCount++
+    if ($state -eq 'FAIL') { $script:fail = $true }
+    if (-not $Summary -or $script:fail -or $state -ne 'PASS') { Write-Output ("$state $message") }
+}
 
 foreach ($tool in @('codex','claude')) { if (Get-Command $tool -ErrorAction SilentlyContinue) { $version = & $tool --version 2>&1 | Select-Object -First 1; Result 'PASS' "$tool available ($version)" } else { Result 'WARN' "$tool unavailable" } }
 if ($PSVersionTable.PSVersion.Major -ge 6 -and -not $IsWindows) { if (Get-Command jq -ErrorAction SilentlyContinue) { Result 'PASS' 'jq available for Claude status line' } else { Result 'WARN' 'jq unavailable; Claude status line is disabled' } }
@@ -42,7 +47,7 @@ if (Test-Path -LiteralPath $settingsPath) {
 }
 $configTomlPath = Join-Path $homePath '.codex/config.toml'
 if (Test-Path -LiteralPath $configTomlPath) {
-    $parseResult = & python -c 'import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8-sig"))' $configTomlPath 2>&1
+    try { $parseResult = & python -c 'import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8-sig"))' $configTomlPath 2>&1 } catch { $parseResult = $_ }
     if ($LASTEXITCODE -eq 0) { Result 'PASS' 'installed .codex/config.toml parses as TOML' } else { Result 'FAIL' "installed .codex/config.toml is invalid TOML: $parseResult" }
     if (Get-Command codex -ErrorAction SilentlyContinue) {
         $previousCodexHome = $env:CODEX_HOME
@@ -77,6 +82,11 @@ foreach ($client in @('codex','claude')) {
     if ($registered) { Result 'PASS' "$client Stop hook is registered" } else { Result 'WARN' "$client ships hook utilities, but no Stop hook is registered" }
 }
 
-if ($fail) { exit 1 }
-Write-Output 'PASS doctor'
+if ($Summary) {
+    if ($script:fail) { Write-Output "Doctor: FAIL | $script:checkCount checks"; exit 1 }
+    Write-Output "Doctor: PASS | $script:checkCount checks"
+} else {
+    if ($script:fail) { exit 1 }
+    Write-Output 'PASS doctor'
+}
 exit 0
