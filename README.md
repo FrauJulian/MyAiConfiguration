@@ -2,21 +2,21 @@
 
 ![OpenAI Codex](https://img.shields.io/badge/OpenAI-Codex-000000)
 ![Claude Code](https://img.shields.io/badge/Anthropic-Claude_Code-D97757)
-![Windows](https://img.shields.io/badge/Windows-PowerShell_5.1%2B-0078D4)
-![Linux](https://img.shields.io/badge/Linux-Bash-FCC624)
+![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-0078D4)
+![Bash](https://img.shields.io/badge/Bash-4.3%2B-FCC624)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 `MyAiConfiguration` is a version-controlled global user configuration for OpenAI Codex and Claude Code.
 
 It keeps rules, skills, agents, hooks, and orchestration guidance in shared source files. Client adapters turn those files
-into platform-specific packages that can be inspected before they are installed.
+into shell-specific packages that can be inspected before they are installed.
 
 ## Quickstart
 
 From an existing checkout, with the [requirements](#requirements) installed, run pull, build, then install.
-Stop if any command fails. Installation asks for the platform, client, and plugin selection.
+Stop if any command fails. Installation asks for the shell, client, CLI update, Flashbang, and extension choices.
 
-PowerShell (Windows):
+PowerShell:
 
 ```powershell
 git pull --ff-only
@@ -24,7 +24,7 @@ git pull --ff-only
 .\scripts\install.ps1 -Summary
 ```
 
-Bash (Linux):
+Bash:
 
 ```bash
 git pull --ff-only
@@ -36,10 +36,10 @@ For an already-installed configuration, use Quickupdate instead.
 
 ## Quickupdate
 
-Run these commands from the repository root. Quick reuses the platform, client, and plugin selection from the last
+Run these commands from the repository root. Quick reuses the shell, client, CLI update, Flashbang, and extension choices from the last
 successful installation or update without opening selection menus. Stop if any command fails.
 
-PowerShell (Windows):
+PowerShell:
 
 ```powershell
 git pull --ff-only
@@ -47,7 +47,7 @@ git pull --ff-only
 .\scripts\update.ps1 -Quick -Summary
 ```
 
-Bash (Linux):
+Bash:
 
 ```bash
 git pull --ff-only
@@ -55,7 +55,7 @@ git pull --ff-only
 ./scripts/update.sh --quick --summary
 ```
 
-If no selection has been saved yet, Quick stops with a hint. Run `scripts/update.ps1` or `./scripts/update.sh` once
+If no selection has been saved yet, or it predates the CLI update and Flashbang options, Quick stops with a hint. Run `scripts/update.ps1` or `./scripts/update.sh` once
 without Quick to save your choices. They are stored in `~/.my-ai-configuration/selection.json`; dry runs and failed
 runs do not overwrite them. To change the selection later, run a normal update again. Quick does not automatically
 select newly added plugins.
@@ -77,15 +77,10 @@ Install and update also rebuild internally; the explicit build above lets you ch
 | [Hook package](shared/hooks/README.md) | Overview shipped with the hook scripts. |
 | [Repository instructions](AI-Instructions.md) | Rules for maintaining this repository. |
 
-Historical records, not current runbooks:
-
-- [Token-efficiency design](docs/superpowers/specs/2026-09-16-token-efficiency-design.md)
-- [Token-efficiency implementation plan](docs/superpowers/plans/2026-09-16-token-efficiency.md)
-
 ## Features
 
 - One shared source of truth for Codex and Claude Code.
-- Separate generated packages for Windows and Linux.
+- Separate generated packages for PowerShell and Bash.
 - Native PowerShell 5.1 and Bash scripts.
 - Installation for Codex, Claude Code, or both, with explicit target parameters and an interactive plugin selection.
 - Claude Code loads technology- and situation-specific rules as skills, so only their name and description sit
@@ -98,8 +93,8 @@ Historical records, not current runbooks:
 - Separate install and update scripts: install refuses to run against an already-installed destination, update refuses
   to run against one that is not installed yet.
 - User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, Humanizer, Impeccable, and
-  Anthropic Frontend Design, with an interactive per-plugin toggle during both install and update; update pre-checks
-  plugins that are already installed, so unchecking one uninstalls it and checking one installs or updates it.
+  Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
+  installed and recorded by this setup can be removed through deselection.
 
 ## Architecture
 
@@ -111,43 +106,43 @@ shared definitions -> client adapters -> generated packages -> user installation
 | --- | --- |
 | `shared/` | Client-independent rules, agents, skills, hooks, status lines, and global instructions. |
 | `adapters/` | Codex and Claude Code formats, settings, templates, and the plugin manifest. |
-| `generated/` | Reproducible Windows and Linux packages. This directory is ignored by Git. |
-| `scripts/` | Build, installation, update, diagnosis, and platform validation entry points. |
+| `generated/` | Reproducible PowerShell and Bash packages. This directory is ignored by Git. |
+| `scripts/` | Build, installation, update, diagnosis, and shell validation entry points. |
 | `docs/` | Focused documentation about the configuration design. |
 
 The build creates:
 
 ```text
 generated/
-├── codex-windows/
-├── claude-windows/
-├── codex-linux/
-└── claude-linux/
+|-- codex-powershell/
+|-- claude-powershell/
+|-- codex-bash/
+`-- claude-bash/
 ```
 
 ## Requirements
 
-- Windows PowerShell 5.1 or newer on Windows.
-- Bash 4.3 or newer on Linux, with standard utilities such as `awk`, `sed`, and `sha256sum`.
-- Python 3.11 or newer for configuration validation (`python` for PowerShell scripts, `python3` for Bash scripts).
-- Git for marketplace installation and branch display; Node.js/npm (`npx`) for Codex's external skill installers.
+- PowerShell 5.1 or newer; PowerShell 7 is supported as well.
+- Bash 4.3 or newer, with standard utilities such as `awk`, `sed`, and `sha256sum`.
+- Python 3.11 or newer for configuration validation and task-state hooks/helpers (`python` for PowerShell scripts, `python3` for Bash scripts).
+- Git for marketplace installation and branch display. External Codex skills are downloaded from their manifest sources.
 - `jq` for Claude's Bash status line; without it, that status line produces no output.
 - The Codex and Claude Code CLIs for the clients that should be installed or diagnosed.
 - Network access for plugin installation and updates.
 
-The Bash scripts do not require PowerShell. The PowerShell scripts remain compatible with Windows PowerShell 5.1;
+The Bash scripts do not require PowerShell. The PowerShell scripts remain compatible with PowerShell 5.1;
 PowerShell 7 can also run them.
 
 ## Build
 
 Run the matching command from the repository root:
 
-Powershell: (Windows)
+PowerShell:
 ```powershell
 .\scripts\build.ps1
 ```
 
-Bash: (Linux)
+Bash:
 ```bash
 ./scripts/build.sh
 ```
@@ -158,36 +153,36 @@ change's risk; documentation-only edits do not require a build. Building writes 
 
 ## Installation
 
-The installer asks for the target platform and client, unless they are passed as parameters, then refuses to continue
-if any selected destination is already installed (`Already installed, use the update script.`). Selecting Linux or
-Windows chooses the generated package format; installation always targets the current user's home directory. This
+The installer asks for the target shell and client, unless they are passed as parameters, then refuses to continue
+if any selected destination is already installed (`Already installed, use the update script.`). Selecting PowerShell or
+Bash chooses the generated package format; installation always targets the current user's home directory. This
 check is skipped for a dry run, so previewing always works regardless of prior install state.
 
 Preview an installation without changing user files, backups, or plugins:
 
-Powershell: (Windows)
+PowerShell:
 ```powershell
 .\scripts\install.ps1 -DryRun 
 ```
 
-Bash: (Linux)
+Bash:
 ```bash
 ./scripts/install.sh --dry-run 
 ```
 
 Install the selected configuration interactively:
 
-Powershell: (Windows)
+PowerShell:
 ```powershell
 .\scripts\install.ps1 
 ```
 
-Bash: (Linux)
+Bash:
 ```bash
 ./scripts/install.sh 
 ```
 
-Omitting either target parameter opens its selection prompt. There is no automatic platform default.
+Omitting either target parameter opens its selection prompt. There is no automatic shell default.
 For a noninteractive preview, supply both target parameters together with `-DryRun` or `--dry-run`.
 
 Every installed file is tracked in a per-destination manifest (`.ai-config-manifest.tsv`). On update, unchanged files
@@ -200,10 +195,10 @@ backed up and retained with a warning. Backups are stored under `backups/<timest
 Local Codex `plugins` and `marketplaces` tables are preserved when syncing `config.toml`; other local settings are
 not generally merged. Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
-Selecting Codex also installs shared skills to `.agents/skills`. Before plugins are installed, an interactive list lets
-you toggle each configured plugin on or off (all checked by default); unchecked plugins are skipped. This step is also
-skipped for a dry run. Codex-only selection omits Humanizer, Impeccable, and Anthropic Frontend Design because they
-use separate skill installers and are always ensured. See [Plugins](docs/plugins.md) for client-specific behavior.
+Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
+Codex skills; unchecked extensions are skipped on installation. Normal runs also ask whether to update
+the selected client CLIs and enable Flashbang. These choices are saved for Quickupdate. Dry runs preview changes
+without updating CLIs or extensions. See [Plugins](docs/plugins.md) for client-specific behavior.
 
 ## Update
 
@@ -211,32 +206,31 @@ Once a destination is installed, use the update script (not the installer) to re
 to continue if any selected destination is not installed yet (`Not installed, use the install script.`), also skipped
 for a dry run.
 
-Powershell: (Windows)
+PowerShell:
 ```powershell
 .\scripts\update.ps1 
 ```
 
-Bash: (Linux)
+Bash:
 ```bash
 ./scripts/update.sh 
 ```
 
-It accepts the same `-DryRun`/`--dry-run`, `-Client`/`--client`, and `-Platform`/`--platform` parameters as the
-installer, re-syncs every managed file the same way, and shows the same plugin toggle list — but pre-checks plugins
-that are already installed. Checking a plugin that is not installed installs it; checking one that is installed
-updates it; unchecking an installed plugin uninstalls it. Selection happens before managed files are synchronized.
-For `Both`, the initial selection follows Claude's installed plugins, not the union of both clients.
+It accepts the same `-DryRun`/`--dry-run`, `-Client`/`--client`, and `-Shell`/`--shell` parameters as the
+installer, re-syncs every managed file, and lets you revise the CLI update, Flashbang, and extension choices.
+Selected extensions are installed or updated. Deselection removes only extensions recorded as installed by this
+setup; pre-existing or manually installed extensions are retained. Quickupdate reuses the saved choices.
 
 ## Doctor
 
 Check client availability, generated packages, source directories, hooks, and installed managed files:
 
-Powershell: (Windows)
+PowerShell:
 ```powershell
 .\scripts\doctor.ps1 
 ```
 
-Bash: (Linux)
+Bash:
 ```bash
 ./scripts/doctor.sh 
 ```
