@@ -58,12 +58,23 @@ def validate_claude(path: Path) -> None:
                     fail(f"hooks.{event} contains an unsupported command hook")
 
 
+def validate_rule_skills(package: Path) -> None:
+    for path in (package / "skills" / "rules").glob("*/SKILL.md"):
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+        if len(lines) < 4 or lines[0] != "---" or lines[3] != "---" or not lines[1].startswith("name: ") or not lines[2].startswith("description: "):
+            fail(f"{path}: invalid generated skill frontmatter")
+        description = json.loads(lines[2].removeprefix("description: "))
+        if not isinstance(description, str) or not description.strip():
+            fail(f"{path}: skill description must be a quoted, nonempty string")
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         print("usage: validate-config.py <codex-toml> <claude-json>", file=sys.stderr)
         return 2
     tomllib.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))
     validate_claude(Path(sys.argv[2]))
+    validate_rule_skills(Path(sys.argv[2]).parent)
     return 0
 
 
