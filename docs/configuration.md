@@ -18,7 +18,7 @@ Codex sets `approval_policy = "on-request"`, `approvals_reviewer = "auto_review"
 
 Codex's native `tui.status_line` contains `model`, `reasoning`, `project-name`, `git-branch`, `context-window-size`, `context-used`, and `used-tokens`, in that order. Rendering and colors are controlled by Codex; the adapter does not define custom colors per field.
 
-Claude runs `shared/statusline/statusline.ps1` on Windows or `statusline.sh` on Linux. Its two-line display is:
+Claude runs `shared/statusline/statusline.ps1` for PowerShell or `statusline.sh` for Bash. Its two-line display is:
 
 ```text
 Opus · Effort high · MyRepo @ main
@@ -32,5 +32,7 @@ Model and context-window size are cyan, effort and cumulative tokens magenta, re
 ## Verification and installation
 
 The agent chooses the smallest sufficient checks based on behavior, affected callers, risk, reversibility, and uncertainty. Inspection can suffice for a small change. Full builds, broad test suites, and independent reviews are not automatic; explicit user and project requirements remain binding.
+
+Delegation and long-running state use the shared orchestration rule, loaded on demand as a Codex rule or Claude skill. The coordinator owns decisions and routes concise evidence-based handoffs. Review and execution verification have separate responsibilities; see [Agents](agents.md).
 
 Rebuild packages after changes to shared definitions or adapters. Generated defaults reach a user's configuration only through installation or update. Updates back up replaced files and preserve Codex's local `plugins` and `marketplaces` tables; other local settings are not generally merged. See [the README](../README.md) for overwrite and backup behavior.
