@@ -1,8 +1,31 @@
 [CmdletBinding()]
-param([string]$Goal,[string[]]$ChangedFiles=@(),[string[]]$Verified=@(),[string[]]$Pending=@(),[string[]]$ImportantFindings=@(),[switch]$Pointer)
+param(
+    [string]$Workspace = (Get-Location).Path,
+    [AllowEmptyString()][string]$Goal,
+    [AllowEmptyCollection()][string[]]$Decisions,
+    [AllowEmptyCollection()][string[]]$ChangedFiles,
+    [AllowEmptyCollection()][string[]]$Verified,
+    [AllowEmptyCollection()][string[]]$Pending,
+    [AllowEmptyCollection()][string[]]$Risks,
+    [AllowEmptyCollection()][string[]]$ImportantFindings,
+    [switch]$Pointer,
+    [switch]$Reset
+)
 $ErrorActionPreference = 'Stop'
-$root = Split-Path $PSScriptRoot -Parent; $dir = Join-Path $root '.ai-session'; $path = Join-Path $dir 'state.json'
-if ($Pointer) { if (Test-Path $path) { Write-Output 'Task state is available in .ai-session/state.json; read it only if needed.' }; exit 0 }
-function Limit([string[]]$items) { @($items | Where-Object { $_ } | Select-Object -First 12 | ForEach-Object { if ($_.Length -gt 180) { $_.Substring(0,180) } else { $_ } }) }
-New-Item $dir -ItemType Directory -Force | Out-Null
-[ordered]@{ goal=if($Goal){$Goal.Substring(0,[Math]::Min(240,$Goal.Length))}else{''}; changedFiles=Limit $ChangedFiles; verified=Limit $Verified; pending=Limit $Pending; importantFindings=Limit $ImportantFindings; updatedAt=(Get-Date).ToUniversalTime().ToString('o') } | ConvertTo-Json -Depth 4 | Set-Content $path -Encoding UTF8
+$helper = Join-Path (Split-Path $PSScriptRoot -Parent) 'shared/hooks/scripts/session-state.py'
+$values = @{ workspace = $Workspace }
+$fields = @{ Goal = 'goal'; Decisions = 'decisions'; ChangedFiles = 'changed'; Verified = 'verified'; Pending = 'open'; Risks = 'risks' }
+foreach ($parameter in $fields.Keys) {
+    if ($PSBoundParameters.ContainsKey($parameter)) { $values[$fields[$parameter]] = $PSBoundParameters[$parameter] }
+}
+if ($PSBoundParameters.ContainsKey('ImportantFindings') -and -not $PSBoundParameters.ContainsKey('Decisions')) {
+    $values.decisions = $ImportantFindings
+}
+$OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$arguments = @($helper, '--update-json')
+if ($Pointer) { $arguments += '--pointer' }
+if ($Reset) { $arguments += '--reset' }
+$payload = $values | ConvertTo-Json -Depth 4 -Compress
+$payload = [regex]::Replace($payload, '[^\x00-\x7F]', { param($match) '\u{0:x4}' -f [int][char]$match.Value })
+$payload | & python @arguments
+exit $LASTEXITCODE
