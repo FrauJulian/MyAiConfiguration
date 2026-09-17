@@ -184,7 +184,7 @@ class InstallOptionsTests(unittest.TestCase):
                         'select_configured_plugins() { :; }\nsync_configured_plugins() { :; }\n'
                         'run_plugin_command() { printf "CLI-MOCK %s\\n" "$2"; }\n')
                 environment = dict(os.environ, HOME=home.as_posix(), TEST_INSTALL_HOME=str(home))
-                for name, quick, answers in [('install', False, 'y\nn\nn\n'), ('update', True, '')]:
+                for name, quick, answers in [('install', False, 'y\nn\nn\nn\n'), ('update', True, '')]:
                     entry = str(scripts / (name + '.' + suffix))
                     command = ([executable, '-NoProfile', '-File', entry, '-Shell', 'Bash', '-Client', 'Both', '-Summary']
                                if kind == 'powershell' else [executable, entry, '--shell', 'bash', '--client', 'both', '--summary'])
