@@ -36,7 +36,7 @@ foreach ($shell in @('powershell','bash')) {
         $expectedSkillCount = if ($client -eq 'claude') { $sourceSkillCount + $ruleSkillCount } else { $sourceSkillCount }
         $skillCount = @(Get-ChildItem (Join-Path $package 'skills') -Filter 'SKILL.md' -Recurse -ErrorAction SilentlyContinue).Count
         if ($skillCount -eq $expectedSkillCount) { Result 'PASS' "$client-$shell skill count matches source ($skillCount)" } else { Result 'FAIL' "$client-$shell skill count $skillCount does not match source ($expectedSkillCount)" }
-        $placeholderHits = @(Get-ChildItem $package -File -Recurse | Where-Object { ((Get-Content -LiteralPath $_.FullName -Raw) -replace '__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__', '') -cmatch '__[A-Z0-9_]+__' })
+        $placeholderHits = @(Get-ChildItem $package -File -Recurse | Where-Object { ((Get-Content -LiteralPath $_.FullName -Raw) -replace '__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__|__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__', '') -cmatch '__[A-Z0-9_]+__' })
         if ($placeholderHits.Count -eq 0) { Result 'PASS' "$client-$shell has no unresolved placeholders" } else { Result 'FAIL' "$client-$shell has unresolved placeholders: $($placeholderHits.FullName -join ', ')" }
     }
 }

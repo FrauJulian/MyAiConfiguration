@@ -49,7 +49,7 @@ for shell in powershell bash; do
     [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
     skill_count=$(find "$package/skills" -name SKILL.md 2>/dev/null | wc -l)
     if [ "$skill_count" -eq "$expected_skill_count" ]; then result PASS "$client-$shell skill count matches source ($skill_count)"; else result FAIL "$client-$shell skill count $skill_count does not match source ($expected_skill_count)"; fi
-    leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$package" 2>/dev/null | sort -u | grep -Ev '^(__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__)$' || true)
+    leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$package" 2>/dev/null | sort -u | grep -Ev '^(__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__|__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__)$' || true)
     if [ -n "$leftover_tokens" ]; then result FAIL "$client-$shell has unresolved placeholders"; else result PASS "$client-$shell has no unresolved placeholders"; fi
   done
 done
