@@ -110,6 +110,13 @@ class ManagedExtensionTests(unittest.TestCase):
         self.assertTrue((directory / 'foreign.txt').exists())
         self.assertFalse((directory / 'references/old.md').exists())
 
+    def test_skill_records_resolved_revision(self):
+        with patch.object(extensions, 'resolve_revision', return_value='a' * 40):
+            self.manager().sync([skill()], ['codex'], {'Humanizer'})
+        record = self.manager().state['resources'][0]
+        self.assertEqual(record['source'], 'blader/humanizer')
+        self.assertEqual(record['resolvedRevision'], 'a' * 40)
+
     def test_skill_partial_failure_records_each_successful_file(self):
         original_write = extensions.atomic_write
         def write(path, content):

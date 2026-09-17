@@ -137,6 +137,17 @@ def fetch_skill(entry):
     return skill, files
 
 
+def resolve_revision(source):
+    try:
+        request = urllib.request.Request(f'https://api.github.com/repos/{source}/commits/HEAD', headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'MyAiConfiguration'})
+        with urllib.request.urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read(1024 * 1024))
+        revision = payload.get('sha') if isinstance(payload, dict) else None
+        return revision if isinstance(revision, str) and re.fullmatch(r'[0-9a-fA-F]{7,64}', revision) else None
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+
+
 class Manager:
     def __init__(self, home, dry_run=False, update=False, summary=False):
         self.home = Path(home).absolute()
@@ -166,6 +177,8 @@ class Manager:
             if resource['kind'] == 'plugin':
                 if not re.fullmatch(r'[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+', resource.get('selector', '')):
                     raise ValueError('Invalid owned plugin selector.')
+                if 'source' in resource and not isinstance(resource['source'], str):
+                    raise ValueError('Invalid owned plugin source.')
             else:
                 directory = resource.get('directory', '')
                 if not re.fullmatch(r'\.agents/skills/[A-Za-z0-9_-]+', directory) or resource['client'] != 'codex':
@@ -173,6 +186,8 @@ class Manager:
                 safe_path(self.home, directory)
                 if not isinstance(resource.get('files'), dict):
                     raise ValueError('Invalid owned skill file inventory.')
+                if 'source' in resource and not isinstance(resource['source'], str):
+                    raise ValueError('Invalid owned skill source.')
                 for relative, value in resource['files'].items():
                     if not relative.startswith(directory + '/') or not re.fullmatch(r'[a-f0-9]{64}', value):
                         raise ValueError('Invalid owned skill file record.')
@@ -271,11 +286,17 @@ class Manager:
         if item is not None and not self.update:
             if client == 'claude' and item.get('enabled') is False:
                 self.command([client, 'plugin', 'enable', selector])
+            if record is not None and item.get('version') is not None:
+                record['version'] = item['version']; self.save()
             return
         if item is not None and client == 'claude':
             self.command([client, 'plugin', 'update', selector])
             if item.get('enabled') is False:
                 self.command([client, 'plugin', 'enable', selector])
+            if record is not None:
+                self.cache.pop(client, None)
+                version = self.installed(client).get(selector, {}).get('version')
+                if version is not None: record['version'] = version; self.save()
             return
         marketplace = entry[client + '_marketplace']
         if marketplace not in ('', '-', 'openai-curated-remote'):
@@ -287,8 +308,14 @@ class Manager:
                 self.command([client, 'plugin', 'marketplace', 'add', marketplace])
         arguments = [client, 'plugin', 'install', selector, '--scope', 'user'] if client == 'claude' else [client, 'plugin', 'add', selector]
         self.command(arguments)
+        resolved_version = None
+        if self.update:
+            self.cache.pop(client, None)
+            resolved_version = self.installed(client).get(selector, {}).get('version')
         if record is None:
-            self.state['resources'].append(dict(client=client, name=entry['name'], kind='plugin', selector=selector))
+            record = dict(client=client, name=entry['name'], kind='plugin', selector=selector, source=entry.get(client + '_marketplace', '-'))
+            if resolved_version is not None: record['version'] = resolved_version
+            self.state['resources'].append(record)
             self.save()
         self.cache[client][selector] = {'scope': 'user'}
 
@@ -311,12 +338,16 @@ class Manager:
             record = None
         if record and record.get('complete') and not self.update and all(safe_path(self.home, name).is_file() for name in record['files']) and record['files']:
             return
-        _, files = fetch_skill(entry)
+        fetched = fetch_skill(entry)
+        _, files = fetched[:2]
+        revision = fetched[2] if len(fetched) > 2 else resolve_revision(entry['codex_source'])
         if record is None:
-            record = dict(client='codex', name=entry['name'], kind='skill', directory=directory, files={}, complete=False)
+            record = dict(client='codex', name=entry['name'], kind='skill', directory=directory, source=entry['codex_source'], files={}, complete=False)
             self.state['resources'].append(record)
             self.save()
         record['complete'] = False
+        if revision:
+            record['resolvedRevision'] = revision
         self.save()
         for name, (content, executable) in files.items():
             relative = directory + '/' + name
