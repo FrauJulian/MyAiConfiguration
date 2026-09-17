@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local MCP semantic search backed by Qwen3-Embedding-0.6B."""
+"""Local MCP semantic search backed by Qwen3 embedding and reranking."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import sqlite3
 
 
 MODEL = "Qwen/Qwen3-Embedding-0.6B"
+RERANKER_MODEL = "Qwen/Qwen3-Reranker-0.6B"
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
 
 
@@ -31,6 +32,7 @@ class Index:
         self.db.execute("create table if not exists chunks (path text, text text, vector blob)")
         self.db.commit()
         self.model = None
+        self.reranker_model = None
 
     def files(self):
         ignored = {".git", ".venv", "generated", "node_modules", ".my-ai-configuration"}
@@ -48,6 +50,19 @@ class Index:
             from sentence_transformers import SentenceTransformer
             self.model = SentenceTransformer(MODEL)
         return self.model
+
+    def reranker(self):
+        if self.reranker_model is None:
+            from sentence_transformers import CrossEncoder
+            self.reranker_model = CrossEncoder(RERANKER_MODEL)
+        return self.reranker_model
+
+    def rerank(self, query: str, rows: list[dict], limit: int):
+        candidates = rows[:min(len(rows), max(limit, 20))]
+        scores = self.reranker().predict([(query, item["text"]) for item in candidates])
+        for item, score in zip(candidates, scores):
+            item["score"] = round(float(score), 6)
+        return sorted(candidates, key=lambda item: item["score"], reverse=True)[:limit]
 
     def rebuild(self):
         encoder = self.encoder()
@@ -73,7 +88,8 @@ class Index:
             import numpy as np
             score = float(np.dot(vector, np.frombuffer(blob, dtype=np.float32)))
             rows.append({"path": path, "score": round(score, 6), "text": text})
-        return sorted(rows, key=lambda item: item["score"], reverse=True)[:max(1, min(top_k, 20))]
+        limit = max(1, min(top_k, 20))
+        return self.rerank(query, sorted(rows, key=lambda item: item["score"], reverse=True), limit)
 
 
 def main():
@@ -91,7 +107,7 @@ def main():
 
     @mcp.tool()
     def semantic_search(query: str, top_k: int = 5) -> list[dict]:
-        """Find repository passages by meaning with Qwen3-Embedding-0.6B."""
+        """Find repository passages with Qwen3 embedding and reranking."""
         return index.search(query, top_k)
 
     @mcp.tool()
