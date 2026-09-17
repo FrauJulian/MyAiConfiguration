@@ -58,3 +58,21 @@ jobs:
       - name: Validate generated configuration
         run: python scripts/validate-config.py generated/codex-powershell/config.toml generated/claude-powershell/settings.json
 
+  powershell-on-ubuntu:
+    name: PowerShell tests on Ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check PowerShell runtime
+        run: pwsh -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
+      - name: Run PowerShell tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/check-capabilities.ps1
+          Get-ChildItem scripts/test-*.ps1 | ForEach-Object {
+            Write-Host "==> $($_.Name)"
+            & $_.FullName -Summary
+          }
+
