@@ -211,8 +211,8 @@ and replaced, with a warning. Untracked files outside package target paths are l
 
 Previously managed files no longer shipped are backed up and removed if unchanged. If locally modified, they are
 backed up and retained with a warning. Backups are stored under `backups/<timestamp>/` in each destination.
-Local Codex `plugins` and `marketplaces` tables are preserved when syncing `config.toml`; other local settings are
-not generally merged. Dry runs still rebuild `generated/`, but do not modify installation destinations.
+Local Codex `model`, `reasoning_effort`, `plugins`, and `marketplaces` settings are preserved when syncing `config.toml`;
+other local settings are not generally merged. Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
 Codex skills; unchecked extensions are skipped on installation. Normal runs also ask whether to update
