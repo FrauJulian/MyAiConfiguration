@@ -143,3 +143,26 @@ jobs:
           QWEN_TEST_MODEL_CACHE: ${{ github.workspace }}/.cache/huggingface
         run: python scripts/test-retrieval-server.py
 
+  security:
+    name: CI configuration security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Reject unsafe workflow settings
+        run: |
+          set -euo pipefail
+          ! grep -RInE 'runs-on:[[:space:]]*windows|pull_request_target|permissions:[[:space:]]*write-all|actions/checkout@v|actions/setup-python@v|curl[[:space:]].*\|[[:space:]]*(bash|sh)|wget[[:space:]].*\|[[:space:]]*(bash|sh)' .github/workflows
+          test "$(grep -Roh 'runs-on: ubuntu-latest' .github/workflows | wc -l)" -ge 1
+          test "$(grep -Roh 'uses: actions/[^@]*@[0-9a-f]\{40\}' .github/workflows | wc -l)" -ge 1
+      - name: Check for tracked secrets
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(\.env($|\.)|.*\.(pem|key))$'; then
+            echo 'Potential secret file or private key tracked' >&2
+            exit 1
+          fi
+          if git ls-files -z | xargs -0 -r grep -IlE 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY'; then
+            echo 'Potential private key material tracked' >&2
+            exit 1
+          fi
