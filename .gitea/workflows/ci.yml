@@ -15,21 +15,16 @@ jobs:
       - name: Bash syntax
         shell: bash
         run: git ls-files -z '*.sh' | xargs -0 -r -n1 bash -n
-      - name: PowerShell syntax
-        shell: pwsh
+      - name: PowerShell checks when runtime exists
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          $failed = $false
-          foreach ($file in (git ls-files '*.ps1')) {
-            $tokens = $null
-            $parseErrors = $null
-            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file), [ref]$tokens, [ref]$parseErrors) | Out-Null
-            if ($parseErrors.Count) {
-              $parseErrors | ForEach-Object { Write-Host "${file}: $_" }
-              $failed = $true
-            }
-          }
-          if ($failed) { exit 1 }
+          if ! command -v pwsh >/dev/null 2>&1; then
+            echo '::warning::PowerShell unavailable; PowerShell checks skipped.'
+            exit 0
+          fi
+          for file in $(git ls-files '*.ps1'); do
+            pwsh -NoLogo -NoProfile -NonInteractive -Command "\$tokens=\$null; \$errors=\$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path '$file'),[ref]\$tokens,[ref]\$errors)|Out-Null; if(\$errors.Count){\$errors|%{Write-Error \"$file: \$_\"}; exit 1}"
+          done
       - name: Build
         shell: bash
         run: bash scripts/build.sh --summary
@@ -39,9 +34,12 @@ jobs:
       - name: Bash update dry run
         shell: bash
         run: bash scripts/update.sh --summary --dry-run --client both --shell bash
-      - name: PowerShell install dry run
-        shell: pwsh
-        run: ./scripts/install.ps1 -Summary -DryRun -Client Both -Shell PowerShell
-      - name: PowerShell update dry run
-        shell: pwsh
-        run: ./scripts/update.ps1 -Summary -DryRun -Client Both -Shell PowerShell
+      - name: PowerShell install and update dry runs
+        shell: bash
+        run: |
+          if ! command -v pwsh >/dev/null 2>&1; then
+            echo '::warning::PowerShell unavailable; PowerShell dry runs skipped.'
+            exit 0
+          fi
+          pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/install.ps1 -Summary -DryRun -Client Both -Shell PowerShell
+          pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/update.ps1 -Summary -DryRun -Client Both -Shell PowerShell
