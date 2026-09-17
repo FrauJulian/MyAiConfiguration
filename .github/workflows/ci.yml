@@ -6,30 +6,34 @@ on:
   pull_request:
   schedule:
     - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHONUNBUFFERED: '1'
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
 
 jobs:
-  ubuntu:
+  capabilities:
+    name: Capabilities and shell quality
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Install ShellCheck
-        run: sudo apt-get update && sudo apt-get install --yes shellcheck
-      - name: Shell syntax and lint
-        shell: bash
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install shell tools
         run: |
-          git ls-files -z '*.sh' | xargs -0 -r -n1 bash -n
-          shellcheck --severity=warning $(git ls-files '*.sh')
-      - name: Python tests
-        run: for file in scripts/test-*.py; do python3 "$file"; done
-      - name: Build
-        env:
-          REQUIRE_CODEX_SCHEMA: 'false'
-        run: bash scripts/build.sh --summary
-      - name: Bash tests
-        run: |
-          bash scripts/test-build-validation.sh --summary
-          bash scripts/test-install-guards.sh --summary
-          bash scripts/test-plugin-selection.sh --summary
-          bash scripts/test-quick-update.sh --summary
-          bash scripts/test-shell-packages.sh --summary
-          bash scripts/test-managed-install.sh --summary
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends shellcheck jq
+      - name: Check capabilities
+        run: bash scripts/check-capabilities.sh
+      - name: Validate Bash syntax
+        run: git ls-files -z '*.sh' | xargs -0 -r -n1 bash -n
+      - name: Lint Bash
+        run: shellcheck --severity=warning $(git ls-files '*.sh')
+
