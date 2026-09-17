@@ -221,6 +221,15 @@ the selected client CLIs, enable Flashbang, and enable Qwen3 semantic retrieval.
 Disabling retrieval on a later update removes its setup-owned runtime and index. Dry runs preview
 changes without updating CLIs, extensions, or retrieval. See [Plugins](docs/plugins.md) for client-specific behavior.
 
+Install also always asks `Uninstall Codex/Claude/Both and reinstall via npm?` (default no), scoped to whatever client
+was selected. This choice is independent of the "update selected agent CLIs" choice above, is never saved, and is not
+asked again by Quickupdate or by the update script. Answering yes uninstalls and reinstalls, per selected client, the
+matching CLI (`@openai/codex` for Codex, `@anthropic-ai/claude-code` for Claude) through `npm uninstall -g`
+followed by `npm install -g <package>@latest`, when that CLI is currently found as a global npm package. When it is
+not (for example, installed through a native installer or another package manager), that prior installation is left
+in place with a warning, and only a fresh `npm install -g` is run alongside it. Codex is skipped with a warning while
+`codex.exe` is running. A dry run never asks this question and never previews it, since the choice is not persisted.
+
 ## Update
 
 Once a destination is installed, use the update script (not the installer) to refresh its files and plugins. It refuses
