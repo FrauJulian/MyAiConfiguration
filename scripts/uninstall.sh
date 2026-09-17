@@ -69,6 +69,7 @@ for target_pair in "${targets[@]}"; do
   fi
 done
 
+# shellcheck disable=SC2034
 selected_plugins=()
 sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" false selected_plugins "$summary"
 sync_semantic_retrieval "$root" "$client" "$home_path" false "$dry_run" false "$summary"

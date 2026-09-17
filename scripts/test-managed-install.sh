@@ -96,7 +96,9 @@ cp "$package/skills/example/SKILL.md" "$legacy/skills/example/SKILL.md"
 printf 'customized' > "$legacy/skills/example/custom.md"
 printf 'foreign' > "$legacy/skills/example/foreign.md"
 declare -A legacy_manifest
+# shellcheck disable=SC2034
 legacy_manifest[skills/example/SKILL.md]=$(sha256_of_file "$legacy/skills/example/SKILL.md")
+# shellcheck disable=SC2034
 legacy_manifest[skills/example/custom.md]=$(printf '0%.0s' {1..64})
 write_managed_manifest "$(manifest_path "$legacy")" legacy_manifest
 mapfile -t targets < <(get_install_targets "$generated" "$test_home" bash codex)

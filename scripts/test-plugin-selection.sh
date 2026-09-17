@@ -11,6 +11,7 @@ done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$root/scripts/lib/plugins.sh"
 
+# shellcheck disable=SC2034
 names=(A B C)
 checked=(true false true)
 toggle_log=$(mktemp)
@@ -35,6 +36,7 @@ if diagnostics=$(summary=true run_plugin_command false test_plugin_output fail 2
   exit 1
 fi
 [[ "$diagnostics" == *'download progress'* ]] && [[ "$diagnostics" == *'WARN test warning'* ]]
+# shellcheck disable=SC2034
 selected=()
 plugin_installed() { printf 'Empty selection must not query installed plugins.\n' >&2; exit 1; }
 run_plugin_command() { printf 'Empty selection must not run commands.\n' >&2; exit 1; }
