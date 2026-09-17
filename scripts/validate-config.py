@@ -9,8 +9,9 @@ import tomllib
 from pathlib import Path
 
 
-CLAUDE_TOP_LEVEL = {"permissions", "env", "statusLine", "hooks"}
+CLAUDE_TOP_LEVEL = {"permissions", "sandbox", "env", "statusLine", "hooks"}
 CLAUDE_PERMISSION_KEYS = {"defaultMode", "allow", "deny"}
+CLAUDE_SANDBOX_KEYS = {"enabled", "allowUnsandboxedCommands"}
 CLAUDE_STATUS_LINE_KEYS = {"type", "command"}
 CLAUDE_HOOK_KEYS = {"type", "command", "timeout"}
 CLAUDE_PERMISSION_MODES = {"acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"}
@@ -37,6 +38,9 @@ def validate_claude(path: Path) -> None:
     for key in ("allow", "deny"):
         if not isinstance(permissions.get(key), list) or not all(isinstance(item, str) for item in permissions[key]):
             fail(f"permissions.{key} must be an array of strings")
+    sandbox = require_keys(settings.get("sandbox"), CLAUDE_SANDBOX_KEYS, "sandbox")
+    if sandbox.get("enabled") is not True or sandbox.get("allowUnsandboxedCommands") is not False:
+        fail("sandbox must be enabled without unsandboxed command retries")
     env = settings.get("env")
     if not isinstance(env, dict) or not all(isinstance(key, str) and isinstance(value, str) for key, value in env.items()):
         fail("env must be an object of string values")
