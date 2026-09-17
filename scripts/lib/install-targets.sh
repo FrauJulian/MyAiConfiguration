@@ -27,7 +27,7 @@ read_install_client() {
 
 clear_interactive() { [ -t 0 ] && [ "${CI:-}" != true ] && [ "${AI_CONFIG_NO_INTERACTIVE:-}" != 1 ] && printf '\033[2J\033[H' >&2; }
 read_single_selection() {
-  local title=$1; shift; local labels=() values=() label value index=0 key
+  local title=$1; shift; local labels=() values=() value index=0 key
   while [ $# -gt 0 ]; do labels+=("$1"); values+=("$2"); shift 2; done
   if [ ! -t 0 ] || [ "${CI:-}" = true ] || [ "${AI_CONFIG_NO_INTERACTIVE:-}" = 1 ]; then printf '%s\n' "$title" >&2; for ((index=0;index<${#labels[@]};index++)); do printf '%d) %s\n' "$((index+1))" "${labels[$index]}" >&2; done; while read -r -p 'Selection ' value; do [[ "$value" =~ ^[1-9][0-9]*$ ]] && [ "$value" -le "${#labels[@]}" ] && { printf '%s\n' "${values[$((value-1))]}"; return; }; done; return 1; fi
   local selected=0

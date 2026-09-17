@@ -18,7 +18,7 @@ capability_manifest="$root/adapters/claude/capabilities.tsv"
 [ -f "$plugin_manifest" ] || { printf 'Missing plugin manifest: %s\n' "$plugin_manifest" >&2; exit 1; }
 declare -A plugin_seen
 plugin_count=0
-while IFS=$'\t' read -r name claude_marketplace claude_plugin codex_marketplace codex_plugin; do
+while IFS=$'\t' read -r name _ claude_plugin _ codex_plugin; do
   [ "$name" != name ] || continue
   [ -n "$name" ] || continue
   plugin_count=$((plugin_count + 1))
