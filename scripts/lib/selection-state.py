@@ -18,7 +18,9 @@ def validate(state, allow_legacy=False):
         raise ValueError('Unsupported saved selection.')
     if state.get('shell') not in ('powershell', 'bash') or state.get('client') not in ('codex', 'claude', 'both'):
         raise ValueError('Invalid saved shell or client.')
-    if any(type(state.get(key)) is not bool for key in ('update_agents', 'flashbang')):
+    if 'semantic_retrieval' not in state:
+        state['semantic_retrieval'] = False
+    if any(type(state.get(key)) is not bool for key in ('update_agents', 'flashbang', 'semantic_retrieval')):
         raise ValueError('Invalid saved install options. Run update once without Quick.')
     for key in ('selected', 'deselected'):
         values = state.get(key)
@@ -41,6 +43,7 @@ def main():
     parser.add_argument('--allow-legacy', action='store_true')
     parser.add_argument('--update-agents', choices=('true', 'false'))
     parser.add_argument('--flashbang', choices=('true', 'false'))
+    parser.add_argument('--semantic-retrieval', choices=('true', 'false'))
     parser.add_argument('--client')
     parser.add_argument('--selected', nargs='*', default=[])
     parser.add_argument('--deselected', nargs='*', default=[])
@@ -59,7 +62,7 @@ def main():
         else:
             print('shell\t' + state['shell'])
             print('client\t' + state['client'])
-            for key in ('update_agents', 'flashbang'):
+            for key in ('update_agents', 'flashbang', 'semantic_retrieval'):
                 print(key + '\t' + str(state[key]).lower())
             for key in ('selected', 'deselected'):
                 for name in state[key]:
@@ -68,6 +71,7 @@ def main():
     state = validate(dict(version=2, shell=args.shell, client=args.client,
                           update_agents=None if args.update_agents is None else args.update_agents == 'true',
                           flashbang=None if args.flashbang is None else args.flashbang == 'true',
+                          semantic_retrieval=False if args.semantic_retrieval is None else args.semantic_retrieval == 'true',
                           selected=args.selected, deselected=args.deselected))
     if (set(state['selected']) | set(state['deselected'])) - names:
         raise ValueError('Unknown plugin in selection.')

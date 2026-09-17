@@ -18,12 +18,13 @@ read_install_boolean() {
 read_install_options() {
   update_agents=false
   flashbang=true
+  semantic_retrieval=false
   local saved key value
   if [ -f "$home_path/.my-ai-configuration/selection.json" ]; then
     if saved=$(python3 "$root/scripts/lib/selection-state.py" read --home "$home_path" --manifest "$root/adapters/plugins.tsv" --format tsv --allow-legacy); then
       while IFS=$'\t' read -r key value; do
         value=${value%$'\r'}
-        case "$key" in update_agents) update_agents=$value ;; flashbang) flashbang=$value ;; esac
+        case "$key" in update_agents) update_agents=$value ;; flashbang) flashbang=$value ;; semantic_retrieval) semantic_retrieval=$value ;; esac
       done <<< "$saved"
     else
       printf 'WARN Saved options could not be read; confirm new options below.\n' >&2
@@ -32,6 +33,7 @@ read_install_options() {
   [ "$dry_run" = false ] || return 0
   update_agents=$(read_install_boolean "Update selected agent CLIs ($client)?" "$update_agents") || return
   flashbang=$(read_install_boolean 'Enable the Flashbang notification hook?' "$flashbang") || return
+  semantic_retrieval=$(read_install_boolean 'Enable Qwen3-Embedding-0.6B semantic retrieval?' "$semantic_retrieval") || return
 }
 
 is_windows_host() {

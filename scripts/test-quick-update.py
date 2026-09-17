@@ -71,6 +71,14 @@ class SelectionTests(unittest.TestCase):
         self.path.write_text(json.dumps(state))
         self.assertNotEqual(self.run_state('read').returncode, 0)
 
+    def test_semantic_retrieval_option_round_trips(self):
+        result = self.run_state('write', '--shell', 'bash', '--client', 'both', '--update-agents', 'false',
+                                '--flashbang', 'true', '--semantic-retrieval', 'true')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = json.loads(self.run_state('read').stdout)
+        self.assertTrue(state['semantic_retrieval'])
+        self.assertIn('semantic_retrieval\ttrue', self.run_state('read', '--format', 'tsv').stdout)
+
     def test_invalid_write_preserves_last_selection(self):
         self.save('--selected', 'Superpowers')
         original = self.path.read_bytes()

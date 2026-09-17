@@ -15,7 +15,7 @@ function Read-InstallBoolean {
 
 function Read-InstallOptions {
     param([string]$HomePath, [string]$RepositoryRoot, [string]$Client, [switch]$DryRun)
-    $defaults = @{ update_agents = $false; flashbang = $true }
+    $defaults = @{ update_agents = $false; flashbang = $true; semantic_retrieval = $false }
     if (Test-Path -LiteralPath (Join-Path $HomePath '.my-ai-configuration/selection.json')) {
         try { $defaults = Read-UpdateSelection -HomePath $HomePath -RepositoryRoot $RepositoryRoot -AllowLegacy }
         catch { Write-Warning 'Saved options could not be read; confirm new options below.' }
@@ -24,6 +24,7 @@ function Read-InstallOptions {
     return @{
         update_agents = Read-InstallBoolean -Prompt "Update selected agent CLIs ($Client)?" -Default $defaults.update_agents
         flashbang = Read-InstallBoolean -Prompt 'Enable the Flashbang notification hook?' -Default $defaults.flashbang
+        semantic_retrieval = Read-InstallBoolean -Prompt 'Enable Qwen3-Embedding-0.6B semantic retrieval?' -Default $defaults.semantic_retrieval
     }
 }
 
