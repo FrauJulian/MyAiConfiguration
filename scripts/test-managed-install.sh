@@ -58,8 +58,8 @@ plugin_state='  [marketplaces.ponytail]
     enabled = true
   [plugins."disabled@market"]
     enabled = false'
-printf "model = 'new'\nmodel_reasoning_effort = 'low'\napprovals_reviewer = 'auto_review'\n" > "$source_dir/config.toml"
-printf "model = 'old'\nmodel_reasoning_effort = 'high'\napprovals_reviewer = 'user'\n%s\n[other]\nvalue = true\n" "$plugin_state" > "$destination/config.toml"
+printf "approvals_reviewer = 'auto_review'\n\n[tui]\n" > "$source_dir/config.toml"
+printf "\357\273\277model = 'old'\nmodel_reasoning_effort = 'high'\napprovals_reviewer = 'user'\n%s\n[other]\nvalue = true\n" "$plugin_state" > "$destination/config.toml"
 original_config=$(cat "$destination/config.toml")
 sync_managed_destination "$source_dir" "$destination" plugins-dry "" "" "" true > /dev/null
 [ "$(cat "$destination/config.toml")" = "$original_config" ] || { printf 'Dry run changed plugin configuration.\n' >&2; exit 1; }
@@ -68,7 +68,9 @@ merged_config=$(cat "$destination/config.toml")
 merged_config_normalized=${merged_config//$'\r'/}
 plugin_state_normalized=${plugin_state//$'\r'/}
 [[ "$merged_config_normalized" == *"$plugin_state_normalized"* ]] || { printf 'Updating config.toml must preserve local marketplace and plugin tables, including disabled plugins.\n' >&2; exit 1; }
-[[ "$merged_config" == *"model = 'old'"* && "$merged_config" == *"model_reasoning_effort = 'high'"* && "$merged_config" == *"approvals_reviewer = 'auto_review'"* && "$merged_config" != *"model = 'new'"* && "$merged_config" != *"model_reasoning_effort = 'low'"* && "$merged_config" != *"approvals_reviewer = 'user'"* && "$merged_config" != *'[other]'* ]] || { printf 'Updating config.toml must preserve local model settings and enforce automatic review.\n' >&2; exit 1; }
+[[ "$merged_config" == *"model = 'old'"* && "$merged_config" == *"model_reasoning_effort = 'high'"* && "$merged_config" == *"approvals_reviewer = 'auto_review'"* && "$merged_config" != *"approvals_reviewer = 'user'"* && "$merged_config" != *'[other]'* ]] || { printf 'Updating config.toml must preserve local model settings and enforce automatic review.\n' >&2; exit 1; }
+[ "$(printf '%s\n' "$merged_config" | grep -n "model = 'old'" | cut -d: -f1)" -lt "$(printf '%s\n' "$merged_config" | grep -n '^\[tui\]$' | cut -d: -f1)" ] || { printf 'Model must remain in TOML root table.\n' >&2; exit 1; }
+[ "$(printf '%s\n' "$merged_config" | grep -n "model_reasoning_effort = 'high'" | cut -d: -f1)" -lt "$(printf '%s\n' "$merged_config" | grep -n '^\[tui\]$' | cut -d: -f1)" ] || { printf 'Model effort must remain in TOML root table.\n' >&2; exit 1; }
 [ "$(cat "$destination/backups/plugins/config.toml")" = "$original_config" ] || { printf 'Original plugin configuration must be backed up.\n' >&2; exit 1; }
 sync_managed_destination "$source_dir" "$destination" plugins-repeat "" "" "" false > /dev/null
 [ "$(cat "$destination/config.toml")" = "$merged_config" ] && [ ! -d "$destination/backups/plugins-repeat" ] || { printf 'Preserving plugin configuration must be idempotent.\n' >&2; exit 1; }

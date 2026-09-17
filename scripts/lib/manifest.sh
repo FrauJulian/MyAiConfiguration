@@ -86,6 +86,7 @@ sync_managed_destination() {
     if [ "$relative" = config.toml ] && [ -f "$target" ]; then
       local plugin_tables local_settings setting_name
       local_settings=$(awk '
+        NR == 1 { sub(/^\357\273\277/, "") }
         /^[ \t]*\[/ { exit }
         /^[ \t]*(model|model_reasoning_effort)[ \t]*=/ { print }
       ' "$target")
@@ -95,7 +96,14 @@ sync_managed_destination() {
           setting_name=${setting_name//[[:space:]]/}
           content=$(printf '%s\n' "$content" | sed "/^[[:space:]]*$setting_name[[:space:]]*=/d")
         done <<< "$local_settings"
-        content="$content"$'\n'"$local_settings"$'\n'
+        if printf '%s\n' "$content" | grep -qE '^[[:blank:]]*\['; then
+          content=$(printf '%s\n' "$content" | awk -v settings="$local_settings" '
+            !inserted && /^[ \t]*\[/ { print settings; inserted = 1 }
+            { print }
+          ')
+        else
+          content="$content"$'\n'"$local_settings"
+        fi
         needs_sub=true
         new_hash=$(sha256_of_string "$content")
       fi
