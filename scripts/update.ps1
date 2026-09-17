@@ -13,6 +13,7 @@ $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'lib/install-targets.ps1')
 . (Join-Path $PSScriptRoot 'lib/selection-state.ps1')
 . (Join-Path $PSScriptRoot 'lib/install-options.ps1')
+. (Join-Path $PSScriptRoot 'lib/semantic-retrieval.ps1')
 
 $homePath = [Environment]::GetFolderPath('UserProfile')
 if ($Quick) {
@@ -65,6 +66,7 @@ try {
     $script:PluginNonInteractive = $previousPluginNonInteractive
     $env:CI = $previousCI
 }
-if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Shell $Shell -Client $Client -Plugins $plugins -UpdateAgents $options.update_agents -Flashbang $options.flashbang }
+Sync-SemanticRetrieval -RepositoryRoot $root -HomePath $homePath -Client $Client -Enabled $options.semantic_retrieval -DryRun:$DryRun -Update -Summary:$Summary
+if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Shell $Shell -Client $Client -Plugins $plugins -UpdateAgents $options.update_agents -Flashbang $options.flashbang -SemanticRetrieval $options.semantic_retrieval }
 if ($Summary) { Write-Output "Update: PASS | $Client, $Shell$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS update dry-run' } else { 'PASS update' })) }
 exit 0

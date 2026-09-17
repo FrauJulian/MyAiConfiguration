@@ -12,6 +12,7 @@ $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'lib/install-targets.ps1')
 . (Join-Path $PSScriptRoot 'lib/selection-state.ps1')
 . (Join-Path $PSScriptRoot 'lib/install-options.ps1')
+. (Join-Path $PSScriptRoot 'lib/semantic-retrieval.ps1')
 
 $Shell = Read-InstallShell -Shell $Shell
 $shell = $Shell.ToLowerInvariant()
@@ -43,6 +44,7 @@ foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath 
 }
 
 Sync-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected
-if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Shell $Shell -Client $Client -Plugins $plugins -UpdateAgents $options.update_agents -Flashbang $options.flashbang }
+Sync-SemanticRetrieval -RepositoryRoot $root -HomePath $homePath -Client $Client -Enabled $options.semantic_retrieval -DryRun:$DryRun -Summary:$Summary
+if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Shell $Shell -Client $Client -Plugins $plugins -UpdateAgents $options.update_agents -Flashbang $options.flashbang -SemanticRetrieval $options.semantic_retrieval }
 if ($Summary) { Write-Output "Install: PASS | $Client, $Shell$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' })) }
 exit 0

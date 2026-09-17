@@ -21,6 +21,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$root/scripts/lib/install-targets.sh"
 . "$root/scripts/lib/selection-state.sh"
 . "$root/scripts/lib/install-options.sh"
+. "$root/scripts/lib/semantic-retrieval.sh"
 
 shell=$(read_install_shell "$shell")
 client=$(read_install_client "$client")
@@ -60,6 +61,7 @@ while IFS='|' read -r source destination; do
 done < <(get_install_targets "$generated" "$home_path" "$shell" "$client")
 
 sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" false selected_plugins "$summary"
+sync_semantic_retrieval "$root" "$client" "$home_path" "$semantic_retrieval" "$dry_run" false
 if [ "$dry_run" = false ]; then save_update_selection; fi
 
 if [ "$summary" = true ]; then
