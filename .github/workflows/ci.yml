@@ -65,16 +65,27 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Check PowerShell runtime
-        run: pwsh -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
-      - name: Run PowerShell tests
-        shell: pwsh
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          ./scripts/check-capabilities.ps1
-          Get-ChildItem scripts/test-*.ps1 | ForEach-Object {
-            Write-Host "==> $($_.Name)"
-            & $_.FullName -Summary
-          }
+          if command -v pwsh >/dev/null 2>&1; then
+            echo 'POWERSHELL_AVAILABLE=true' >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if sudo apt-get update && sudo apt-get install --yes --no-install-recommends powershell; then
+            echo 'POWERSHELL_AVAILABLE=true' >> "$GITHUB_ENV"
+          else
+            echo 'POWERSHELL_AVAILABLE=false' >> "$GITHUB_ENV"
+            echo '::warning::PowerShell is unavailable; PowerShell checks skipped for this runner.'
+          fi
+      - name: Run PowerShell tests
+        shell: bash
+        run: |
+          if [ "${POWERSHELL_AVAILABLE:-false}" != true ]; then exit 0; fi
+          pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/check-capabilities.ps1
+          for file in scripts/test-*.ps1; do
+            echo "==> $file"
+            pwsh -NoLogo -NoProfile -NonInteractive -File "$file" -Summary
+          done
 
   build:
     name: Build and inspect generated packages
