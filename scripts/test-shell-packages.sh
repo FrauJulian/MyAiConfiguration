@@ -32,7 +32,7 @@ for shell in powershell bash; do
     [ "$client" != claude ] || file=settings.json
     test -f "$package/$file"
     if [ "$client" = codex ]; then
-      while IFS=$'\t' read -r rule_file skill_name trigger; do
+      while IFS=$'\t' read -r rule_file _ trigger; do
         [ "$rule_file" = rule_file ] && continue
         [ -n "$rule_file" ] || continue
         rule_path=$rule_file
@@ -56,13 +56,15 @@ for shell in powershell bash; do
       ! grep -q 'flashbang-if-input' "$package/$file"
       ! grep -Eq '^async[[:space:]]*=[[:space:]]*true[[:space:]]*$' "$package/$file"
       grep -q 'approvals_reviewer[[:space:]]*=[[:space:]]*"auto_review"' "$package/$file"
+      grep -Eq '^max_depth[[:space:]]*=[[:space:]]*1[[:space:]]*$' "$package/$file"
       grep -Fq 'status_line = ["model", "reasoning", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]' "$package/$file"
     else
       python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); assert set(settings["hooks"]) == {"PreCompact", "SessionStart", "Stop"}' "$package/$file"
       ! grep -q 'flashbang-if-input' "$package/$file"
       ! grep -q '"async"[[:space:]]*:[[:space:]]*true' "$package/$file"
       grep -q '"defaultMode"[[:space:]]*:[[:space:]]*"auto"' "$package/$file"
-      statusline_extension=sh
+      python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); assert settings["sandbox"] == {"enabled": True, "allowUnsandboxedCommands": False}' "$package/$file"
+      statusline_extension='sh'
       [ "$shell" != powershell ] || statusline_extension=ps1
       test -f "$package/statusline/statusline.$statusline_extension"
       grep -q "statusline.$statusline_extension" "$package/$file"

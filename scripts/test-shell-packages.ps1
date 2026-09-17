@@ -41,11 +41,14 @@ foreach ($shell in @('powershell','bash')) {
             $events = @([regex]::Matches($content, '(?m)^\[\[hooks\.([^.\]]+)\]\]\s*$') | ForEach-Object { $_.Groups[1].Value })
             if ($events.Count -ne 1 -or $events[0] -ne 'Stop' -or $content -match 'flashbang-if-input' -or $content -match '(?m)^async\s*=\s*true\s*$') { throw "Codex finish hook is incorrect in $package" }
             if ($content -notmatch 'approvals_reviewer\s*=\s*"auto_review"') { throw "Codex auto review is missing in $package" }
+            if ($content -notmatch '(?m)^max_depth\s*=\s*1\s*$') { throw "Codex agent depth limit is missing in $package" }
             if ($content -notmatch 'status_line\s*=\s*\["model", "reasoning", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"\]') { throw "Codex status line is incorrect in $package" }
         } elseif ((($settings.hooks.PSObject.Properties.Name | Sort-Object) -join ',') -ne 'PreCompact,SessionStart,Stop' -or $content -match 'flashbang-if-input' -or $settings.hooks.Stop[0].hooks[0].async) {
             throw "Claude finish hook is incorrect in $package"
         } elseif ($content -notmatch '"defaultMode"\s*:\s*"auto"') {
             throw "Claude auto permission mode is missing in $package"
+        } elseif (-not $settings.sandbox.enabled -or $settings.sandbox.allowUnsandboxedCommands -ne $false) {
+            throw "Claude strict sandbox is missing in $package"
         } elseif (-not (Test-Path -LiteralPath (Join-Path $package "statusline/statusline.$(if ($shell -eq 'powershell') { 'ps1' } else { 'sh' })")) -or $settings.statusLine.command -notmatch "statusline\.$(if ($shell -eq 'powershell') { 'ps1' } else { 'sh' })") {
             throw "Claude status line is incorrect in $package"
         }
