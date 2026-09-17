@@ -31,7 +31,17 @@ for shell in powershell bash; do
     file=config.toml
     [ "$client" != claude ] || file=settings.json
     test -f "$package/$file"
+    if [ "$client" = codex ]; then
+      while IFS=$'\t' read -r rule_file skill_name trigger; do
+        [ "$rule_file" = rule_file ] && continue
+        [ -n "$rule_file" ] || continue
+        rule_path=$rule_file
+        [ -d "$root/shared/rules/$rule_file" ] && rule_path="$rule_file/index.md"
+        grep -Fq -- "- rules/$rule_path for $trigger." "$package/AGENTS.md"
+      done < "$root/adapters/claude/rule-skills.tsv"
+    fi
     test "$(find "$package/agents" -type f | wc -l)" -eq "$source_agent_count"
+    if [ "$client" = claude ]; then grep -q '^tools: Read,Diff,Search$' "$package/agents/reviewer.md"; fi
     expected_skill_count=$source_skill_count
     [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
     test "$(find "$package/skills" -name SKILL.md | wc -l)" -eq "$expected_skill_count"

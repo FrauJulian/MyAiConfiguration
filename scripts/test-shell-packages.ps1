@@ -22,8 +22,16 @@ foreach ($shell in @('powershell','bash')) {
         $package = Join-Path $root "generated/$client-$shell"
         $file = if ($client -eq 'codex') { 'config.toml' } else { 'settings.json' }
         $content = Get-Content -LiteralPath (Join-Path $package $file) -Raw
+        if ($client -eq 'codex') {
+            foreach ($entry in @(Import-Csv (Join-Path $root 'adapters/claude/rule-skills.tsv') -Delimiter ([char]9))) {
+                $rulePath = $entry.rule_file
+                if (Test-Path (Join-Path $root "shared/rules/$($entry.rule_file)") -PathType Container) { $rulePath = "$($entry.rule_file)/index.md" }
+                if ((Get-Content (Join-Path $package 'AGENTS.md') -Raw) -notmatch [regex]::Escape("- rules/$rulePath for $($entry.trigger).")) { throw "Codex rule loading is missing $($entry.rule_file) in $package" }
+            }
+        }
         if ($client -eq 'claude') { $settings = $content | ConvertFrom-Json }
         if (@(Get-ChildItem "$package/agents" -File).Count -ne $sourceAgentCount) { throw "Missing agents in $package" }
+        if ($client -eq 'claude' -and (Get-Content (Join-Path $package 'agents/reviewer.md') -Raw) -notmatch '(?m)^tools: Read,Diff,Search\r?$') { throw "Reviewer capability profile is missing in $package" }
         $expectedSkillCount = if ($client -eq 'claude') { $sourceSkillCount + $ruleSkillCount } else { $sourceSkillCount }
         if (@(Get-ChildItem "$package/skills" -Filter SKILL.md -Recurse).Count -ne $expectedSkillCount) { throw "Missing skills in $package" }
         $expected = if ($shell -eq 'powershell') { '__POWERSHELL_COMMAND__ .*flashbang.ps1' } else { 'bash .*flashbang.sh' }
