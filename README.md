@@ -108,8 +108,9 @@ Install and update also rebuild internally; the explicit build above lets you ch
   files are retained with a warning.
 - Dry-run support (no destination writes, backups, or plugin changes) and timestamped backup directories.
 - Finish notifications, Claude session-state hooks, optional safety utilities, and compact status displays.
-- Separate install and update scripts: install refuses to run against an already-installed destination, update refuses
-  to run against one that is not installed yet.
+- Separate install, update, and uninstall scripts: install refuses to run against an already-installed destination,
+  update refuses to run against one that is not installed yet, and uninstall refuses to run against one that was
+  never installed.
 - User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, QMD, Humanizer, Impeccable, and
   Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
   integrations installed and recorded by this setup can be removed through deselection.
@@ -240,6 +241,42 @@ It accepts the same `-DryRun`/`--dry-run`, `-Client`/`--client`, and `-Shell`/`-
 installer, re-syncs every managed file, and lets you revise the CLI update, Flashbang, and extension choices.
 Selected extensions are installed or updated. Deselection removes only extensions recorded as installed by this
 setup; pre-existing or manually installed extensions are retained. Quickupdate reuses the saved choices.
+
+## Uninstall
+
+Remove everything this setup previously installed for the selected client(s): managed files tracked in each
+destination's manifest, extensions and skills recorded in the extension ledger, an enabled semantic retrieval setup,
+and the saved Quickupdate selection (once no destination remains installed for any client).
+
+PowerShell:
+```powershell
+.\scripts\uninstall.ps1
+```
+
+Bash:
+```bash
+./scripts/uninstall.sh
+```
+
+Omitting `-Client`/`--client` opens the same selection prompt as install and update. Uninstall refuses to continue
+if none of the selected destinations are installed (`Not installed, nothing to uninstall.`), unless previewing with
+`-DryRun`/`--dry-run`, which always works and never changes anything.
+
+Because this removes configuration rather than adding it, a real run asks for confirmation (type `yes`) before
+touching anything, unless `-Force`/`--force` is passed; running without a terminal attached and without `-Force`/`--force`
+fails instead of hanging. Removal reuses the same manifest-sync logic as install and update: every managed file is
+backed up under `backups/<timestamp>/` before removal, and a file changed locally since the last install/update is
+backed up but left in place with a warning instead of being deleted. Files this setup never installed are never
+touched. A destination directory is only deleted once it is fully empty; backups already on disk are always kept.
+Extensions and skills recorded in the ledger are removed the same way `update` removes a deselected extension:
+pre-existing or manually installed ones outside the ledger are left alone, and a skill file modified since it was
+installed is kept with a warning. An enabled semantic retrieval setup is disabled and its setup-owned runtime and
+index removed for the selected client(s). The saved Quickupdate selection (`~/.my-ai-configuration/selection.json`)
+is only removed once uninstalling leaves no client installed at all, so uninstalling just one client out of a
+`Both` installation keeps the saved choices for the client that remains.
+
+Uninstall does not remove the CLI tools themselves (`codex`, `claude`), any plugin marketplace registrations they
+keep outside this setup's ledger, or files this setup never installed.
 
 ## Doctor
 
