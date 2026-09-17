@@ -267,7 +267,7 @@ workspace-scoped and use automatic review for eligible escalation requests. Ever
 
 Claude Code receives the equivalent global instructions, agents, hooks, and `settings.json`. General rules are embedded
 once in `CLAUDE.md` (and in Codex's `AGENTS.md`); every technology- or
-situation-specific rule (`adapters/claude/rule-skills.tsv`) is generated as a skill under `skills/rules/` instead, so
+situation-specific rule (`adapters/rule-skills.tsv`) is generated as a skill under `skills/rules/` instead, so
 only its name and description are permanently visible and the full rule text loads only when Claude invokes it. Its
 generated settings use the supported automatic permission mode where available.
 
@@ -296,7 +296,7 @@ turning yellow at 60% and red at 85%; its status-line input does not expose the 
 ### Add a rule
 
 Create a focused Markdown file in `shared/rules/`. For a rule that applies only to a language, framework, tool, or
-change area, add one row to `adapters/claude/rule-skills.tsv`. The build uses that manifest to generate both Claude's
+change area, add one row to `adapters/rule-skills.tsv`. The build uses that manifest to generate both Claude's
 rule skill and Codex's rule-loading condition. Put always-applicable guidance in `general.md`, which the build embeds
 for both clients; a new rule file is not automatically embedded.
 
