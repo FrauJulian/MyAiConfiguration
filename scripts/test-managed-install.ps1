@@ -3,6 +3,7 @@ param([switch]$Summary)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'lib/manifest.ps1')
+. (Join-Path $PSScriptRoot 'lib/install-targets.ps1')
 
 $work = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-config-manifest-test-" + [Guid]::NewGuid())
 New-Item $work -ItemType Directory -Force | Out-Null
@@ -72,7 +73,36 @@ try {
     if (@($outSummary | Where-Object { $_ -like 'CREATE*' -or $_ -like 'UPDATE*' -or $_ -like 'UNCHANGED*' -or $_ -like 'BACKUP*' }).Count -ne 0) { throw "Summary mode must not print per-file lines: $($outSummary -join '; ')" }
     if (@($outSummary | Where-Object { $_ -match '^SYNC .* unchanged' }).Count -ne 1) { throw "Summary mode must print exactly one SYNC tally line: $($outSummary -join '; ')" }
 
-    if ($Summary) { Write-Output 'Tests: PASS | managed install' } else { Write-Output 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free' }
+    $generated = Join-Path $work 'generated'
+    $package = Join-Path $generated 'codex-powershell'
+    $testHome = Join-Path $work 'home'
+    $legacy = Join-Path $testHome '.codex'
+    New-Item (Join-Path $package 'skills/example') -ItemType Directory -Force | Out-Null
+    Set-Content (Join-Path $package 'skills/example/SKILL.md') 'managed skill' -NoNewline
+    New-Item (Join-Path $legacy 'skills/example') -ItemType Directory -Force | Out-Null
+    Copy-Item (Join-Path $package 'skills/example/SKILL.md') (Join-Path $legacy 'skills/example/SKILL.md')
+    Set-Content (Join-Path $legacy 'skills/example/custom.md') 'customized' -NoNewline
+    Set-Content (Join-Path $legacy 'skills/example/foreign.md') 'foreign' -NoNewline
+    Write-ManagedManifest (Get-ManagedManifestPath $legacy) @{
+        'skills/example/SKILL.md' = (Get-Sha256Hash (Join-Path $legacy 'skills/example/SKILL.md'))
+        'skills/example/custom.md' = ('0' * 64)
+    }
+    $targets = @(Get-InstallTargets -Generated $generated -HomePath $testHome -Shell PowerShell -Client Codex)
+    if ($targets[0].Destination -ne (Join-Path $testHome '.agents/skills')) { throw 'Canonical skills must be installed before legacy copies are removed.' }
+    foreach ($item in $targets) { $null = Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp 'migrate' }
+    if (-not (Test-Path (Join-Path $testHome '.agents/skills/example/SKILL.md'))) { throw 'Canonical skill is missing.' }
+    if (Test-Path (Join-Path $legacy 'skills/example/SKILL.md')) { throw 'Unmodified managed skill must not remain duplicated.' }
+    if (-not (Test-Path (Join-Path $legacy 'backups/migrate/skills/example/SKILL.md'))) { throw 'Removed legacy skill must have a backup.' }
+    foreach ($name in @('custom.md', 'foreign.md')) {
+        if (-not (Test-Path (Join-Path $legacy "skills/example/$name"))) { throw 'Modified and foreign legacy skills must be preserved.' }
+    }
+    foreach ($item in $targets) { $null = Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp 'migrate-repeat' }
+    if (Test-Path (Join-Path $legacy 'backups/migrate-repeat')) { throw 'Skill migration must be idempotent.' }
+    Set-Content (Join-Path $source 'concurrency.txt') '__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__' -NoNewline
+    $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'concurrency' -ClaudeConcurrency '7'
+    if ((Get-Content (Join-Path $destination 'concurrency.txt') -Raw) -ne '7') { throw 'Standalone concurrency placeholder must be resolved.' }
+
+    if ($Summary) { Write-Output 'Tests: PASS | managed install' } else { Write-Output 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free, skill migration' }
 } finally {
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 }

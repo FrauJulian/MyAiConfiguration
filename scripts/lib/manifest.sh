@@ -64,6 +64,7 @@ sync_managed_destination() {
   while IFS= read -r -d '' source_file; do
     local relative target content needs_sub new_hash exists current_hash action backup
     relative=${source_file#"$source/"}
+    if [ "${destination##*/}" = .codex ] && [[ "$relative" = skills/* ]]; then continue; fi
     target="$destination/$relative"
     content=$(<"$source_file")
     needs_sub=false
@@ -71,7 +72,7 @@ sync_managed_destination() {
       content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter --path "$source_file" --flashbang false) || return
       needs_sub=true
     fi
-    if [[ "$needs_sub" = true || "$content" == *'__AI_CONFIG_ROOT__'* || "$content" == *'__HOOK_COMMAND__'* || "$content" == *'__POWERSHELL_HOOK_COMMAND__'* || "$content" == *'__POWERSHELL_COMMAND__'* ]]; then
+    if [[ "$needs_sub" = true || "$content" == *'__AI_CONFIG_ROOT__'* || "$content" == *'__HOOK_COMMAND__'* || "$content" == *'__POWERSHELL_HOOK_COMMAND__'* || "$content" == *'__POWERSHELL_COMMAND__'* || "$content" == *'__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__'* ]]; then
       needs_sub=true
       content=${content//__AI_CONFIG_ROOT__/$ai_config_root}
       content=${content//__HOOK_COMMAND__/$shell_command}

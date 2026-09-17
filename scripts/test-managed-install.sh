@@ -10,6 +10,7 @@ done
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$root/scripts/lib/manifest.sh"
+. "$root/scripts/lib/install-targets.sh"
 
 work=$(mktemp -d)
 cleanup() { rm -rf -- "$work"; }
@@ -85,4 +86,32 @@ if [ "$(printf '%s\n' "$out_summary" | grep -c '^SYNC .* unchanged')" -ne 1 ]; t
   exit 1
 fi
 
-if [ "$summary" = true ]; then printf 'Tests: PASS | managed install\n'; else printf 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free\n'; fi
+generated="$work/generated"
+package="$generated/codex-bash"
+test_home="$work/home"
+legacy="$test_home/.codex"
+mkdir -p "$package/skills/example" "$legacy/skills/example"
+printf 'managed skill' > "$package/skills/example/SKILL.md"
+cp "$package/skills/example/SKILL.md" "$legacy/skills/example/SKILL.md"
+printf 'customized' > "$legacy/skills/example/custom.md"
+printf 'foreign' > "$legacy/skills/example/foreign.md"
+declare -A legacy_manifest
+legacy_manifest[skills/example/SKILL.md]=$(sha256_of_file "$legacy/skills/example/SKILL.md")
+legacy_manifest[skills/example/custom.md]=$(printf '0%.0s' {1..64})
+write_managed_manifest "$(manifest_path "$legacy")" legacy_manifest
+mapfile -t targets < <(get_install_targets "$generated" "$test_home" bash codex)
+[[ "${targets[0]}" = *"|$test_home/.agents/skills" ]] || { printf 'Canonical skills must be installed first.\n' >&2; exit 1; }
+for target_pair in "${targets[@]}"; do
+  sync_managed_destination "${target_pair%%|*}" "${target_pair#*|}" migrate "" "" "" false > /dev/null
+done
+[ -f "$test_home/.agents/skills/example/SKILL.md" ] && [ ! -f "$legacy/skills/example/SKILL.md" ] && [ -f "$legacy/backups/migrate/skills/example/SKILL.md" ] || { printf 'Skill migration must remove and back up the managed duplicate.\n' >&2; exit 1; }
+[ -f "$legacy/skills/example/custom.md" ] && [ -f "$legacy/skills/example/foreign.md" ] || { printf 'Skill migration must preserve modified and foreign files.\n' >&2; exit 1; }
+for target_pair in "${targets[@]}"; do
+  sync_managed_destination "${target_pair%%|*}" "${target_pair#*|}" migrate-repeat "" "" "" false > /dev/null
+done
+[ ! -d "$legacy/backups/migrate-repeat" ] || { printf 'Skill migration must be idempotent.\n' >&2; exit 1; }
+printf '__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__' > "$source_dir/concurrency.txt"
+sync_managed_destination "$source_dir" "$destination" concurrency "" "" "" false false true 7 > /dev/null
+[ "$(cat "$destination/concurrency.txt")" = 7 ] || { printf 'Standalone concurrency placeholder must be resolved.\n' >&2; exit 1; }
+
+if [ "$summary" = true ]; then printf 'Tests: PASS | managed install\n'; else printf 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free, skill migration\n'; fi
