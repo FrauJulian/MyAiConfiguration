@@ -113,8 +113,8 @@ Install and update also rebuild internally; the explicit build above lets you ch
 - User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, QMD, Humanizer, Impeccable, and
   Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
   integrations installed and recorded by this setup can be removed through deselection.
-- Optional local semantic retrieval for both clients using Qwen3-Embedding-0.6B, disabled by default and removable
-  through the install/update choice.
+- Optional local semantic retrieval for both clients using Qwen3-Embedding-0.6B embeddings and Qwen3-Reranker-0.6B
+  reranking, disabled by default and removable through the install/update choice.
 
 ## Architecture
 
