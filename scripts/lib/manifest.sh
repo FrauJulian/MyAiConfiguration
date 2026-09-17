@@ -32,6 +32,7 @@ read_managed_manifest() {
     fi
     [ -n "$rel" ] || continue
     hash=$(printf '%s' "$hash" | tr '[:upper:]' '[:lower:]') # tolerate uppercase hashes from older manifests
+    # shellcheck disable=SC2034
     out_ref[$rel]=$hash
   done < "$path"
 }
@@ -96,7 +97,7 @@ sync_managed_destination() {
         while IFS= read -r setting; do
           setting_name=${setting%%=*}
           setting_name=${setting_name//[[:space:]]/}
-          content=$(printf '%s\n' "$content" | sed "/^[[:space:]]*$setting_name[[:space:]]*=/d")
+          content=$(printf '%s\n' "$content" | sed "/^[[:space:]]*${setting_name}[[:space:]]*=/d")
         done <<< "$local_settings"
         if printf '%s\n' "$content" | grep -qE '^[[:blank:]]*\['; then
           content=$(printf '%s\n' "$content" | awk -v settings="$local_settings" '
