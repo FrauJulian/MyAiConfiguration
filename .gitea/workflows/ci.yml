@@ -18,7 +18,7 @@ jobs:
       - name: Bash syntax
         run: find scripts shared/hooks -name '*.sh' -print0 | xargs -0 -n1 bash -n
       - name: Capability checks
-        run: ./scripts/check-capabilities.sh --skip-external
+        run: ./scripts/check-capabilities.sh
       - name: Build
         run: ./scripts/build.sh --summary
       - name: Prompt budget
@@ -34,7 +34,7 @@ jobs:
         shell: pwsh
         run: |
           $env:REQUIRE_CODEX_SCHEMA = 'true'
-          ./scripts/check-capabilities.ps1 -SkipExternal
+          ./scripts/check-capabilities.ps1
           ./scripts/build.ps1 -Summary
           ./scripts/doctor.ps1 -Summary
           ./scripts/test-shell-packages.ps1 -Summary
@@ -48,6 +48,7 @@ jobs:
           python ./scripts/test-managed-extensions.py
           python ./scripts/test-session-state.py
           python ./scripts/test-telemetry.py
+          python ./scripts/test-semantic-retrieval.py
           ./scripts/install.ps1 -Summary -DryRun -Client Both -Shell PowerShell
           ./scripts/update.ps1 -Summary -DryRun -Client Both -Shell PowerShell
       - name: Shell package tests
@@ -65,6 +66,7 @@ jobs:
           ./scripts/test-quick-update.sh --summary
           python3 scripts/test-install-options.py
           python3 scripts/test-telemetry.py
+          python3 scripts/test-semantic-retrieval.py
       - name: Managed extension and session-state tests
         run: |
           python3 scripts/test-managed-extensions.py
