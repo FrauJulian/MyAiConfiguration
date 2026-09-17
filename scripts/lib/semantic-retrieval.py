@@ -10,6 +10,7 @@ import sys
 
 NAME = 'my-ai-qwen3-retrieval'
 FILES = ('server.py', 'requirements.txt')
+CUDA_INDEX = 'https://download.pytorch.org/whl/cu126'
 
 
 def digest(path):
@@ -43,8 +44,15 @@ def ensure_runtime(target, dry_run):
     python = python_path(venv)
     if not python.is_file():
         raise ValueError('Semantic retrieval virtual environment is incomplete.')
-    subprocess.run([str(python), '-m', 'pip', 'install', '--disable-pip-version-check', '-r', str(target / 'requirements.txt')],
-                   check=True, timeout=900)
+    arguments = [str(python), '-m', 'pip', 'install', '--disable-pip-version-check', '-r', str(target / 'requirements.txt')]
+    if shutil.which('nvidia-smi'):
+        try:
+            subprocess.run([*arguments, '--extra-index-url', CUDA_INDEX], check=True, timeout=900)
+        except subprocess.CalledProcessError:
+            print('Semantic retrieval: CUDA runtime installation failed; falling back to CPU.', file=sys.stderr)
+            subprocess.run(arguments, check=True, timeout=900)
+    else:
+        subprocess.run(arguments, check=True, timeout=900)
     return python
 
 
