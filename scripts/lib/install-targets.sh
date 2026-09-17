@@ -63,8 +63,8 @@ get_install_targets() {
   local generated=$1 home_path=$2 shell=$3 client=$4
   case "$client" in
     codex|both)
-      printf '%s/codex-%s|%s/.codex\n' "$generated" "$shell" "$home_path"
       printf '%s/codex-%s/skills|%s/.agents/skills\n' "$generated" "$shell" "$home_path"
+      printf '%s/codex-%s|%s/.codex\n' "$generated" "$shell" "$home_path"
       ;;
   esac
   case "$client" in claude|both) printf '%s/claude-%s|%s/.claude\n' "$generated" "$shell" "$home_path" ;; esac

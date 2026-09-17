@@ -29,7 +29,7 @@ function Get-InstallDestinations {
 }
 function Get-InstallTargets {
     param([Parameter(Mandatory=$true)][string]$Generated,[Parameter(Mandatory=$true)][string]$HomePath,[Parameter(Mandatory=$true)][string]$Shell,[ValidateSet('Codex','Claude','Both')][Parameter(Mandatory=$true)][string]$Client)
-    $targets=@(); if($Client -in @('Codex','Both')){$targets+=@{Source=(Join-Path $Generated "codex-$($Shell.ToLowerInvariant())");Destination=(Join-Path $HomePath '.codex')};$targets+=@{Source=(Join-Path $Generated "codex-$($Shell.ToLowerInvariant())/skills");Destination=(Join-Path $HomePath '.agents/skills')}}; if($Client -in @('Claude','Both')){$targets+=@{Source=(Join-Path $Generated "claude-$($Shell.ToLowerInvariant())");Destination=(Join-Path $HomePath '.claude')};}; return $targets
+    $targets=@(); if($Client -in @('Codex','Both')){$targets+=@{Source=(Join-Path $Generated "codex-$($Shell.ToLowerInvariant())/skills");Destination=(Join-Path $HomePath '.agents/skills')};$targets+=@{Source=(Join-Path $Generated "codex-$($Shell.ToLowerInvariant())");Destination=(Join-Path $HomePath '.codex')}}; if($Client -in @('Claude','Both')){$targets+=@{Source=(Join-Path $Generated "claude-$($Shell.ToLowerInvariant())");Destination=(Join-Path $HomePath '.claude')};}; return $targets
 }
 function Test-AnyManifestPresent { param([Parameter(Mandatory=$true)][string[]]$Destinations); return [bool](@($Destinations|Where-Object{Test-Path(Get-ManagedManifestPath $_)}).Count) }
 function Test-AllManifestsPresent { param([Parameter(Mandatory=$true)][string[]]$Destinations); return [bool](@($Destinations|Where-Object{-not(Test-Path(Get-ManagedManifestPath $_))}).Count -eq 0) }
