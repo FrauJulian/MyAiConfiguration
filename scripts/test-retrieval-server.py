@@ -201,6 +201,10 @@ class RetrievalServerTests(unittest.TestCase):
         ]:
             self.assertEqual([symbol for symbol, _ in MODULE.sections(source, path)], symbols)
 
+    def test_rrf_rewards_agreement_and_breaks_ties_deterministically(self):
+        self.assertEqual(MODULE.reciprocal_rank_fusion([1, 2, 3], [4, 2, 3]), [2, 3, 1, 4])
+        self.assertEqual(MODULE.reciprocal_rank_fusion([], [4, 2]), [4, 2])
+
     def test_old_cache_is_preserved_but_not_reused(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

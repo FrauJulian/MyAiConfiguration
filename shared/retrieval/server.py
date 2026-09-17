@@ -20,8 +20,11 @@ RERANKER_MODEL = "Qwen/Qwen3-Reranker-0.6B"
 EMBEDDING_DIMENSIONS = 1024
 CHUNK_TOKENS = 400
 OVERLAP_TOKENS = 64
+DENSE_CANDIDATES = 50
+LEXICAL_CANDIDATES = 50
 RERANK_CANDIDATES = 20
 FINAL_RESULTS = 20
+RRF_K = 60
 INDEX_VERSION = 2
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
@@ -115,6 +118,14 @@ def document_text(path: str, symbol: str, content: str):
     return f"Path: {path}\nSymbol: {symbol}\n\n{content}"
 
 
+def reciprocal_rank_fusion(*rankings):
+    scores = {}
+    for ranking in rankings:
+        for rank, identifier in enumerate(ranking, 1):
+            scores[identifier] = scores.get(identifier, 0.0) + 1.0 / (RRF_K + rank)
+    return sorted(scores, key=lambda identifier: (-scores[identifier], identifier))
+
+
 class Index:
     def __init__(self, root: Path, data: Path):
         self.root = root.resolve()
@@ -205,7 +216,7 @@ class Index:
                 self.delete_path(relative)
                 self.db.execute("delete from files where path = ?", (relative,))
 
-    def search(self, query: str, top_k: int):
+    def search(self, query: str, top_k: int = 5):
         if not query.strip():
             raise ValueError("query must not be empty")
         with self.lock:
@@ -216,10 +227,21 @@ class Index:
             vector = self.encoder().encode([query], prompt_name="query", normalize_embeddings=True)[0]
             if len(vector) != EMBEDDING_DIMENSIONS:
                 raise ValueError("Embedding must have 1024 dimensions")
-            rows = ({"path": path, "symbol": symbol, "score": float(np.dot(vector, np.frombuffer(blob, dtype=np.float32))), "text": text}
-                    for path, symbol, text, blob in self.db.execute("select path, symbol, text, vector from chunks"))
-            limit = max(1, min(top_k, 20))
-            return self.rerank(query, heapq.nlargest(20, rows, key=lambda item: item["score"]), limit)
+            scores = ((identifier, float(np.dot(vector, np.frombuffer(blob, dtype=np.float32))))
+                      for identifier, blob in self.db.execute("select rowid, vector from chunks"))
+            dense = [identifier for identifier, _ in heapq.nlargest(DENSE_CANDIDATES, scores, key=lambda item: item[1])]
+            terms = list(dict.fromkeys(re.findall(r"[^\W_]+", query)))[:128]
+            expression = " OR ".join(f'"{term}"' for term in terms)
+            lexical = [row[0] for row in self.db.execute(
+                "select rowid from lexical where lexical match ? order by bm25(lexical), rowid limit ?",
+                (expression, LEXICAL_CANDIDATES))] if terms else []
+            identifiers = reciprocal_rank_fusion(dense, lexical)[:RERANK_CANDIDATES]
+            placeholders = ",".join("?" for _ in identifiers)
+            rows = {identifier: {"path": path, "symbol": symbol, "text": text}
+                    for identifier, path, symbol, text in self.db.execute(
+                        f"select rowid, path, symbol, text from chunks where rowid in ({placeholders})", identifiers)}
+            candidates = [rows[identifier] for identifier in identifiers]
+            return self.rerank(query, candidates, max(1, min(top_k, FINAL_RESULTS)))
 
 
 def main():
