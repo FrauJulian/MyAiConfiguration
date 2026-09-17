@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import heapq
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
 import threading
 
@@ -20,13 +22,77 @@ CHUNK_TOKENS = 400
 OVERLAP_TOKENS = 64
 RERANK_CANDIDATES = 20
 FINAL_RESULTS = 20
-INDEX_VERSION = 0
+INDEX_VERSION = 1
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
 
 
+def sections(text: str, path: str):
+    lines = text.splitlines(keepends=True)
+    boundaries = {0: "<module>", len(lines): "<module>"}
+    suffix = Path(path).suffix.lower()
+    if suffix == ".py":
+        try:
+            tree = ast.parse(text)
+        except (SyntaxError, ValueError):
+            tree = None
+
+        def visit(node, parent):
+            symbol = parent
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                symbol = f"{parent}.{node.name}" if parent != "<module>" else node.name
+                start = min([node.lineno, *(item.lineno for item in node.decorator_list)]) - 1
+                boundaries[start] = symbol
+                boundaries.setdefault(node.end_lineno, parent)
+            for child in ast.iter_child_nodes(node):
+                visit(child, symbol)
+
+        if tree is not None:
+            visit(tree, "<module>")
+    else:
+        fence = None
+        headings = []
+        for number, line in enumerate(lines):
+            if suffix == ".md":
+                marker = re.match(r"^\s{0,3}(`{3,}|~{3,})", line)
+                if marker:
+                    value = marker[1]
+                    if fence is None:
+                        fence = value
+                    elif value[0] == fence[0] and len(value) >= len(fence):
+                        fence = None
+                    continue
+                heading = re.match(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$", line)
+                if heading and fence is None:
+                    level = len(heading[1])
+                    headings = [(depth, title) for depth, title in headings if depth < level]
+                    headings.append((level, heading[2]))
+                    boundaries[number] = " / ".join(title for _, title in headings)
+            elif suffix == ".toml":
+                heading = re.match(r"^\s*\[\[?([^\]]+)\]\]?\s*(?:#.*)?$", line)
+                if heading:
+                    boundaries[number] = heading[1]
+            elif suffix in {".js", ".ts", ".tsx", ".cs", ".java", ".go", ".rs", ".c", ".cpp", ".ps1", ".sh"}:
+                symbol = re.match(
+                    r"^\s*(?:(?:export|default|public|private|protected|internal|static|abstract|async|sealed|partial|pub)\s+)*"
+                    r"(?:(?:class|interface|struct|enum|record|function|fn|def)\s+([\w$-]+)"
+                    r"|func\s+(?:\([^)]*\)\s*)?([\w]+)"
+                    r"|(?:const|let|var)\s+([\w$]+)\s*=.*=>"
+                    r"|([\w$-]+)\s*\([^;]*\)\s*\{"
+                    r"|[\w<>\[\],?]+\s+([\w]+)\s*\([^;]*\)\s*(?:\{|=>|$))", line)
+                if symbol:
+                    name = next(value for value in symbol.groups() if value)
+                    if name not in {"if", "for", "foreach", "while", "switch", "catch", "using", "lock"}:
+                        boundaries[number] = name
+    positions = sorted(boundaries)
+    for start, end in zip(positions, positions[1:]):
+        content = "".join(lines[start:end])
+        if content.strip():
+            yield boundaries[start], content
+
+
 def chunks(text: str, path: str, tokenizer):
-    for symbol, content in [("<module>", text)]:
+    for symbol, content in sections(text, path):
         offsets = tokenizer(content, add_special_tokens=False, return_offsets_mapping=True)["offset_mapping"]
         start = 0
         while start < len(offsets):
