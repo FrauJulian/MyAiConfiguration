@@ -16,15 +16,37 @@ import threading
 MODEL = "Qwen/Qwen3-Embedding-0.6B"
 RERANKER_MODEL = "Qwen/Qwen3-Reranker-0.6B"
 EMBEDDING_DIMENSIONS = 1024
+CHUNK_TOKENS = 400
+OVERLAP_TOKENS = 64
+RERANK_CANDIDATES = 20
+FINAL_RESULTS = 20
+INDEX_VERSION = 0
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
 
 
-def chunks(text: str):
-    for start in range(0, len(text), 1050):
-        value = text[start:start + 1200].strip()
-        if value:
-            yield value
+def chunks(text: str, path: str, tokenizer):
+    for symbol, content in [("<module>", text)]:
+        offsets = tokenizer(content, add_special_tokens=False, return_offsets_mapping=True)["offset_mapping"]
+        start = 0
+        while start < len(offsets):
+            end = min(start + CHUNK_TOKENS, len(offsets))
+            first = 0 if start == 0 else offsets[start][0]
+            while end > start:
+                last = len(content) if end == len(offsets) else offsets[end][0]
+                value = content[first:last].strip()
+                if len(tokenizer(value, add_special_tokens=False)["input_ids"]) <= CHUNK_TOKENS:
+                    break
+                end -= 1
+            if value:
+                yield symbol, value
+            if end == len(offsets):
+                break
+            start = max(start + 1, end - OVERLAP_TOKENS)
+
+
+def document_text(path: str, symbol: str, content: str):
+    return f"Path: {path}\nSymbol: {symbol}\n\n{content}"
 
 
 class Index:
@@ -32,10 +54,11 @@ class Index:
         self.root = root.resolve()
         self.data = data.resolve()
         self.data.mkdir(parents=True, exist_ok=True)
-        identity = os.path.normcase(str(self.root)) + "\n" + MODEL + "\n" + str(EMBEDDING_DIMENSIONS)
+        identity = json.dumps([os.path.normcase(str(self.root)), MODEL, EMBEDDING_DIMENSIONS,
+                               INDEX_VERSION, CHUNK_TOKENS, OVERLAP_TOKENS])
         database = hashlib.sha256(identity.encode()).hexdigest() + ".sqlite3"
         self.db = sqlite3.connect(self.data / database, check_same_thread=False, timeout=30)
-        self.db.execute("create table if not exists chunks (path text, text text, vector blob)")
+        self.db.execute("create table if not exists chunks (path text, symbol text, text text, vector blob)")
         self.db.execute("create index if not exists chunks_path on chunks (path)")
         self.db.execute("create table if not exists files (path text primary key, digest text)")
         self.db.commit()
@@ -74,11 +97,15 @@ class Index:
         return self.reranker_model
 
     def rerank(self, query: str, rows: list[dict], limit: int):
-        candidates = rows[:min(len(rows), max(limit, 20))]
-        scores = self.reranker().predict([(query, item["text"]) for item in candidates])
+        candidates = rows[:RERANK_CANDIDATES]
+        scores = self.reranker().predict([(query, document_text(item["path"], item["symbol"], item["text"]))
+                                          for item in candidates], batch_size=8)
         for item, score in zip(candidates, scores):
             item["score"] = round(float(score), 6)
-        return sorted(candidates, key=lambda item: item["score"], reverse=True)[:limit]
+        return sorted(candidates, key=lambda item: item["score"], reverse=True)[:min(limit, FINAL_RESULTS)]
+
+    def delete_path(self, path):
+        self.db.execute("delete from chunks where path = ?", (path,))
 
     def rebuild(self):
         with self.lock:
@@ -95,14 +122,18 @@ class Index:
                 old_digest = previous.pop(relative, None)
                 if not force and digest == old_digest:
                     continue
-                values = list(chunks(content.decode("utf-8", errors="ignore")))
-                vectors = self.encoder().encode(values, normalize_embeddings=True) if values else []
-                self.db.execute("delete from chunks where path = ?", (relative,))
-                self.db.executemany("insert into chunks values (?, ?, ?)",
-                                    ((relative, value, vector.tobytes()) for value, vector in zip(values, vectors)))
+                values = list(chunks(content.decode("utf-8", errors="ignore"), relative, self.encoder().tokenizer))
+                documents = [document_text(relative, symbol, value) for symbol, value in values]
+                vectors = self.encoder().encode(documents, normalize_embeddings=True) if documents else []
+                self.delete_path(relative)
+                for (symbol, value), vector in zip(values, vectors):
+                    if len(vector) != EMBEDDING_DIMENSIONS:
+                        raise ValueError("Embedding must have 1024 dimensions")
+                    self.db.execute("insert into chunks values (?, ?, ?, ?)",
+                                             (relative, symbol, value, vector.tobytes()))
                 self.db.execute("insert or replace into files values (?, ?)", (relative, digest))
             for relative in previous:
-                self.db.execute("delete from chunks where path = ?", (relative,))
+                self.delete_path(relative)
                 self.db.execute("delete from files where path = ?", (relative,))
 
     def search(self, query: str, top_k: int):
@@ -114,8 +145,10 @@ class Index:
                 return []
             import numpy as np
             vector = self.encoder().encode([query], prompt_name="query", normalize_embeddings=True)[0]
-            rows = ({"path": path, "score": float(np.dot(vector, np.frombuffer(blob, dtype=np.float32))), "text": text}
-                    for path, text, blob in self.db.execute("select path, text, vector from chunks"))
+            if len(vector) != EMBEDDING_DIMENSIONS:
+                raise ValueError("Embedding must have 1024 dimensions")
+            rows = ({"path": path, "symbol": symbol, "score": float(np.dot(vector, np.frombuffer(blob, dtype=np.float32))), "text": text}
+                    for path, symbol, text, blob in self.db.execute("select path, symbol, text, vector from chunks"))
             limit = max(1, min(top_k, 20))
             return self.rerank(query, heapq.nlargest(20, rows, key=lambda item: item["score"]), limit)
 

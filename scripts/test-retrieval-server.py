@@ -3,6 +3,7 @@ from array import array
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
+import re
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import time
@@ -14,6 +15,11 @@ ROOT = Path(__file__).resolve().parent.parent
 SPEC = importlib.util.spec_from_file_location('retrieval_server', ROOT / 'shared/retrieval/server.py')
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
+def tokenize(text, **kwargs):
+    offsets = [match.span() for match in re.finditer(r'\S+', text)]
+    return {'offset_mapping': offsets, 'input_ids': list(range(len(offsets)))}
 
 
 def embedding():
@@ -30,6 +36,13 @@ class RetrievalServerTests(unittest.TestCase):
             (root / 'weather.md').write_text('The weather service fetches temperature and rainfall forecasts for a city.', encoding='utf-8')
             index = MODULE.Index(root, root / 'data')
             try:
+                tokenizer = index.encoder().tokenizer
+                for source in ['alpha beta gamma ' * 450, 'Grüße 世界 🙂 ' * 300]:
+                    windows = list(MODULE.chunks(source, 'sample.txt', tokenizer))
+                    self.assertGreater(len(windows), 1)
+                    self.assertTrue(all(len(tokenizer(value, add_special_tokens=False)['input_ids']) <= 400
+                                        for _, value in windows))
+                    self.assertTrue(all('\ufffd' not in value for _, value in windows))
                 for query, expected in [('Where are password reset tokens created?', 'authentication.md'),
                                         ('Which service provides rainfall forecasts?', 'weather.md')]:
                     started = time.monotonic()
@@ -59,7 +72,7 @@ class RetrievalServerTests(unittest.TestCase):
                 return [embedding() for _ in values]
 
             for index in indexes:
-                index.encoder = lambda: SimpleNamespace(encode=encode)
+                index.encoder = lambda: SimpleNamespace(encode=encode, tokenizer=tokenize)
                 index.rerank = lambda query, rows, limit: rows[:limit]
             numpy = SimpleNamespace(dot=lambda a, b: sum(x * y for x, y in zip(a, b)),
                                     frombuffer=lambda blob, **kwargs: array('f', blob), float32=None)
@@ -92,18 +105,18 @@ class RetrievalServerTests(unittest.TestCase):
             root = Path(temporary)
             (root / 'a.md').write_text('before', encoding='utf-8')
             index = MODULE.Index(root, root / 'data')
-            index.encoder = lambda: SimpleNamespace(encode=lambda values, **kwargs: [embedding() for _ in values])
+            index.encoder = lambda: SimpleNamespace(encode=lambda values, **kwargs: [embedding() for _ in values], tokenizer=tokenize)
             try:
                 index.rebuild()
                 (root / 'a.md').write_text('after', encoding='utf-8')
                 (root / 'b.md').write_text('fail', encoding='utf-8')
 
                 def encode(values, **kwargs):
-                    if values == ['fail']:
+                    if any(value.endswith('\n\nfail') for value in values):
                         raise RuntimeError('encoder failed')
                     return [embedding() for _ in values]
 
-                index.encoder = lambda: SimpleNamespace(encode=encode)
+                index.encoder = lambda: SimpleNamespace(encode=encode, tokenizer=tokenize)
                 with self.assertRaisesRegex(RuntimeError, 'encoder failed'):
                     index.rebuild()
                 self.assertEqual(index.db.execute('select path, text from chunks').fetchall(), [('a.md', 'before')])
@@ -131,22 +144,51 @@ class RetrievalServerTests(unittest.TestCase):
         index = MODULE.Index.__new__(MODULE.Index)
 
         class Reranker:
-            def predict(self, pairs):
+            def predict(self, pairs, **kwargs):
                 self.pairs = pairs
                 return [0.1, 0.8, 0.5]
 
         reranker = Reranker()
         index.reranker = lambda: reranker
         rows = [
-            {'path': 'a.md', 'score': 0.9, 'text': 'first'},
-            {'path': 'b.md', 'score': 0.8, 'text': 'second'},
-            {'path': 'c.md', 'score': 0.7, 'text': 'third'},
+            {'path': 'a.md', 'symbol': 'A', 'score': 0.9, 'text': 'first'},
+            {'path': 'b.md', 'symbol': 'B', 'score': 0.8, 'text': 'second'},
+            {'path': 'c.md', 'symbol': 'C', 'score': 0.7, 'text': 'third'},
         ]
 
         result = index.rerank('query', rows, 2)
 
         self.assertEqual([item['path'] for item in result], ['b.md', 'c.md'])
-        self.assertEqual(reranker.pairs, [('query', 'first'), ('query', 'second'), ('query', 'third')])
+        self.assertEqual(reranker.pairs, [('query', 'Path: a.md\nSymbol: A\n\nfirst'),
+                                        ('query', 'Path: b.md\nSymbol: B\n\nsecond'),
+                                        ('query', 'Path: c.md\nSymbol: C\n\nthird')])
+
+    def test_token_windows_have_exact_overlap_and_no_redundant_tail(self):
+        for size, lengths in [(0, []), (400, [400]), (401, [400, 65]), (736, [400, 400]), (800, [400, 400, 128])]:
+            words = [f'token{number}' for number in range(size)]
+            result = list(MODULE.chunks(' '.join(words), 'plain.txt', tokenize))
+            windows = [content.split() for _, content in result]
+            self.assertEqual([len(window) for window in windows], lengths)
+            for first, second in zip(windows, windows[1:]):
+                self.assertEqual(first[-64:], second[:64])
+            if windows:
+                reconstructed = windows[0] + [word for window in windows[1:] for word in window[64:]]
+                self.assertEqual(reconstructed, words)
+
+    def test_old_cache_is_preserved_but_not_reused(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data = root / 'data'
+            data.mkdir()
+            identity = os.path.normcase(str(root.resolve())) + '\n' + MODULE.MODEL
+            old = data / (MODULE.hashlib.sha256(identity.encode()).hexdigest() + '.sqlite3')
+            old.write_bytes(b'old cache')
+            index = MODULE.Index(root, data)
+            try:
+                self.assertNotEqual(Path(index.db.execute('pragma database_list').fetchone()[2]), old)
+                self.assertEqual(old.read_bytes(), b'old cache')
+            finally:
+                index.db.close()
 
 
 if __name__ == '__main__':
