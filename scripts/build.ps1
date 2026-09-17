@@ -6,6 +6,7 @@ $shared = Join-Path $root 'shared'
 $output = Join-Path $root 'generated'
 $pluginManifest = Join-Path $root 'adapters/plugins.tsv'
 $ruleSkillManifest = Join-Path $root 'adapters/claude/rule-skills.tsv'
+$capabilityManifest = Join-Path $root 'adapters/claude/capabilities.tsv'
 
 if (-not (Test-Path -LiteralPath $pluginManifest)) { throw "Missing plugin manifest: $pluginManifest" }
 $pluginEntries = @(Import-Csv -LiteralPath $pluginManifest -Delimiter ([char]9))
@@ -20,6 +21,7 @@ foreach ($pluginEntry in $pluginEntries) {
 }
 
 if (-not (Test-Path -LiteralPath $ruleSkillManifest)) { throw "Missing rule-skill manifest: $ruleSkillManifest" }
+if (-not (Test-Path -LiteralPath $capabilityManifest)) { throw "Missing capability manifest: $capabilityManifest" }
 $ruleSkillEntries = @(Import-Csv -LiteralPath $ruleSkillManifest -Delimiter ([char]9) | Sort-Object skill_name)
 if ($ruleSkillEntries.Count -eq 0) { throw 'Rule-skill manifest must define at least one entry.' }
 $ruleSkillNames = @()
@@ -31,6 +33,18 @@ foreach ($entry in $ruleSkillEntries) {
     if ($ruleSkillNames -contains $entry.skill_name) { throw "Duplicate rule-skill name in manifest: $($entry.skill_name)" }
     $ruleSkillNames += $entry.skill_name
 }
+$agentTools = @{}
+foreach ($entry in @(Import-Csv -LiteralPath $capabilityManifest -Delimiter ([char]9))) {
+    if ([string]::IsNullOrWhiteSpace($entry.role) -or [string]::IsNullOrWhiteSpace($entry.tools)) { throw 'Invalid capability manifest row.' }
+    $agentTools[$entry.role] = $entry.tools
+}
+$codexRuleLoadingLines = @()
+foreach ($entry in $ruleSkillEntries) {
+    $rulePath = $entry.rule_file
+    if (Test-Path -LiteralPath (Join-Path $shared "rules/$($entry.rule_file)") -PathType Container) { $rulePath = "$($entry.rule_file)/index.md" }
+    $codexRuleLoadingLines += "- rules/$rulePath for $($entry.trigger)."
+}
+$codexRuleLoadingList = $codexRuleLoadingLines -join "`r`n"
 
 Remove-Item $output -Recurse -Force -ErrorAction SilentlyContinue
 New-Item $output -ItemType Directory -Force | Out-Null
@@ -102,26 +116,9 @@ Detect the languages, frameworks, tools, and change areas from the repository an
 
 Load rule files when their subject applies:
 
-- rules/security-auth.md for authentication, authorization, sessions, tokens, permissions, or tenant boundaries.
-- rules/security-web.md for browser, frontend, cookie, redirect, XSS, or CSRF work.
-- rules/security-api.md for HTTP APIs, request handling, serialization, or endpoints.
-- rules/security-data.md for databases, persistence, sensitive data, or multi-tenancy.
-- rules/security-files.md for files, uploads, archives, paths, processes, IPC, or deserialization.
-- rules/security-network.md for network access, URLs, TLS, proxies, or SSRF.
-- rules/security-crypto.md for cryptography, secrets, credentials, keys, or tokens.
-- rules/security-supply-chain.md for dependencies, packages, plugins, builds, deployments, or CI.
-- rules/angular/index.md for Angular work.
-- rules/typescript.md for TypeScript work.
-- rules/csharp.md for C# or .NET work.
-- rules/wpf/index.md for WPF work.
-- rules/ui-ux/index.md for UI or UX decisions.
-- rules/microsoft.md for Microsoft 365, Azure DevOps, or Teams work.
-- rules/orchestration.md for delegation, subagent work, or long-running task state.
-- rules/git.md for Git operations.
-- rules/refactoring.md for refactoring work.
-- rules/definition-of-done.md when validating completion.
-- rules/decision-rule.md when requirements are unresolved, behavior is ambiguous, or a meaningful technical choice remains.
+__CODEX_RULE_LOADING__
 '@
+$codexRuleLoading = $codexRuleLoading.Replace('__CODEX_RULE_LOADING__', $codexRuleLoadingList)
 
 foreach ($shell in @('powershell','bash')) {
     New-Item (Join-Path $output "codex-$shell") -ItemType Directory -Force | Out-Null
@@ -180,7 +177,10 @@ foreach ($shell in @('powershell','bash')) {
             if ($client -eq 'codex') {
                 Set-Content (Join-Path $agentsOutput "$name.toml") "name = $(Quote-Toml $name)`r`ndescription = $(Quote-Toml $description)`r`ndeveloper_instructions = $(Quote-Toml $instructions)" -Encoding UTF8
             } else {
-                Set-Content (Join-Path $agentsOutput "$name.md") "---`r`nname: $name`r`ndescription: $description`r`n---`r`n`r`n$instructions" -Encoding UTF8
+                $tools = $agentTools[$name]
+                $frontmatter = "---`r`nname: $name`r`ndescription: $description`r`n"
+                if ($tools) { $frontmatter += "tools: $tools`r`n" }
+                Set-Content (Join-Path $agentsOutput "$name.md") ($frontmatter + "---`r`n`r`n$instructions") -Encoding UTF8
             }
         }
     }

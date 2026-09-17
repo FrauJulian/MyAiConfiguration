@@ -1,0 +1,6 @@
+role	tools
+architect	Read,Search,WebFetch
+researcher	Read,Search,WebFetch
+reviewer	Read,Diff,Search
+verifier	Read,Shell
+implementer	Read,Write,Shell,Tests

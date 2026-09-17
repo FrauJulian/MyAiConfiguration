@@ -13,6 +13,7 @@ shared="$root/shared"
 output="$root/generated"
 plugin_manifest="$root/adapters/plugins.tsv"
 rule_skill_manifest="$root/adapters/claude/rule-skills.tsv"
+capability_manifest="$root/adapters/claude/capabilities.tsv"
 
 [ -f "$plugin_manifest" ] || { printf 'Missing plugin manifest: %s\n' "$plugin_manifest" >&2; exit 1; }
 declare -A plugin_seen
@@ -29,6 +30,7 @@ done < "$plugin_manifest"
 [ "$plugin_count" -gt 0 ] || { printf 'Plugin manifest must define at least one plugin.\n' >&2; exit 1; }
 
 [ -f "$rule_skill_manifest" ] || { printf 'Missing rule-skill manifest: %s\n' "$rule_skill_manifest" >&2; exit 1; }
+[ -f "$capability_manifest" ] || { printf 'Missing capability manifest: %s\n' "$capability_manifest" >&2; exit 1; }
 declare -A rule_skill_seen
 rule_skill_files=()
 rule_skill_names=()
@@ -45,8 +47,21 @@ while IFS=$'\t' read -r rule_file skill_name trigger; do
   rule_skill_files+=("$rule_file")
   rule_skill_names+=("$skill_name")
   rule_skill_triggers+=("$trigger")
-done < "$rule_skill_manifest"
+done < <(tail -n +2 "$rule_skill_manifest" | sort -t$'\t' -k2,2)
 [ "${#rule_skill_names[@]}" -gt 0 ] || { printf 'Rule-skill manifest must define at least one entry.\n' >&2; exit 1; }
+codex_rule_loading_list=""
+for i in "${!rule_skill_names[@]}"; do
+  rule_file=${rule_skill_files[$i]}
+  rule_path="$rule_file"
+  [ -d "$shared/rules/$rule_file" ] && rule_path="$rule_file/index.md"
+  codex_rule_loading_list="${codex_rule_loading_list}- rules/${rule_path} for ${rule_skill_triggers[$i]}."$'\n'
+done
+declare -A agent_tools
+while IFS=$'\t' read -r role tools; do
+  [ "$role" != role ] || continue
+  [ -n "$role" ] && [ -n "$tools" ] || { printf 'Invalid capability manifest row.\n' >&2; exit 1; }
+  agent_tools[$role]="$tools"
+done < "$capability_manifest"
 
 copy_directory() {
   local source=$1 destination=$2
@@ -97,27 +112,8 @@ When programming, always load and apply `rules/security.md`. This includes imple
 Detect the languages, frameworks, tools, and change areas from the repository and the requested work. Load every applicable rule file before editing. Load all matching files when multiple technologies apply.
 
 Load rule files when their subject applies:
-
-- rules/security-auth.md for authentication, authorization, sessions, tokens, permissions, or tenant boundaries.
-- rules/security-web.md for browser, frontend, cookie, redirect, XSS, or CSRF work.
-- rules/security-api.md for HTTP APIs, request handling, serialization, or endpoints.
-- rules/security-data.md for databases, persistence, sensitive data, or multi-tenancy.
-- rules/security-files.md for files, uploads, archives, paths, processes, IPC, or deserialization.
-- rules/security-network.md for network access, URLs, TLS, proxies, or SSRF.
-- rules/security-crypto.md for cryptography, secrets, credentials, keys, or tokens.
-- rules/security-supply-chain.md for dependencies, packages, plugins, builds, deployments, or CI.
-- rules/angular/index.md for Angular work.
-- rules/typescript.md for TypeScript work.
-- rules/csharp.md for C# or .NET work.
-- rules/wpf/index.md for WPF work.
-- rules/ui-ux/index.md for UI or UX decisions.
-- rules/microsoft.md for Microsoft 365, Azure DevOps, or Teams work.
-- rules/orchestration.md for delegation, subagent work, or long-running task state.
-- rules/git.md for Git operations.
-- rules/refactoring.md for refactoring work.
-- rules/definition-of-done.md when validating completion.
-- rules/decision-rule.md when requirements are unresolved, behavior is ambiguous, or a meaningful technical choice remains.
 BLOCK
+codex_rule_loading="${codex_rule_loading}"$'\n\n'"${codex_rule_loading_list%$'\n'}"
 
 for shell in powershell bash; do
 mkdir -p "$output/codex-$shell" "$output/claude-$shell"
@@ -178,7 +174,8 @@ for client in codex claude; do
     if [ "$client" = codex ]; then
       printf 'name = %s\ndescription = %s\ndeveloper_instructions = %s\n' "$(quote_toml "$name")" "$(quote_toml "$description")" "$(quote_toml "$instructions")" > "$agents_output/$name.toml"
     else
-      printf '%s\nname: %s\ndescription: %s\n%s\n\n%s\n' '---' "$name" "$description" '---' "$instructions" > "$agents_output/$name.md"
+      tools=${agent_tools[$name]:-}
+      if [ -n "$tools" ]; then printf '%s\nname: %s\ndescription: %s\ntools: %s\n%s\n\n%s\n' '---' "$name" "$description" "$tools" '---' "$instructions" > "$agents_output/$name.md"; else printf '%s\nname: %s\ndescription: %s\n%s\n\n%s\n' '---' "$name" "$description" '---' "$instructions" > "$agents_output/$name.md"; fi
     fi
   done
 done
