@@ -125,6 +125,26 @@ class RetrievalServerTests(unittest.TestCase):
             finally:
                 index.db.close()
 
+    def test_refresh_batches_embeddings_for_changed_files(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'first.md').write_text('first', encoding='utf-8')
+            (root / 'second.md').write_text('second', encoding='utf-8')
+            index = MODULE.Index(root, root / 'data')
+            encoded = []
+
+            def encode(values, **kwargs):
+                encoded.append(list(values))
+                return [embedding() for _ in values]
+
+            index.encoder = lambda: SimpleNamespace(encode=encode, tokenizer=tokenize)
+            try:
+                index.rebuild()
+                self.assertEqual(len(encoded), 1)
+                self.assertEqual(len(encoded[0]), 2)
+            finally:
+                index.db.close()
+
     def test_scan_prunes_ignored_directories_and_stops_at_limit(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

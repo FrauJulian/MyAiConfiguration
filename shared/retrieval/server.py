@@ -193,19 +193,31 @@ class Index:
 
     def refresh(self, force=False):
         previous = dict(self.db.execute("select path, digest from files"))
+        encoder = None
+        changed = []
+        documents = []
+        document_offsets = []
+        for path in self.files():
+            relative = path.relative_to(self.root).as_posix()
+            content = path.read_bytes()
+            digest = hashlib.sha256(content).hexdigest()
+            old_digest = previous.pop(relative, None)
+            if not force and digest == old_digest:
+                continue
+            if encoder is None:
+                encoder = self.encoder()
+            values = list(chunks(content.decode("utf-8", errors="ignore"), relative, encoder.tokenizer))
+            file_documents = [document_text(relative, symbol, value) for symbol, value in values]
+            document_offsets.append(len(documents))
+            documents.extend(file_documents)
+            changed.append((relative, digest, values, file_documents))
+        vectors = encoder.encode(documents, normalize_embeddings=True) if documents else []
         with self.db:
-            for path in self.files():
-                relative = path.relative_to(self.root).as_posix()
-                content = path.read_bytes()
-                digest = hashlib.sha256(content).hexdigest()
-                old_digest = previous.pop(relative, None)
-                if not force and digest == old_digest:
-                    continue
-                values = list(chunks(content.decode("utf-8", errors="ignore"), relative, self.encoder().tokenizer))
-                documents = [document_text(relative, symbol, value) for symbol, value in values]
-                vectors = self.encoder().encode(documents, normalize_embeddings=True) if documents else []
+            for number, (relative, digest, values, file_documents) in enumerate(changed):
+                start = document_offsets[number]
+                file_vectors = vectors[start:start + len(file_documents)]
                 self.delete_path(relative)
-                for (symbol, value), document, vector in zip(values, documents, vectors):
+                for (symbol, value), document, vector in zip(values, file_documents, file_vectors):
                     if len(vector) != EMBEDDING_DIMENSIONS:
                         raise ValueError("Embedding must have 1024 dimensions")
                     cursor = self.db.execute("insert into chunks values (?, ?, ?, ?)",
