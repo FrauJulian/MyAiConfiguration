@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "[ ! -f 'C:\\Users\\j.lechner\\.agents\\skills\\impeccable\\scripts\\impeccable' ] || 'C:\\Users\\j.lechner\\.agents\\skills\\impeccable\\scripts\\impeccable' hook",
-            "commandWindows": "if exist \"C:\\\\Users\\\\j.lechner\\\\.agents\\\\skills\\\\impeccable\\\\scripts\\\\impeccable.cmd\" (\"C:\\\\Users\\\\j.lechner\\\\.agents\\\\skills\\\\impeccable\\\\scripts\\\\impeccable.cmd\" hook & exit /b)",
+            "commandWindows": "powershell -NoProfile -NonInteractive -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAaQBsAGUAbgB0AGwAeQBDAG8AbgB0AGkAbgB1AGUAJwA7ACAAaQBmACAAKABUAGUAcwB0AC0AUABhAHQAaAAgAC0ATABpAHQAZQByAGEAbABQAGEAdABoACAAJwBDADoALwBVAHMAZQByAHMALwBqAC4AbABlAGMAaABuAGUAcgAvAC4AYQBnAGUAbgB0AHMALwBzAGsAaQBsAGwAcwAvAGkAbQBwAGUAYwBjAGEAYgBsAGUALwBzAGMAcgBpAHAAdABzAC8AaQBtAHAAZQBjAGMAYQBiAGwAZQAuAGMAbQBkACcAKQAgAHsAIAAmACAAJwBDADoALwBVAHMAZQByAHMALwBqAC4AbABlAGMAaABuAGUAcgAvAC4AYQBnAGUAbgB0AHMALwBzAGsAaQBsAGwAcwAvAGkAbQBwAGUAYwBjAGEAYgBsAGUALwBzAGMAcgBpAHAAdABzAC8AaQBtAHAAZQBjAGMAYQBiAGwAZQAuAGMAbQBkACcAIABoAG8AbwBrADsAIABlAHgAaQB0ACAAJABMAEEAUwBUAEUAWABJAFQAQwBPAEQARQAgAH0A",
             "timeout": 5,
             "statusMessage": "Checking UI changes"
           }
@@ -20,7 +20,7 @@
           {
             "type": "command",
             "command": "[ ! -f 'C:\\Users\\j.lechner\\.agents\\skills\\impeccable\\scripts\\impeccable' ] || 'C:\\Users\\j.lechner\\.agents\\skills\\impeccable\\scripts\\impeccable' hook",
-            "commandWindows": "if exist \"C:\\\\Users\\\\j.lechner\\\\.agents\\\\skills\\\\impeccable\\\\scripts\\\\impeccable.cmd\" (\"C:\\\\Users\\\\j.lechner\\\\.agents\\\\skills\\\\impeccable\\\\scripts\\\\impeccable.cmd\" hook & exit /b)",
+            "commandWindows": "powershell -NoProfile -NonInteractive -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAaQBsAGUAbgB0AGwAeQBDAG8AbgB0AGkAbgB1AGUAJwA7ACAAaQBmACAAKABUAGUAcwB0AC0AUABhAHQAaAAgAC0ATABpAHQAZQByAGEAbABQAGEAdABoACAAJwBDADoALwBVAHMAZQByAHMALwBqAC4AbABlAGMAaABuAGUAcgAvAC4AYQBnAGUAbgB0AHMALwBzAGsAaQBsAGwAcwAvAGkAbQBwAGUAYwBjAGEAYgBsAGUALwBzAGMAcgBpAHAAdABzAC8AaQBtAHAAZQBjAGMAYQBiAGwAZQAuAGMAbQBkACcAKQAgAHsAIAAmACAAJwBDADoALwBVAHMAZQByAHMALwBqAC4AbABlAGMAaABuAGUAcgAvAC4AYQBnAGUAbgB0AHMALwBzAGsAaQBsAGwAcwAvAGkAbQBwAGUAYwBjAGEAYgBsAGUALwBzAGMAcgBpAHAAdABzAC8AaQBtAHAAZQBjAGMAYQBiAGwAZQAuAGMAbQBkACcAIABoAG8AbwBrADsAIABlAHgAaQB0ACAAJABMAEEAUwBUAEUAWABJAFQAQwBPAEQARQAgAH0A",
             "timeout": 30,
             "statusMessage": "Design deep pass"
           }
