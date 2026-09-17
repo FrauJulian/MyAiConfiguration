@@ -24,6 +24,9 @@ function Test-BuildFails([string]$Label, [scriptblock]$Mutate) {
     if (-not $failed) { throw "Expected build to fail for case '$Label' but it succeeded." }
 }
 
+$baseline = New-RepoCopy
+& (Join-Path $baseline 'scripts/build.ps1') -Summary | Out-Null
+
 Test-BuildFails 'invalid Claude settings.json' {
     param($copy)
     Add-Content (Join-Path $copy 'adapters/claude/config/settings.json') '} this is not json {'
@@ -45,6 +48,12 @@ Test-BuildFails 'duplicate plugin name' {
 Test-BuildFails 'leftover template placeholder' {
     param($copy)
     Add-Content (Join-Path $copy 'shared/global-instructions.md') "`n__NOT_A_REAL_PLACEHOLDER__"
+}
+
+Test-BuildFails 'unknown placeholder beside an allowed installer placeholder' {
+    param($copy)
+    $path = Join-Path $copy 'adapters/claude/config/settings.json'
+    (Get-Content $path -Raw).Replace('__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__', '__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY____UNKNOWN_PLACEHOLDER__') | Set-Content $path
 }
 
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue

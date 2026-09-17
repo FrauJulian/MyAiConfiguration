@@ -31,6 +31,9 @@ test_build_fails() {
   rm -rf -- "$copy"
 }
 
+baseline=$(new_repo_copy)
+bash "$baseline/scripts/build.sh" --summary >/dev/null
+
 mutate_invalid_json() {
   printf '} this is not json {' >> "$1/adapters/claude/config/settings.json"
 }
@@ -51,5 +54,10 @@ mutate_leftover_placeholder() {
   printf '\n__NOT_A_REAL_PLACEHOLDER__\n' >> "$1/shared/global-instructions.md"
 }
 test_build_fails 'leftover template placeholder' mutate_leftover_placeholder
+
+mutate_mixed_placeholders() {
+  sed -i 's/__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__/__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__ __UNKNOWN_PLACEHOLDER__/' "$1/adapters/claude/config/settings.json"
+}
+test_build_fails 'unknown placeholder beside an allowed installer placeholder' mutate_mixed_placeholders
 
 if [ "$summary" = true ]; then printf 'Tests: PASS | build validation\n'; else printf 'PASS build validation: invalid JSON, duplicate agent, duplicate plugin, and leftover placeholders are all rejected\n'; fi
