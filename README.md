@@ -13,13 +13,14 @@ into shell-specific packages that can be inspected before they are installed.
 
 ## Quickstart
 
-From an existing checkout, with the [requirements](#requirements) installed, run pull, build, then install.
+With the [requirements](#requirements) installed, clone the repository, build it, then install it.
 Stop if any command fails. Installation asks for the shell, client, CLI update, Flashbang, and extension choices.
 
 PowerShell:
 
 ```powershell
-git pull --ff-only
+git clone https://git.lechner-systems.at/fraujulian/MyAiConfiguration.git
+cd MyAiConfiguration
 .\scripts\build.ps1 -Summary
 .\scripts\install.ps1 -Summary
 ```
@@ -27,7 +28,8 @@ git pull --ff-only
 Bash:
 
 ```bash
-git pull --ff-only
+git clone https://git.lechner-systems.at/fraujulian/MyAiConfiguration.git
+cd MyAiConfiguration
 ./scripts/build.sh --summary
 ./scripts/install.sh --summary
 ```
