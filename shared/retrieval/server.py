@@ -15,6 +15,7 @@ import threading
 
 MODEL = "Qwen/Qwen3-Embedding-0.6B"
 RERANKER_MODEL = "Qwen/Qwen3-Reranker-0.6B"
+EMBEDDING_DIMENSIONS = 1024
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
 
@@ -31,7 +32,7 @@ class Index:
         self.root = root.resolve()
         self.data = data.resolve()
         self.data.mkdir(parents=True, exist_ok=True)
-        identity = os.path.normcase(str(self.root)) + "\n" + MODEL
+        identity = os.path.normcase(str(self.root)) + "\n" + MODEL + "\n" + str(EMBEDDING_DIMENSIONS)
         database = hashlib.sha256(identity.encode()).hexdigest() + ".sqlite3"
         self.db = sqlite3.connect(self.data / database, check_same_thread=False, timeout=30)
         self.db.execute("create table if not exists chunks (path text, text text, vector blob)")
@@ -62,7 +63,8 @@ class Index:
     def encoder(self):
         if self.model is None:
             from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer(MODEL, prompts={"query": f"Instruct: {RETRIEVAL_INSTRUCTION}\nQuery: "})
+            self.model = SentenceTransformer(MODEL, truncate_dim=EMBEDDING_DIMENSIONS,
+                                             prompts={"query": f"Instruct: {RETRIEVAL_INSTRUCTION}\nQuery: "})
         return self.model
 
     def reranker(self):

@@ -16,6 +16,10 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+def embedding():
+    return array('f', [1.0] + [0.0] * (MODULE.EMBEDDING_DIMENSIONS - 1))
+
+
 class RetrievalServerTests(unittest.TestCase):
     @unittest.skipUnless(os.environ.get('QWEN_TEST_MODEL_CACHE'), 'Set QWEN_TEST_MODEL_CACHE to run the real-model check.')
     def test_real_models(self):
@@ -52,7 +56,7 @@ class RetrievalServerTests(unittest.TestCase):
             def encode(values, **kwargs):
                 self.assertEqual(kwargs.get('prompt_name'), 'query' if values == ['query'] else None)
                 encoded.extend(values)
-                return [array('f', [1.0]) for _ in values]
+                return [embedding() for _ in values]
 
             for index in indexes:
                 index.encoder = lambda: SimpleNamespace(encode=encode)
@@ -88,7 +92,7 @@ class RetrievalServerTests(unittest.TestCase):
             root = Path(temporary)
             (root / 'a.md').write_text('before', encoding='utf-8')
             index = MODULE.Index(root, root / 'data')
-            index.encoder = lambda: SimpleNamespace(encode=lambda values, **kwargs: [array('f', [1.0]) for _ in values])
+            index.encoder = lambda: SimpleNamespace(encode=lambda values, **kwargs: [embedding() for _ in values])
             try:
                 index.rebuild()
                 (root / 'a.md').write_text('after', encoding='utf-8')
@@ -97,7 +101,7 @@ class RetrievalServerTests(unittest.TestCase):
                 def encode(values, **kwargs):
                     if values == ['fail']:
                         raise RuntimeError('encoder failed')
-                    return [array('f', [1.0]) for _ in values]
+                    return [embedding() for _ in values]
 
                 index.encoder = lambda: SimpleNamespace(encode=encode)
                 with self.assertRaisesRegex(RuntimeError, 'encoder failed'):
