@@ -13,6 +13,23 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SemanticRetrievalTests(unittest.TestCase):
+    def test_claude_registration_places_name_before_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / 'home'
+            calls = []
+            original = MODULE.command
+            original_runtime = MODULE.ensure_runtime
+            MODULE.command = lambda client, arguments, home, dry_run: calls.append((client, arguments))
+            MODULE.ensure_runtime = lambda target, dry_run: target / '.venv' / 'bin' / 'python'
+            try:
+                MODULE.sync(ROOT, home, ['claude'], True, False, False)
+            finally:
+                MODULE.command = original
+                MODULE.ensure_runtime = original_runtime
+            add = calls[0][1]
+            self.assertEqual(add[:5], ['claude', 'mcp', 'add', MODULE.NAME, '--scope'])
+            self.assertIn('-e', add)
+
     def test_disable_removes_owned_runtime_and_registration(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / 'home'

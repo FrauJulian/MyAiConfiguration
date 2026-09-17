@@ -111,10 +111,11 @@ def sync(root, home, clients, enabled, dry_run, update):
     for client in clients:
         command_args = [client, 'mcp', 'add']
         if client == 'claude':
-            command_args += ['--scope', 'user', '-e', f'HF_HOME={target / "model-cache"}']
+            command_args += [NAME, '--scope', 'user', '-e', f'HF_HOME={target / "model-cache"}']
         else:
             command_args += ['--env', f'HF_HOME={target / "model-cache"}']
-        command_args += [NAME] + arguments
+            command_args += [NAME]
+        command_args += arguments
         if update and client in existing_clients:
             command(client, [client, 'mcp', 'remove', NAME] + (['--scope', 'user'] if client == 'claude' else []), home, False)
         command(client, command_args, home, False)
