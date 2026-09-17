@@ -16,7 +16,7 @@ Codex sets `approval_policy = "on-request"`, `approvals_reviewer = "auto_review"
 
 ## Status displays
 
-Codex's native `tui.status_line` contains `model`, `reasoning`, `project-name`, `git-branch`, `context-window-size`, `context-used`, and `used-tokens`, in that order. Rendering and colors are controlled by Codex; the adapter does not define custom colors per field.
+Codex's native `tui.status_line` contains `model`, `reasoning`, `permissions`, `approval-mode`, `project-name`, `git-branch`, `context-window-size`, `context-used`, and `used-tokens`, in that order. `permissions` reports the active permission profile or sandbox summary, and `approval-mode` reports the active command approval mode. Rendering and colors are controlled by Codex; the adapter does not define custom colors per field.
 
 Claude runs `shared/statusline/statusline.ps1` for PowerShell or `statusline.sh` for Bash. Its two-line display is:
 
@@ -29,10 +29,12 @@ Model and context-window size are cyan, effort and cumulative tokens magenta, re
 
 `Ctx` is the context-window capacity; `Used` is the reported percentage occupied. `Tokens` adds the session's reported total input and output tokens, not just the current context. Counts use `k` and `M` suffixes. Missing model, effort, context size, or percentage is shown as `-`; missing token totals start at zero. Repository names fall back to the Git root or current directory; unavailable branches show `-`.
 
+Claude Code reruns its status-line command when the permission mode changes, but does not pass that mode in the status-line JSON. Its line therefore does not show a configured default as though it were the active mode.
+
 ## Verification and installation
 
 The agent chooses the smallest sufficient checks based on behavior, affected callers, risk, reversibility, and uncertainty. Inspection can suffice for a small change. Full builds, broad test suites, and independent reviews are not automatic; explicit user and project requirements remain binding.
 
 Delegation and long-running state use the shared orchestration rule, loaded on demand as a Codex rule or Claude skill. The coordinator owns decisions and routes concise evidence-based handoffs. Review and execution verification have separate responsibilities; see [Agents](agents.md).
 
-Rebuild packages after changes to shared definitions or adapters. Generated defaults reach a user's configuration only through installation or update. Updates back up replaced files and preserve Codex's local `plugins` and `marketplaces` tables; other local settings are not generally merged. See [the README](../README.md) for overwrite and backup behavior.
+Rebuild packages after changes to shared definitions or adapters. Generated defaults reach a user's configuration only through installation or update. Updates back up replaced files and preserve Codex's local `model`, `reasoning_effort`, `plugins`, and `marketplaces` settings; other local settings are not generally merged. See [the README](../README.md) for overwrite and backup behavior.

@@ -287,8 +287,9 @@ and uncertainty. A small change may need only focused inspection; builds, tests,
 automatic. Explicit user and project requirements still apply.
 
 Both status displays include model, effort, repository, branch, context-window size, context used, and tokens used.
-Claude uses two colored lines, with context usage turning yellow at 60% and red at 85%. Codex uses its native status
-items and rendering. See [Configuration](docs/configuration.md) for details and limitations.
+Codex also shows its active permission profile and approval mode. Claude uses two colored lines, with context usage
+turning yellow at 60% and red at 85%; its status-line input does not expose the active permission mode. See
+[Configuration](docs/configuration.md) for details and limitations.
 
 ## Extending the Configuration
 
