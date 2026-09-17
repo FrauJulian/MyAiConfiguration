@@ -17,6 +17,27 @@ SHELLS = [
 
 
 class SessionStateHookTests(unittest.TestCase):
+    def test_git_identity_and_stale_verification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            env = dict(os.environ, GIT_AUTHOR_NAME='Test', GIT_AUTHOR_EMAIL='test@example.invalid', GIT_COMMITTER_NAME='Test', GIT_COMMITTER_EMAIL='test@example.invalid')
+            subprocess.run(['git', '-C', str(workspace), 'init', '-q'], check=True)
+            (workspace / 'file').write_text('one')
+            subprocess.run(['git', '-C', str(workspace), 'add', 'file'], check=True)
+            subprocess.run(['git', '-C', str(workspace), 'commit', '-qm', 'one'], check=True, env=env)
+            command = [sys.executable, str(ROOT / 'shared/hooks/scripts/session-state.py'), '--workspace', str(workspace)]
+            self.assertEqual(subprocess.run(command + ['--verified', 'check'], capture_output=True).returncode, 0)
+            state = json.loads((workspace / '.ai-session/state.json').read_text())
+            self.assertTrue(state['head'])
+            self.assertEqual(state['verification'][0]['head'], state['head'])
+            (workspace / 'file').write_text('two')
+            subprocess.run(['git', '-C', str(workspace), 'add', 'file'], check=True)
+            subprocess.run(['git', '-C', str(workspace), 'commit', '-qm', 'two'], check=True, env=env)
+            self.assertEqual(subprocess.run(command, capture_output=True).returncode, 0)
+            state = json.loads((workspace / '.ai-session/state.json').read_text())
+            self.assertTrue(state['verificationStale'])
+            self.assertTrue(state['verification'][0]['stale'])
+
     def test_writer_migrates_legacy_state_and_requires_reset_for_new_goal(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
