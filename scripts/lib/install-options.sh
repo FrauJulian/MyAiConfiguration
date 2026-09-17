@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2154
 
 read_install_boolean() {
   local prompt=$1 default=$2 hint=y/N answer
