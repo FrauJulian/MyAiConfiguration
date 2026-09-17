@@ -24,7 +24,7 @@ expected_status_output=$'Test Model \xc2\xb7 Effort high \xc2\xb7 TestRepo @ '"$
 [ "$plain_status_output" = "$expected_status_output" ]
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
-rule_skill_count=$(($(wc -l < "$root/adapters/claude/rule-skills.tsv") - 1))
+rule_skill_count=$(($(wc -l < "$root/adapters/rule-skills.tsv") - 1))
 for shell in powershell bash; do
   for client in codex claude; do
     package="$root/generated/$client-$shell"
@@ -38,7 +38,7 @@ for shell in powershell bash; do
         rule_path=$rule_file
         [ -d "$root/shared/rules/$rule_file" ] && rule_path="$rule_file/index.md"
         grep -Fq -- "- rules/$rule_path for $trigger." "$package/AGENTS.md"
-      done < "$root/adapters/claude/rule-skills.tsv"
+      done < "$root/adapters/rule-skills.tsv"
     fi
     test "$(find "$package/agents" -type f | wc -l)" -eq "$source_agent_count"
     if [ "$client" = claude ]; then grep -q '^tools: Read,Diff,Search$' "$package/agents/reviewer.md"; fi

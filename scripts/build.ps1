@@ -5,7 +5,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $shared = Join-Path $root 'shared'
 $output = Join-Path $root 'generated'
 $pluginManifest = Join-Path $root 'adapters/plugins.tsv'
-$ruleSkillManifest = Join-Path $root 'adapters/claude/rule-skills.tsv'
+$ruleSkillManifest = Join-Path $root 'adapters/rule-skills.tsv'
 $capabilityManifest = Join-Path $root 'adapters/claude/capabilities.tsv'
 
 if (-not (Test-Path -LiteralPath $pluginManifest)) { throw "Missing plugin manifest: $pluginManifest" }

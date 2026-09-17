@@ -12,7 +12,7 @@ function Tokens([int64]$bytes) { return [int][Math]::Ceiling($bytes / 4.0) }
 $claude = (Get-Item (Join-Path $generated 'claude-bash/CLAUDE.md')).Length
 $codex = (Get-Item (Join-Path $generated 'codex-bash/AGENTS.md')).Length
 $skills = Measure-Tree (Join-Path $generated 'claude-bash/skills')
-$triggers = (Get-Item (Join-Path $root 'adapters/claude/rule-skills.tsv')).Length
+$triggers = (Get-Item (Join-Path $root 'adapters/rule-skills.tsv')).Length
 $lazyItem = Get-ChildItem (Join-Path $root 'shared/rules') -File -Recurse | Sort-Object Length -Descending | Select-Object -First 1
 $lazy = if ($lazyItem) { [int64]$lazyItem.Length } else { 0 }
 $baseline = Join-Path $root 'adapters/prompt-budget-baseline.json'

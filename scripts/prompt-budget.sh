@@ -8,7 +8,7 @@ generated="$root/generated"
 bytes() { wc -c < "$1" | tr -d ' '; }
 tree_bytes() { find "$1" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}'; }
 tokens() { awk -v b="$1" 'BEGIN { printf "%d", (b + 3) / 4 }'; }
-claude=$(bytes "$generated/claude-bash/CLAUDE.md"); codex=$(bytes "$generated/codex-bash/AGENTS.md"); skills=$(tree_bytes "$generated/claude-bash/skills"); triggers=$(bytes "$root/adapters/claude/rule-skills.tsv"); lazy=$(find "$root/shared/rules" -type f -printf '%s %p\n' | sort -nr | awk 'NR==1 {print $1+0}'); fail=false
+claude=$(bytes "$generated/claude-bash/CLAUDE.md"); codex=$(bytes "$generated/codex-bash/AGENTS.md"); skills=$(tree_bytes "$generated/claude-bash/skills"); triggers=$(bytes "$root/adapters/rule-skills.tsv"); lazy=$(find "$root/shared/rules" -type f -printf '%s %p\n' | sort -nr | awk 'NR==1 {print $1+0}'); fail=false
 claude_baseline=0; codex_baseline=0; claude_absolute=0; codex_absolute=0
 if [ -f "$root/adapters/prompt-budget-baseline.tsv" ]; then
   while IFS=$'\t' read -r name old absolute; do

@@ -33,7 +33,7 @@ command -v jq >/dev/null && result PASS 'jq available for Claude Bash status lin
 
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md 2>/dev/null | wc -l)
-rule_skill_manifest="$root/adapters/claude/rule-skills.tsv"
+rule_skill_manifest="$root/adapters/rule-skills.tsv"
 rule_skill_count=0
 [ -f "$rule_skill_manifest" ] && rule_skill_count=$(($(wc -l < "$rule_skill_manifest") - 1))
 

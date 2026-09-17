@@ -12,7 +12,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 shared="$root/shared"
 output="$root/generated"
 plugin_manifest="$root/adapters/plugins.tsv"
-rule_skill_manifest="$root/adapters/claude/rule-skills.tsv"
+rule_skill_manifest="$root/adapters/rule-skills.tsv"
 capability_manifest="$root/adapters/claude/capabilities.tsv"
 
 [ -f "$plugin_manifest" ] || { printf 'Missing plugin manifest: %s\n' "$plugin_manifest" >&2; exit 1; }

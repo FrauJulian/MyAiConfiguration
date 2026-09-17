@@ -22,7 +22,7 @@ if (Get-Command jq -ErrorAction SilentlyContinue) { Result 'PASS' 'jq available 
 
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory -ErrorAction SilentlyContinue).Count
 $sourceSkillCount = @(Get-ChildItem (Join-Path $root 'shared/skills') -Filter 'SKILL.md' -Recurse -ErrorAction SilentlyContinue).Count
-$ruleSkillManifestPath = Join-Path $root 'adapters/claude/rule-skills.tsv'
+$ruleSkillManifestPath = Join-Path $root 'adapters/rule-skills.tsv'
 $ruleSkillCount = if (Test-Path -LiteralPath $ruleSkillManifestPath) { @(Import-Csv -LiteralPath $ruleSkillManifestPath -Delimiter ([char]9)).Count } else { 0 }
 
 foreach ($shell in @('powershell','bash')) {

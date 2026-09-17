@@ -16,14 +16,14 @@ if ($buildSummaryOutput.Count -ne 1) { throw 'Build summary must contain only on
 if ($plainStatusOutput -ne $expectedStatusOutput) { throw 'PowerShell status line output is incorrect.' }
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory).Count
 $sourceSkillCount = @(Get-ChildItem (Join-Path $root 'shared/skills') -Filter 'SKILL.md' -Recurse).Count
-$ruleSkillCount = @(Import-Csv -LiteralPath (Join-Path $root 'adapters/claude/rule-skills.tsv') -Delimiter ([char]9)).Count
+$ruleSkillCount = @(Import-Csv -LiteralPath (Join-Path $root 'adapters/rule-skills.tsv') -Delimiter ([char]9)).Count
 foreach ($shell in @('powershell','bash')) {
     foreach ($client in @('codex','claude')) {
         $package = Join-Path $root "generated/$client-$shell"
         $file = if ($client -eq 'codex') { 'config.toml' } else { 'settings.json' }
         $content = Get-Content -LiteralPath (Join-Path $package $file) -Raw
         if ($client -eq 'codex') {
-            foreach ($entry in @(Import-Csv (Join-Path $root 'adapters/claude/rule-skills.tsv') -Delimiter ([char]9))) {
+            foreach ($entry in @(Import-Csv (Join-Path $root 'adapters/rule-skills.tsv') -Delimiter ([char]9))) {
                 $rulePath = $entry.rule_file
                 if (Test-Path (Join-Path $root "shared/rules/$($entry.rule_file)") -PathType Container) { $rulePath = "$($entry.rule_file)/index.md" }
                 if ((Get-Content (Join-Path $package 'AGENTS.md') -Raw) -notmatch [regex]::Escape("- rules/$rulePath for $($entry.trigger).")) { throw "Codex rule loading is missing $($entry.rule_file) in $package" }
