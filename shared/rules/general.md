@@ -19,6 +19,16 @@ Project instructions may specialize global defaults, but must not weaken securit
 * Ask about business behavior, user-visible behavior, UI, UX, APIs, database models, configuration formats, or compatibility behavior only when it is missing, ambiguous, contradictory, or open to interpretation; implement explicitly specified behavior without asking again.
 * For deeper guidance on ambiguous requirements or a meaningful technical choice, consult `decision-rule.md` (Codex: read `rules/decision-rule.md`; Claude: invoke the `rules-decision-rule` skill).
 
+## Semantic repository search
+
+* In Codex and Claude Code, proactively use Qwen3-Embedding-0.6B through the `my-ai-qwen3-retrieval` MCP server's `semantic_search` tool whenever available and useful. Discover the tool if it is not already exposed.
+* Use semantic search early to find unfamiliar code, understand responsibilities and relationships, locate similar implementations, or investigate behavior described without exact symbols. Reuse relevant results and search again when a new question would benefit.
+* Use direct file reads for known paths and exact text search for symbols, literals, and exhaustive caller checks. Combine these with semantic search when meaning-based discovery adds value.
+* Treat retrieved passages as leads: verify them against current files in the intended workspace before relying on them. Empty results do not prove absence; stale or unrelated results require direct inspection.
+* If retrieval is unavailable, fails, or adds no value, continue with ordinary repository tools. Report failures briefly; avoid repeated failing calls or installing or enabling retrieval without authorization.
+
+* When QMD is available, use its `qmd` MCP tools for questions about indexed Markdown notes, documents, meeting records, or knowledge bases. Verify retrieved results against the source document when the current content matters.
+
 ## Verification
 
 * Choose checks independently by behavior, callers, impact, reversibility, and uncertainty. Focused inspection can suffice; builds, tests, new tests, and separate reviews are not automatic.
