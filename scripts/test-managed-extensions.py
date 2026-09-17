@@ -40,7 +40,7 @@ class ManagedExtensionTests(unittest.TestCase):
 
     def command(self, args, summary, home=None):
         self.commands.append(args)
-        if args[2] in ('add', 'install') and args[1] == 'plugin':
+        if len(args) > 3 and args[2] in ('add', 'install') and args[1] == 'plugin':
             self.installed[args[0]][args[3]] = {'scope': 'user'}
         if args[2] in ('remove', 'uninstall'):
             self.installed[args[0]].pop(args[3], None)
@@ -171,6 +171,20 @@ class ManagedExtensionTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()) as output:
             self.manager(dry_run=True, summary=True).sync([plugin(), skill()], ['codex'], {'Example', 'Humanizer'})
         self.assertEqual('EXTENSIONS: reconciliation complete (dry run)\n', output.getvalue())
+
+    def test_qmd_installs_once_and_registers_codex_mcp(self):
+        entry = dict(name='QMD', codex_method='qmd', codex_source='@tobilu/qmd', codex_skill='qmd', codex_plugin='-', codex_marketplace='-', claude_plugin='qmd@qmd', claude_marketplace='tobi/qmd')
+        self.manager().sync([entry], ['codex'], {'QMD'})
+        self.assertEqual([['npm', 'install', '--global', '@tobilu/qmd'], ['codex', 'mcp', 'add', 'qmd', '--', 'qmd', 'mcp']], self.commands)
+        self.manager().sync([], ['codex'], set())
+        self.assertEqual(['codex', 'mcp', 'remove', 'qmd'], self.commands[-1])
+
+    def test_qmd_installs_once_for_both_clients(self):
+        entry = dict(name='QMD', codex_method='qmd', codex_source='@tobilu/qmd', codex_skill='qmd', codex_plugin='-', codex_marketplace='-', claude_plugin='qmd@qmd', claude_marketplace='tobi/qmd')
+        self.manager().sync([entry], ['claude', 'codex'], {'QMD'})
+        self.assertEqual(1, self.commands.count(['npm', 'install', '--global', '@tobilu/qmd']))
+        self.assertIn(['claude', 'plugin', 'install', 'qmd@qmd', '--scope', 'user'], self.commands)
+        self.assertIn(['codex', 'mcp', 'add', 'qmd', '--', 'qmd', 'mcp'], self.commands)
 
     def test_foreign_empty_directory_survives_skill_removal(self):
         self.manager().sync([skill()], ['codex'], {'Humanizer'})

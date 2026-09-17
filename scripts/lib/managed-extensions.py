@@ -166,7 +166,7 @@ class Manager:
             raise ValueError('Invalid extension ownership ledger.')
         identities = set()
         for resource in self.state['resources']:
-            if not isinstance(resource, dict) or resource.get('client') not in ('codex', 'claude') or resource.get('kind') not in ('plugin', 'skill'):
+            if not isinstance(resource, dict) or resource.get('client') not in ('codex', 'claude') or resource.get('kind') not in ('plugin', 'skill', 'qmd'):
                 raise ValueError('Invalid extension ownership record.')
             if not isinstance(resource.get('name'), str) or not resource['name']:
                 raise ValueError('Invalid extension ownership name.')
@@ -179,7 +179,7 @@ class Manager:
                     raise ValueError('Invalid owned plugin selector.')
                 if 'source' in resource and not isinstance(resource['source'], str):
                     raise ValueError('Invalid owned plugin source.')
-            else:
+            elif resource['kind'] == 'skill':
                 directory = resource.get('directory', '')
                 if not re.fullmatch(r'\.agents/skills/[A-Za-z0-9_-]+', directory) or resource['client'] != 'codex':
                     raise ValueError('Invalid owned skill directory.')
@@ -192,6 +192,8 @@ class Manager:
                     if not relative.startswith(directory + '/') or not re.fullmatch(r'[a-f0-9]{64}', value):
                         raise ValueError('Invalid owned skill file record.')
                     safe_path(self.home, relative)
+            elif resource.get('package') != '@tobilu/qmd' or resource['client'] != 'codex':
+                raise ValueError('Invalid owned QMD record.')
 
     def save(self):
         if not self.dry_run:
@@ -224,7 +226,7 @@ class Manager:
                 arguments = [client, 'plugin', 'uninstall', selector, '--scope', 'user'] if client == 'claude' else [client, 'plugin', 'remove', selector]
                 self.command(arguments)
                 self.cache[client].pop(selector, None)
-        else:
+        elif record['kind'] == 'skill':
             empty_candidates = set()
             for relative, expected in list(record['files'].items()):
                 path = safe_path(self.home, relative)
@@ -254,10 +256,15 @@ class Manager:
                     pass
             if record['files']:
                 return
+        else:
+            self.command([record['client'], 'mcp', 'remove', 'qmd'] + (['--scope', 'user'] if record['client'] == 'claude' else []))
         self.state['resources'].remove(record)
         self.save()
 
     def ensure(self, client, entry):
+        if entry['codex_method'] == 'qmd':
+            self.ensure_qmd(client, entry)
+            return
         skill = client == 'codex' and entry['codex_method'] != 'plugin'
         kind = 'skill' if skill else 'plugin'
         record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
@@ -318,6 +325,24 @@ class Manager:
             self.state['resources'].append(record)
             self.save()
         self.cache[client][selector] = {'scope': 'user'}
+
+    def ensure_qmd(self, client, entry):
+        package = entry['codex_source']
+        if package != '@tobilu/qmd':
+            raise ValueError('Invalid QMD package.')
+        if not getattr(self, 'qmd_ready', False):
+            self.command(['npm', 'install', '--global', package])
+            self.qmd_ready = True
+        if client == 'claude':
+            entry = dict(entry, codex_method='plugin')
+            self.ensure(client, entry)
+            return
+        record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
+        if record is not None:
+            return
+        self.command(['codex', 'mcp', 'add', 'qmd', '--', 'qmd', 'mcp'])
+        self.state['resources'].append(dict(client='codex', name=entry['name'], kind='qmd', package=package))
+        self.save()
 
     def ensure_skill(self, entry, record):
         skill = entry['codex_skill']

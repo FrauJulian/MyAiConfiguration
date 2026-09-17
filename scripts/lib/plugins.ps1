@@ -97,7 +97,9 @@ function Select-ConfiguredPlugins {
     $checked = @($toggleable | ForEach-Object {
         if ($Mode -eq 'Install') { $true; return }
         $selector = if ($referenceClient -eq 'Claude') { $_.claude_plugin } else { $_.codex_plugin }
-        if ($referenceClient -eq 'Codex' -and $_.codex_method -ne 'plugin') {
+        if ($referenceClient -eq 'Codex' -and $_.codex_method -eq 'qmd') {
+            $null -ne (Get-Command qmd -ErrorAction SilentlyContinue)
+        } elseif ($referenceClient -eq 'Codex' -and $_.codex_method -ne 'plugin') {
             (Test-Path -LiteralPath (Join-Path $HomePath ('.agents/skills/' + $_.codex_skill))) -or (Test-Path -LiteralPath (Join-Path $HomePath ('.codex/skills/' + $_.codex_skill)))
         } else { [bool](@($installed | Where-Object { $_.$idField -eq $selector }).Count) }
     })
