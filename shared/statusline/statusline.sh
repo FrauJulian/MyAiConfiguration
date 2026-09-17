@@ -4,9 +4,10 @@ set -euo pipefail
 command -v jq >/dev/null 2>&1 || exit 0
 input=
 while IFS= read -r line || [ -n "$line" ]; do input+="$line"; done
-IFS=$'\t' read -r model effort repo directory used_percentage used_tokens context_window < <(
+IFS=$'\t' read -r model review_mode effort repo directory used_percentage used_tokens context_window < <(
   printf '%s' "$input" | jq -r '[
     (.model.display_name // "-"),
+    (.permission_mode // .permissionMode // "auto"),
     (.effort.level // "-"),
     (.workspace.repo.name // "-"),
     (.workspace.current_dir // .cwd // "-"),
@@ -66,5 +67,5 @@ if [ -n "${NO_COLOR:-}" ]; then
 fi
 sep="${dim}·${reset}"
 
-printf "${cyan}%s${reset} ${sep} Effort ${magenta}%s${reset} ${sep} ${blue}%s${reset} @ ${green}%s${reset}\nCtx ${cyan}%s${reset} ${sep} Used ${context_color}%s${reset} ${sep} Tokens ${magenta}%s${reset}\n" \
-  "$model" "$effort" "$repo" "$branch" "$context_window_display" "$used_context" "$used_tokens_display"
+printf "${cyan}%s${reset} ${sep} Review ${magenta}%s${reset} ${sep} Effort ${magenta}%s${reset} ${sep} ${blue}%s${reset} @ ${green}%s${reset}\nCtx ${cyan}%s${reset} ${sep} Used ${context_color}%s${reset} ${sep} Tokens ${magenta}%s${reset}\n" \
+  "$model" "$review_mode" "$effort" "$repo" "$branch" "$context_window_display" "$used_context" "$used_tokens_display"

@@ -11,6 +11,7 @@ function Format-TokenCount {
 $data = ($input | Out-String) | ConvertFrom-Json
 $model = if ($data.model.display_name) { $data.model.display_name } else { '-' }
 $effort = if ($data.effort.level) { $data.effort.level } else { '-' }
+$reviewMode = if ($data.permission_mode) { $data.permission_mode } elseif ($data.permissionMode) { $data.permissionMode } else { 'auto' }
 $directory = if ($data.workspace.current_dir) { $data.workspace.current_dir } else { $data.cwd }
 $repo = if ($data.workspace.repo.name) { $data.workspace.repo.name } elseif ($directory) { Split-Path $directory -Leaf } else { '-' }
 if (-not $data.workspace.repo.name -and $directory -and (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -36,7 +37,7 @@ $contextColor = if ($null -eq $usedPercentage) { $dim } elseif ($usedPercentage 
 $middot = [char]0x00B7
 $sep = "$dim$middot$reset"
 
-$line1 = "$cyan$model$reset $sep Effort $magenta$effort$reset $sep $blue$repo$reset @ $green$branch$reset"
+$line1 = "$cyan$model$reset $sep Review $magenta$reviewMode$reset $sep Effort $magenta$effort$reset $sep $blue$repo$reset @ $green$branch$reset"
 $line2 = "Ctx $cyan$contextWindow$reset $sep Used $contextColor$usedContext$reset $sep Tokens $magenta$usedTokensDisplay$reset"
 $outputText = "$line1`n$line2"
 if ($env:NO_COLOR) { $outputText = [regex]::Replace($outputText, [char]27 + '\[[0-9;]*m', '') }

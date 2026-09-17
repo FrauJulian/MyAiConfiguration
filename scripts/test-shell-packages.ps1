@@ -11,7 +11,7 @@ $buildSummaryOutput = & (Join-Path $root 'scripts/build.ps1') -Summary
 if (@($buildSummaryOutput | Where-Object { $_ -eq 'Build: PASS | 4 packages' }).Count -ne 1) { throw "build.ps1 -Summary must still print the PASS line: $($buildSummaryOutput -join '; ')" }
 $statusOutput = ($statusInput | & (Join-Path $root 'shared/statusline/statusline.ps1')) -join "`n"
 $plainStatusOutput = [regex]::Replace($statusOutput, [char]27 + '\[[0-9;]*m', '')
-$expectedStatusOutput = "Test Model $([char]0x00B7) Effort high $([char]0x00B7) TestRepo @ $branch`nCtx 200k $([char]0x00B7) Used 9% $([char]0x00B7) Tokens 16.7k"
+$expectedStatusOutput = "Test Model $([char]0x00B7) Review auto $([char]0x00B7) Effort high $([char]0x00B7) TestRepo @ $branch`nCtx 200k $([char]0x00B7) Used 9% $([char]0x00B7) Tokens 16.7k"
 if ($buildSummaryOutput.Count -ne 1) { throw 'Build summary must contain only one success line.' }
 if ($plainStatusOutput -ne $expectedStatusOutput) { throw 'PowerShell status line output is incorrect.' }
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory).Count
@@ -41,7 +41,7 @@ foreach ($shell in @('powershell','bash')) {
             $events = @([regex]::Matches($content, '(?m)^\[\[hooks\.([^.\]]+)\]\]\s*$') | ForEach-Object { $_.Groups[1].Value })
             if ($events.Count -ne 1 -or $events[0] -ne 'Stop' -or $content -match 'flashbang-if-input' -or $content -match '(?m)^async\s*=\s*true\s*$') { throw "Codex finish hook is incorrect in $package" }
             if ($content -notmatch 'approvals_reviewer\s*=\s*"auto_review"') { throw "Codex auto review is missing in $package" }
-            if ($content -notmatch 'status_line\s*=\s*\["model", "reasoning", "permissions", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"\]') { throw "Codex status line is incorrect in $package" }
+            if ($content -notmatch 'status_line\s*=\s*\["model", "reasoning", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"\]') { throw "Codex status line is incorrect in $package" }
         } elseif ((($settings.hooks.PSObject.Properties.Name | Sort-Object) -join ',') -ne 'PreCompact,SessionStart,Stop' -or $content -match 'flashbang-if-input' -or $settings.hooks.Stop[0].hooks[0].async) {
             throw "Claude finish hook is incorrect in $package"
         } elseif ($content -notmatch '"defaultMode"\s*:\s*"auto"') {
