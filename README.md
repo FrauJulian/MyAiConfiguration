@@ -13,7 +13,7 @@ into shell-specific packages that can be inspected before they are installed.
 
 ## Capability check
 
-Check required tools, versions, repository files, and (by default) client/network access before setup. The command exits with an error when a requirement is missing. Use `--skip-external` or `-SkipExternal` only for an offline repository-only check.
+Check the selected shell's minimum version and required Python and `jq` tools before setup. The command exits with an error when a requirement is missing.
 
 PowerShell:
 
@@ -113,6 +113,8 @@ Install and update also rebuild internally; the explicit build above lets you ch
 - User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, Humanizer, Impeccable, and
   Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
   installed and recorded by this setup can be removed through deselection.
+- Optional local semantic retrieval for both clients using Qwen3-Embedding-0.6B, disabled by default and removable
+  through the install/update choice.
 
 ## Architecture
 
@@ -143,10 +145,8 @@ generated/
 - PowerShell 5.1 or newer; PowerShell 7 is supported as well.
 - Bash 4.3 or newer, with standard utilities such as `awk`, `sed`, and `sha256sum`.
 - Python 3.11 or newer for configuration validation and task-state hooks/helpers (`python` for PowerShell scripts, `python3` for Bash scripts).
-- Git for marketplace installation and branch display. External Codex skills are downloaded from their manifest sources.
 - `jq` for Claude's Bash status line; without it, that status line produces no output.
-- The Codex and Claude Code CLIs for the clients that should be installed or diagnosed.
-- Network access for plugin installation and updates.
+- Python `venv` and `pip` when the optional semantic retrieval layer is enabled.
 
 The Bash scripts do not require PowerShell. The PowerShell scripts remain compatible with PowerShell 5.1;
 PowerShell 7 can also run them.
@@ -215,8 +215,9 @@ not generally merged. Dry runs still rebuild `generated/`, but do not modify ins
 
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
 Codex skills; unchecked extensions are skipped on installation. Normal runs also ask whether to update
-the selected client CLIs and enable Flashbang. These choices are saved for Quickupdate. Dry runs preview changes
-without updating CLIs or extensions. See [Plugins](docs/plugins.md) for client-specific behavior.
+the selected client CLIs, enable Flashbang, and enable Qwen3 semantic retrieval. These choices are saved for Quickupdate.
+Disabling retrieval on a later update removes its setup-owned runtime, index, and MCP registrations. Dry runs preview
+changes without updating CLIs, extensions, or retrieval. See [Plugins](docs/plugins.md) for client-specific behavior.
 
 ## Update
 
