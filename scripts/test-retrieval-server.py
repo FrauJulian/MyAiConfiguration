@@ -205,6 +205,51 @@ class RetrievalServerTests(unittest.TestCase):
         self.assertEqual(MODULE.reciprocal_rank_fusion([1, 2, 3], [4, 2, 3]), [2, 3, 1, 4])
         self.assertEqual(MODULE.reciprocal_rank_fusion([], [4, 2]), [4, 2])
 
+    def test_hybrid_candidates_and_document_metadata(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for number in range(110):
+                (root / f'{number:03}.md').write_text(f'# Symbol{number}\ncontent {number}', encoding='utf-8', newline='\n')
+            index = MODULE.Index(root, root / 'data')
+            documents = []
+
+            def encode(values, **kwargs):
+                if kwargs.get('prompt_name') != 'query':
+                    documents.extend(values)
+                return [embedding() for _ in values]
+
+            pairs = []
+            index.encoder = lambda: SimpleNamespace(encode=encode, tokenizer=tokenize)
+            index.reranker = lambda: SimpleNamespace(predict=lambda values, **kwargs:
+                pairs.extend(values) or [float('109.md' in document) for _, document in values])
+            numpy = SimpleNamespace(dot=lambda a, b: 1.0,
+                                    frombuffer=lambda blob, **kwargs: array('f', blob), float32=None)
+            original_fusion = MODULE.reciprocal_rank_fusion
+            rankings = []
+
+            def fuse(*values):
+                rankings.extend(values)
+                return original_fusion(*values)
+
+            try:
+                with patch.dict('sys.modules', numpy=numpy), patch.object(MODULE, 'reciprocal_rank_fusion', fuse):
+                    results = index.search('109.md Symbol109 content', 20)
+                self.assertEqual([len(ranking) for ranking in rankings], [50, 50])
+                self.assertEqual(len(pairs), 50)
+                self.assertEqual(len(results), 5)
+                self.assertEqual(results[0]['path'], '109.md')
+                self.assertEqual(results[0]['symbol'], 'Symbol109')
+                self.assertIn('Path: 109.md\nSymbol: Symbol109\n\n# Symbol109\ncontent 109', documents)
+                self.assertTrue(all(document in documents for _, document in pairs))
+                with patch.dict('sys.modules', numpy=numpy):
+                    self.assertEqual(len(index.search('" OR * () : -')), 5)
+                    self.assertEqual(len(index.search('***')), 5)
+                    (root / '109.md').unlink()
+                    index.search('Symbol109')
+                self.assertEqual(index.db.execute('select count(*) from lexical where lexical match ?', ('"Symbol109"',)).fetchone()[0], 0)
+            finally:
+                index.db.close()
+
     def test_old_cache_is_preserved_but_not_reused(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

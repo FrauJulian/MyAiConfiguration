@@ -22,8 +22,8 @@ CHUNK_TOKENS = 400
 OVERLAP_TOKENS = 64
 DENSE_CANDIDATES = 50
 LEXICAL_CANDIDATES = 50
-RERANK_CANDIDATES = 20
-FINAL_RESULTS = 20
+RERANK_CANDIDATES = 50
+FINAL_RESULTS = 5
 RRF_K = 60
 INDEX_VERSION = 2
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
@@ -216,7 +216,7 @@ class Index:
                 self.delete_path(relative)
                 self.db.execute("delete from files where path = ?", (relative,))
 
-    def search(self, query: str, top_k: int = 5):
+    def search(self, query: str, top_k: int = FINAL_RESULTS):
         if not query.strip():
             raise ValueError("query must not be empty")
         with self.lock:
@@ -258,7 +258,7 @@ def main():
     mcp = FastMCP("my-ai-qwen3-retrieval")
 
     @mcp.tool()
-    def semantic_search(query: str, top_k: int = 5) -> list[dict]:
+    def semantic_search(query: str, top_k: int = FINAL_RESULTS) -> list[dict]:
         """Search repository concepts, behavior, and implementation patterns first with Qwen3 embedding and reranking. Verify returned passages against current files; use direct reads for known paths."""
         return index.search(query, top_k)
 
