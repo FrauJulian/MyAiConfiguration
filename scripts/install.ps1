@@ -24,6 +24,7 @@ if (-not $DryRun -and (Test-AnyManifestPresent (Get-InstallDestinations -HomePat
 }
 
 $options = Read-InstallOptions -HomePath $homePath -RepositoryRoot $root -Client $Client -DryRun:$DryRun
+$reinstallViaNpm = Read-CliReinstallOption -Client $Client -DryRun:$DryRun
 
 $buildScript = Join-Path $PSScriptRoot 'build.ps1'
 & $buildScript -Summary:$Summary
@@ -39,6 +40,7 @@ if ($claudeConcurrency -notmatch '^[1-9][0-9]?$' -or [int]$claudeConcurrency -gt
 
 $plugins = Select-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -Mode 'Install' -DryRun:$DryRun
 if ($options.update_agents) { Update-SelectedAgentClis -Client $Client -DryRun:$DryRun -Summary:$Summary }
+if ($reinstallViaNpm) { Invoke-CliReinstall -Client $Client -DryRun:$DryRun -Summary:$Summary }
 
 foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath -Shell $shell -Client $Client)) {
     Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp $stamp `
