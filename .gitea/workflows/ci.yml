@@ -12,20 +12,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Install current Codex CLI for schema validation
-        run: npm install --global @openai/codex@latest
+      - name: Check Linux tooling
+        run: |
+          command -v pwsh >/dev/null || { echo 'pwsh is required on the Linux runner'; exit 1; }
       - name: Bash syntax
         run: find scripts shared/hooks -name '*.sh' -print0 | xargs -0 -n1 bash -n
       - name: Build
-        run: REQUIRE_CODEX_SCHEMA=true ./scripts/build.sh --summary
+        run: ./scripts/build.sh --summary
       - name: Prompt budget
         run: ./scripts/prompt-budget.sh --summary
       - name: Repository context cache
         run: ./scripts/repository-context.sh --summary
       - name: Doctor
         run: ./scripts/doctor.sh --summary
-      - name: Platform package tests
-        run: ./scripts/test-platform-packages.sh --summary
+      - name: PowerShell syntax
+        run: |
+          find scripts shared/hooks -name '*.ps1' -print0 | xargs -0 -n1 pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile($args[0],[ref]$tokens,[ref]$errors) | Out-Null; if ($errors.Count) { $errors | % { Write-Error $_ }; exit 1 }'
+      - name: PowerShell build and validation
+        shell: pwsh
+        run: |
+          $env:REQUIRE_CODEX_SCHEMA = 'true'
+          ./scripts/build.ps1 -Summary
+          ./scripts/doctor.ps1 -Summary
+          ./scripts/test-shell-packages.ps1 -Summary
+          ./scripts/test-managed-install.ps1 -Summary
+          ./scripts/test-build-validation.ps1 -Summary
+          ./scripts/test-install-guards.ps1 -Summary
+          ./scripts/test-plugin-selection.ps1 -Summary
+          ./scripts/test-quick-update.ps1 -Summary
+          python ./scripts/test-install-options.py
+          python ./scripts/test-quick-update.py
+          python ./scripts/test-managed-extensions.py
+          python ./scripts/test-session-state.py
+          python ./scripts/test-telemetry.py
+          ./scripts/install.ps1 -Summary -DryRun -Client Both -Shell PowerShell
+          ./scripts/update.ps1 -Summary -DryRun -Client Both -Shell PowerShell
+      - name: Shell package tests
+        run: ./scripts/test-shell-packages.sh --summary
       - name: Managed manifest tests
         run: ./scripts/test-managed-install.sh --summary
       - name: Build validation tests
@@ -34,6 +57,15 @@ jobs:
         run: ./scripts/test-install-guards.sh --summary
       - name: Plugin selection tests
         run: ./scripts/test-plugin-selection.sh --summary
+      - name: Quick-update and install-option tests
+        run: |
+          ./scripts/test-quick-update.sh --summary
+          python3 scripts/test-install-options.py
+          python3 scripts/test-telemetry.py
+      - name: Managed extension and session-state tests
+        run: |
+          python3 scripts/test-managed-extensions.py
+          python3 scripts/test-session-state.py
       - name: Install dry run
         run: |
           export HOME="$RUNNER_TEMP/isolated-home"
@@ -45,48 +77,15 @@ jobs:
           mkdir -p "$HOME"
           ./scripts/update.sh --summary --dry-run --client both --platform linux
 
-#  windows:
-#    runs-on: windows-latest
-#    steps:
-#      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-#      - name: Install current Codex CLI for schema validation
-#        shell: powershell
-#        run: npm install --global @openai/codex@latest
-#      - name: PowerShell syntax
-#        shell: powershell
-#        run: |
-#          $errors = @()
-#          Get-ChildItem scripts,shared/hooks -Recurse -Filter *.ps1 | ForEach-Object {
-#            $tokens = $null
-#            $parseErrors = $null
-#            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors)
-#            $errors += $parseErrors
-#          }
-#          if ($errors.Count) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
-#      - name: Build
-#        shell: powershell
-#        run: $env:REQUIRE_CODEX_SCHEMA = 'true'; .\scripts\build.ps1
-#      - name: Doctor
-#        shell: powershell
-#        run: .\scripts\doctor.ps1
-#      - name: Platform package tests
-#        shell: powershell
-#        run: .\scripts\test-platform-packages.ps1
-#      - name: Managed manifest tests
-#        shell: powershell
-#        run: .\scripts\test-managed-install.ps1
-#      - name: Build validation tests
-#        shell: powershell
-#        run: .\scripts\test-build-validation.ps1
-#      - name: Install guard tests
-#        shell: powershell
-#        run: .\scripts\test-install-guards.ps1
-#      - name: Plugin selection tests
-#        shell: powershell
-#        run: .\scripts\test-plugin-selection.ps1
-#      - name: Install dry run
-#        shell: powershell
-#        run: .\scripts\install.ps1 -DryRun -Client Both -Platform Windows
-#      - name: Update dry run
-#        shell: powershell
-#        run: .\scripts\update.ps1 -DryRun -Client Both -Platform Windows
+  compatibility-canary:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Latest external clients
+        run: npm install --global @openai/codex@latest
+      - name: Latest-client schema and dry runs
+        run: |
+          REQUIRE_CODEX_SCHEMA=true ./scripts/build.sh --summary
+          HOME="$RUNNER_TEMP/canary-home" ./scripts/install.sh --summary --dry-run --client both --platform linux
+          HOME="$RUNNER_TEMP/canary-home" ./scripts/update.sh --summary --dry-run --client both --platform linux
