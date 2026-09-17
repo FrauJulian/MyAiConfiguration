@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 sync_semantic_retrieval() {
   local root=$1 client=$2 home_path=$3 enabled=$4 dry_run=$5 update=$6 summary=${7:-false}
   [ "$enabled" = true ] || [ -f "$home_path/.my-ai-configuration/semantic-retrieval.json" ] || return 0
