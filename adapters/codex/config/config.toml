@@ -2,12 +2,16 @@ approval_policy = "on-request"
 approvals_reviewer = "auto_review"
 sandbox_mode = "workspace-write"
 
+[windows]
+sandbox = "unelevated"
+
 [tui]
 status_line = ["model", "reasoning", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]
 
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 5
+max_depth = 1
 
 [features]
 hooks = true
