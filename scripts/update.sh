@@ -72,7 +72,7 @@ if [ "$quick" = true ]; then
 else
   sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" true selected_plugins "$summary"
 fi
-sync_semantic_retrieval "$root" "$client" "$home_path" "$semantic_retrieval" "$dry_run" true
+sync_semantic_retrieval "$root" "$client" "$home_path" "$semantic_retrieval" "$dry_run" true "$summary"
 if [ "$dry_run" = false ]; then save_update_selection; fi
 
 if [ "$summary" = true ]; then

@@ -4,6 +4,7 @@ function Sync-SemanticRetrieval {
     if (-not $Enabled -and -not (Test-Path -LiteralPath $statePath)) { return }
     $arguments = @((Join-Path $PSScriptRoot 'semantic-retrieval.py'), 'sync', '--root', $RepositoryRoot, '--home', $HomePath, '--client', $Client.ToLowerInvariant(), '--enabled', $Enabled.ToString().ToLowerInvariant())
     if ($DryRun) { $arguments += '--dry-run' }; if ($Update) { $arguments += '--update' }
+    if ($Summary) { $arguments += '--summary' }
     & python @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Semantic retrieval reconciliation failed.' }
 }
