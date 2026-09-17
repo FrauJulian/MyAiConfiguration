@@ -34,13 +34,15 @@ if (-not (Test-Path $generated)) { throw 'Generated output is missing after a su
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $powerShellCommand = if (Get-Command powershell -ErrorAction SilentlyContinue) { 'powershell -NoProfile -ExecutionPolicy Bypass -File' } else { 'pwsh -NoProfile -ExecutionPolicy Bypass -File' }
 $shellCommand = if ($Shell -eq 'PowerShell') { $powerShellCommand } else { 'bash' }
+$claudeConcurrency = if ($env:CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY) { $env:CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY } else { '5' }
+if ($claudeConcurrency -notmatch '^[1-9][0-9]?$' -or [int]$claudeConcurrency -gt 10) { throw 'CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY must be an integer from 1 to 10.' }
 
 $plugins = Select-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -Mode 'Install' -DryRun:$DryRun
 if ($options.update_agents) { Update-SelectedAgentClis -Client $Client -DryRun:$DryRun -Summary:$Summary }
 
 foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath -Shell $shell -Client $Client)) {
     Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp $stamp `
-        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -FlashbangEnabled $options.flashbang -DryRun:$DryRun -Summary:$Summary
+        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -ClaudeConcurrency $claudeConcurrency -FlashbangEnabled $options.flashbang -DryRun:$DryRun -Summary:$Summary
 }
 
 Sync-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected

@@ -227,7 +227,7 @@ done
 # __AI_CONFIG_ROOT__ is resolved at install time, once the destination is known; it is
 # expected to remain in generated output, so it is excluded from the leftover check. A
 # single tree-wide grep (rather than one process per file) keeps this fast.
-leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$output" 2>/dev/null | sort -u | grep -Ev '^(__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__)$' || true)
+leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$output" 2>/dev/null | sort -u | grep -Ev '^(__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__|__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__)$' || true)
 if [ -n "$leftover_tokens" ]; then
   offending_files=$(grep -RlE '__[A-Z0-9_]+__' "$output" 2>/dev/null | tr '\n' ' ')
   printf 'Unresolved template placeholders (%s) in: %s\n' "$(printf '%s' "$leftover_tokens" | tr '\n' ' ')" "$offending_files" >&2

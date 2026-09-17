@@ -210,7 +210,7 @@ $leftoverPlaceholders = @(Get-ChildItem $output -File -Recurse | ForEach-Object 
     # expected to remain in generated output. -cmatch keeps this case-sensitive so Python
     # dunder names (__main__, __name__) in flashbang.sh are not mistaken for placeholders.
     $content = (Get-Content -LiteralPath $_.FullName -Raw) -replace '__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__', ''
-    if ($content -cmatch '__[A-Z0-9_]+__') { $_.FullName }
+    if ($content -cmatch '__[A-Z0-9_]+__' -and $content -notmatch '__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__') { $_.FullName }
 })
 if ($leftoverPlaceholders.Count) { throw "Unresolved template placeholders in: $($leftoverPlaceholders -join ', ')" }
 

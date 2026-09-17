@@ -49,9 +49,9 @@ write_managed_manifest() {
   } > "$path"
 }
 
-# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <powershell-command> <dry-run: true|false> [summary: true|false]
+# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <powershell-command> <dry-run: true|false> [summary: true|false] [flashbang] [claude-concurrency]
 sync_managed_destination() {
-  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 powershell_command=$6 dry_run=$7 summary=${8:-false} flashbang_enabled=${9:-true}
+  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 powershell_command=$6 dry_run=$7 summary=${8:-false} flashbang_enabled=${9:-true} claude_concurrency=${10:-5}
   [ "$summary" = true ] || printf 'SOURCE %s -> %s\n' "$source" "$destination"
   local manifest
   manifest=$(manifest_path "$destination")
@@ -77,6 +77,7 @@ sync_managed_destination() {
       content=${content//__HOOK_COMMAND__/$shell_command}
       content=${content//__POWERSHELL_HOOK_COMMAND__/$powershell_command}
       content=${content//__POWERSHELL_COMMAND__/$powershell_command}
+      content=${content//__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__/$claude_concurrency}
       content=${content//__HOOK_SCRIPT__/flashbang.sh}
       content=${content//__POWERSHELL_HOOK_SCRIPT__/flashbang.sh}
       new_hash=$(sha256_of_string "$content")

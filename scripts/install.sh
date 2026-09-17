@@ -48,6 +48,8 @@ powershell_command='pwsh -NoProfile -ExecutionPolicy Bypass -File'
 if command -v powershell >/dev/null; then powershell_command='powershell -NoProfile -ExecutionPolicy Bypass -File'; fi
 shell_command=bash
 [ "$shell" != powershell ] || shell_command=$powershell_command
+claude_concurrency=${CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY:-5}
+[[ "$claude_concurrency" =~ ^[1-9][0-9]?$ ]] && [ "$claude_concurrency" -le 10 ] || { printf 'CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY must be an integer from 1 to 10.\n' >&2; exit 1; }
 
 selected_plugins=()
 deselected_plugins=()
@@ -57,7 +59,7 @@ select_configured_plugins "$root" "$client" Install "$dry_run" selected_plugins 
 while IFS='|' read -r source destination; do
   ai_config_root=$destination
   command -v cygpath >/dev/null && ai_config_root=$(cygpath -m "$destination")
-  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang"
+  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang" "$claude_concurrency"
 done < <(get_install_targets "$generated" "$home_path" "$shell" "$client")
 
 sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" false selected_plugins "$summary"

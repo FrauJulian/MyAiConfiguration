@@ -12,7 +12,7 @@
     ]
   },
   "env": {
-    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "5"
+    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__"
   },
   "statusLine": {
     "type": "command",

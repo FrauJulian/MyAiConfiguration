@@ -56,6 +56,7 @@ function Sync-ManagedDestination {
         [string]$AiConfigRoot,
         [string]$ShellCommand,
         [string]$PowerShellCommand,
+        [string]$ClaudeConcurrency = '5',
         [bool]$FlashbangEnabled = $true,
         [switch]$DryRun,
         [switch]$Summary
@@ -78,7 +79,7 @@ function Sync-ManagedDestination {
         }
         $needsSubstitution = $filterFlashbang -or $rawContent.Contains('__AI_CONFIG_ROOT__') -or $rawContent.Contains('__HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_COMMAND__')
         if ($needsSubstitution) {
-            $finalContent = $rawContent.Replace('__AI_CONFIG_ROOT__', $AiConfigRoot).Replace('__HOOK_COMMAND__', $ShellCommand).Replace('__POWERSHELL_HOOK_COMMAND__', $PowerShellCommand).Replace('__POWERSHELL_COMMAND__', $PowerShellCommand).Replace('__HOOK_SCRIPT__', 'flashbang.ps1').Replace('__POWERSHELL_HOOK_SCRIPT__', 'flashbang.ps1')
+            $finalContent = $rawContent.Replace('__AI_CONFIG_ROOT__', $AiConfigRoot).Replace('__HOOK_COMMAND__', $ShellCommand).Replace('__POWERSHELL_HOOK_COMMAND__', $PowerShellCommand).Replace('__POWERSHELL_COMMAND__', $PowerShellCommand).Replace('__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__', $ClaudeConcurrency).Replace('__HOOK_SCRIPT__', 'flashbang.ps1').Replace('__POWERSHELL_HOOK_SCRIPT__', 'flashbang.ps1')
             $newBytes = [System.Text.Encoding]::UTF8.GetBytes($finalContent)
         } else {
             $newBytes = [System.IO.File]::ReadAllBytes($_.FullName)
