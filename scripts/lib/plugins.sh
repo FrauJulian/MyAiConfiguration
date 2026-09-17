@@ -43,7 +43,9 @@ get_plugin_names() {
 # plugin_field <root> <name> <field> -- field is one of the plugins.tsv column names
 plugin_field() {
   local root=$1 target=$2 field=$3
+  # shellcheck disable=SC2034
   local name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill
+  # shellcheck disable=SC2034
   while IFS=$'\t' read -r name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill; do
     [ "$name" = "$target" ] || continue
     printf '%s\n' "${!field}"
@@ -72,7 +74,7 @@ read_plugin_toggle_selection() {
       printf '  %d) [%s] %s\n' "$((i + 1))" "$mark" "${names_ref[$i]}"
     done
     read -r -p 'Toggle number or "done" ' answer || { printf 'Plugin selection cancelled: input closed.\n' >&2; return 1; }
-    { [ -z "$answer" ] || [ "$answer" = done ]; } && return 0
+    { [ -z "$answer" ] || [ "$answer" = "done" ]; } && return 0
     if [[ "$answer" =~ ^[0-9]+$ ]] && [ "$answer" -ge 1 ] && [ "$answer" -le "${#names_ref[@]}" ]; then
       i=$((10#$answer - 1))
       if [ "${checked_ref[$i]}" = true ]; then checked_ref[$i]=false; else checked_ref[$i]=true; fi
