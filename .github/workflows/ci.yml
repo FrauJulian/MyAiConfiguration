@@ -120,3 +120,26 @@ jobs:
           bash scripts/install.sh --summary --dry-run --client both --shell bash
           bash scripts/update.sh --summary --dry-run --client both --shell bash
 
+  retrieval:
+    name: Qwen retrieval integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [python]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d # v5.6.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: shared/retrieval/requirements.txt
+      - name: Install retrieval dependencies
+        run: python -m pip install -r shared/retrieval/requirements.txt
+      - uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.2.3
+        with:
+          path: .cache/huggingface
+          key: qwen-retrieval-${{ runner.os }}-${{ hashFiles('shared/retrieval/requirements.txt') }}
+      - name: Run retrieval tests with real models
+        env:
+          QWEN_TEST_MODEL_CACHE: ${{ github.workspace }}/.cache/huggingface
+        run: python scripts/test-retrieval-server.py
+
