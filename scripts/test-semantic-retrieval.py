@@ -16,6 +16,16 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SemanticRetrievalTests(unittest.TestCase):
+    def test_codex_registration_sets_tool_timeout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'config.toml'
+            config.write_text('[mcp_servers.my-ai-qwen3-retrieval]\ncommand = "python"\n\n[mcp_servers.my-ai-qwen3-retrieval.env]\nHF_HOME = "cache"\n', encoding='utf-8')
+
+            MODULE.set_codex_tool_timeout(config, 1800)
+
+            self.assertEqual(config.read_text(encoding='utf-8'),
+                             '[mcp_servers.my-ai-qwen3-retrieval]\ncommand = "python"\ntool_timeout_sec = 1800\n\n[mcp_servers.my-ai-qwen3-retrieval.env]\nHF_HOME = "cache"\n')
+
     def test_runtime_prefers_cuda_packages_for_nvidia_gpu(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)

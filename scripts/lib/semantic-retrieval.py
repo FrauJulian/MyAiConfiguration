@@ -11,6 +11,7 @@ import sys
 NAME = 'my-ai-qwen3-retrieval'
 FILES = ('server.py', 'requirements.txt')
 CUDA_INDEX = 'https://download.pytorch.org/whl/cu126'
+TOOL_TIMEOUT_SECONDS = 1800
 
 
 def digest(path):
@@ -54,6 +55,26 @@ def ensure_runtime(target, dry_run):
     else:
         subprocess.run(arguments, check=True, timeout=900)
     return python
+
+
+def set_codex_tool_timeout(path, seconds):
+    lines = path.read_text(encoding='utf-8').splitlines(keepends=True)
+    section = f'[mcp_servers.{NAME}]'
+    start = next((number for number, line in enumerate(lines) if line.strip() == section), None)
+    if start is None:
+        raise ValueError('Codex semantic retrieval configuration is missing.')
+    end = next((number for number in range(start + 1, len(lines)) if lines[number].lstrip().startswith('[')), len(lines))
+    for number in range(start + 1, end):
+        if lines[number].lstrip().startswith('tool_timeout_sec'):
+            newline = '\r\n' if lines[number].endswith('\r\n') else '\n'
+            lines[number] = f'tool_timeout_sec = {seconds}{newline}'
+            break
+    else:
+        while end > start + 1 and not lines[end - 1].strip():
+            end -= 1
+        newline = '\r\n' if lines and lines[0].endswith('\r\n') else '\n'
+        lines.insert(end, f'tool_timeout_sec = {seconds}{newline}')
+    path.write_text(''.join(lines), encoding='utf-8')
 
 
 def load_state(path):
@@ -129,6 +150,8 @@ def sync(root, home, clients, enabled, dry_run, update, summary=False):
         if update and client in existing_clients:
             command(client, [client, 'mcp', 'remove', NAME] + (['--scope', 'user'] if client == 'claude' else []), home, False)
         command(client, command_args, home, False)
+        if client == 'codex':
+            set_codex_tool_timeout(home / '.codex' / 'config.toml', TOOL_TIMEOUT_SECONDS)
         if client not in state['clients']:
             state['clients'].append(client)
             save_state(state_path, state, False)
