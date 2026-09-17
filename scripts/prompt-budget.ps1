@@ -19,7 +19,16 @@ $baseline = Join-Path $root 'adapters/prompt-budget-baseline.json'
 $old = if (Test-Path $baseline) { Get-Content $baseline -Raw | ConvertFrom-Json } else { $null }
 $rows = @([pscustomobject]@{Name='Claude permanent context';Bytes=$claude;Tokens=(Tokens $claude)},[pscustomobject]@{Name='Codex permanent context';Bytes=$codex;Tokens=(Tokens $codex)},[pscustomobject]@{Name='Claude skill files (lazy)';Bytes=$skills;Tokens=(Tokens $skills)},[pscustomobject]@{Name='Rule trigger metadata';Bytes=$triggers;Tokens=(Tokens $triggers)},[pscustomobject]@{Name='Largest lazy rule';Bytes=$lazy;Tokens=(Tokens $lazy)})
 $fail = $false
-if ($old) { foreach ($row in $rows | Select-Object -First 2) { $previous = [double]$old.($row.Name); if ($previous -gt 0 -and $row.Bytes -gt $previous * 1.15) { $fail = $true } } }
-if ($Summary) { Write-Output 'Prompt Budget'; $rows | ForEach-Object { Write-Output ('{0,-28} {1,8} bytes  {2,6} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } } else { $rows | ForEach-Object { Write-Output ('{0}: {1} bytes / {2} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } }
-if ($fail) { Write-Error 'Prompt budget: permanent context increased by more than 15 percent.'; exit 1 }
+$baselineValues = @{}
+if ($old) {
+    foreach ($row in $rows | Select-Object -First 2) {
+        $previous = [double]$old.($row.Name)
+        $absolute = [double]$old.(($row.Name + ' absolute limit'))
+        $baselineValues[$row.Name] = @($previous, $absolute)
+        if ($previous -gt 0 -and $row.Bytes -gt $previous * 1.15) { $fail = $true; Write-Error "Prompt budget relative limit failed: $($row.Name) $($row.Bytes) bytes (baseline $previous, limit 15%)." }
+        if ($absolute -gt 0 -and $row.Bytes -gt $absolute) { $fail = $true; Write-Error "Prompt budget absolute limit failed: $($row.Name) $($row.Bytes) bytes (absolute limit $absolute)." }
+    }
+}
+if ($Summary) { Write-Output 'Prompt Budget'; foreach ($row in $rows | Select-Object -First 2) { $limits = $baselineValues[$row.Name]; $base = if($limits){$limits[0]}else{'-'}; $absolute = if($limits){$limits[1]}else{'-'}; Write-Output ('{0,-28} {1,8} bytes  baseline {2}  relative 115%  absolute {3}' -f $row.Name,$row.Bytes,$base,$absolute) }; $rows | Select-Object -Skip 2 | ForEach-Object { Write-Output ('{0,-28} {1,8} bytes  {2,6} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } } else { $rows | ForEach-Object { Write-Output ('{0}: {1} bytes / {2} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } }
+if ($fail) { exit 1 }
 exit 0
