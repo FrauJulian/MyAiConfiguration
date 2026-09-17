@@ -211,7 +211,7 @@ and replaced, with a warning. Untracked files outside package target paths are l
 
 Previously managed files no longer shipped are backed up and removed if unchanged. If locally modified, they are
 backed up and retained with a warning. Backups are stored under `backups/<timestamp>/` in each destination.
-Local Codex `model`, `reasoning_effort`, `plugins`, and `marketplaces` settings are preserved when syncing `config.toml`;
+Local Codex `model`, `model_reasoning_effort`, `plugins`, and `marketplaces` settings are preserved when syncing `config.toml`;
 other local settings are not generally merged. Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
@@ -296,10 +296,9 @@ turning yellow at 60% and red at 85%; its status-line input does not expose the 
 ### Add a rule
 
 Create a focused Markdown file in `shared/rules/`. For a rule that applies only to a language, framework, tool, or
-change area, add a row to `adapters/claude/rule-skills.tsv` (Claude generates it as a skill) and add its loading
-condition to the Codex rule-loading text in `scripts/build.ps1`/`scripts/build.sh` (Codex loads it as a plain file, by
-path). Put always-applicable guidance in `general.md`, which the build embeds for both clients; a new rule file is
-not automatically embedded.
+change area, add one row to `adapters/claude/rule-skills.tsv`. The build uses that manifest to generate both Claude's
+rule skill and Codex's rule-loading condition. Put always-applicable guidance in `general.md`, which the build embeds
+for both clients; a new rule file is not automatically embedded.
 
 ### Add a skill
 
