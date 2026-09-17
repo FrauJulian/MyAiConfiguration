@@ -24,7 +24,7 @@ function Read-InstallOptions {
     return @{
         update_agents = Read-InstallBoolean -Prompt "Update selected agent CLIs ($Client)?" -Default $defaults.update_agents
         flashbang = Read-InstallBoolean -Prompt 'Enable the Flashbang notification hook?' -Default $defaults.flashbang
-        semantic_retrieval = Read-InstallBoolean -Prompt 'Enable Qwen3-Embedding-0.6B semantic retrieval?' -Default $defaults.semantic_retrieval
+        semantic_retrieval = Read-InstallBoolean -Prompt 'Enable Qwen3 embedding and reranking semantic retrieval?' -Default $defaults.semantic_retrieval
     }
 }
 

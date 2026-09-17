@@ -33,7 +33,7 @@ read_install_options() {
   [ "$dry_run" = false ] || return 0
   update_agents=$(read_install_boolean "Update selected agent CLIs ($client)?" "$update_agents") || return
   flashbang=$(read_install_boolean 'Enable the Flashbang notification hook?' "$flashbang") || return
-  semantic_retrieval=$(read_install_boolean 'Enable Qwen3-Embedding-0.6B semantic retrieval?' "$semantic_retrieval") || return
+  semantic_retrieval=$(read_install_boolean 'Enable Qwen3 embedding and reranking semantic retrieval?' "$semantic_retrieval") || return
 }
 
 is_windows_host() {

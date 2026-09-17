@@ -96,7 +96,7 @@ def sync(root, home, clients, enabled, dry_run, update):
     if target.exists() and not state['files']:
         raise ValueError('Semantic retrieval directory exists without setup ownership; refusing to overwrite it.')
     if dry_run:
-        print('DRYRUN enable semantic retrieval: Qwen3-Embedding-0.6B')
+        print('DRYRUN enable semantic retrieval: Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B')
         return
     target.mkdir(parents=True, exist_ok=True)
     source = root / 'shared' / 'retrieval'
