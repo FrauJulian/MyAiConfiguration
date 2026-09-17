@@ -21,5 +21,6 @@ if [ -f "$root/adapters/prompt-budget-baseline.tsv" ]; then
   done < "$root/adapters/prompt-budget-baseline.tsv"
 fi
 if [ "$summary" = true ]; then printf 'Prompt Budget\nClaude permanent context    %8s bytes  baseline %s  relative 115%%  absolute %s\nCodex permanent context     %8s bytes  baseline %s  relative 115%%  absolute %s\nClaude skill files (lazy)       %8s bytes  %6s tokens\nRule trigger metadata       %8s bytes  %6s tokens\nLargest lazy rule           %8s bytes  %6s tokens\n' "$claude" "$claude_baseline" "$claude_absolute" "$codex" "$codex_baseline" "$codex_absolute" "$skills" "$(tokens "$skills")" "$triggers" "$(tokens "$triggers")" "$lazy" "$(tokens "$lazy")"; else printf 'Prompt budget: Claude %s bytes, Codex %s bytes, skills %s bytes, triggers %s bytes, largest lazy rule %s bytes\n' "$claude" "$codex" "$skills" "$triggers" "$lazy"; fi
+python3 "$root/scripts/lib/prompt-inventory.py" --home "${HOME:?HOME is required}"
 $fail && { printf 'Prompt budget: permanent context increased by more than 15 percent.\n' >&2; exit 1; }
 exit 0

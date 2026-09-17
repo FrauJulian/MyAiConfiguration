@@ -30,5 +30,7 @@ if ($old) {
     }
 }
 if ($Summary) { Write-Output 'Prompt Budget'; foreach ($row in $rows | Select-Object -First 2) { $limits = $baselineValues[$row.Name]; $base = if($limits){$limits[0]}else{'-'}; $absolute = if($limits){$limits[1]}else{'-'}; Write-Output ('{0,-28} {1,8} bytes  baseline {2}  relative 115%  absolute {3}' -f $row.Name,$row.Bytes,$base,$absolute) }; $rows | Select-Object -Skip 2 | ForEach-Object { Write-Output ('{0,-28} {1,8} bytes  {2,6} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } } else { $rows | ForEach-Object { Write-Output ('{0}: {1} bytes / {2} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } }
+& python (Join-Path $PSScriptRoot 'lib/prompt-inventory.py') --home ([Environment]::GetFolderPath('UserProfile'))
+if ($LASTEXITCODE -ne 0) { throw 'Prompt inventory failed.' }
 if ($fail) { exit 1 }
 exit 0
