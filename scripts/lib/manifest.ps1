@@ -87,7 +87,7 @@ function Sync-ManagedDestination {
             $localConfig = [System.IO.File]::ReadAllText($target)
             $pluginTables = [regex]::Matches($localConfig, '(?m)^[ \t]*\[(?:plugins|marketplaces)(?:\.|\])[\s\S]*?(?=^[ \t]*\[|\z)')
             $rootConfig = [regex]::Split($localConfig, '(?m)^[ \t]*\[', 2)[0]
-            $localSettings = [regex]::Matches($rootConfig, '(?m)^[ \t]*(?:model|reasoning_effort)[ \t]*=.*$')
+            $localSettings = [regex]::Matches($rootConfig, '(?m)^[ \t]*(?:model|model_reasoning_effort)[ \t]*=.*$')
             if ($localSettings.Count -gt 0) {
                 $content = [System.Text.Encoding]::UTF8.GetString($newBytes).TrimEnd([char[]]"`r`n")
                 foreach ($setting in $localSettings) {

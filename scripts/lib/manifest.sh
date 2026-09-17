@@ -87,7 +87,7 @@ sync_managed_destination() {
       local plugin_tables local_settings setting_name
       local_settings=$(awk '
         /^[ \t]*\[/ { exit }
-        /^[ \t]*(model|reasoning_effort)[ \t]*=/ { print }
+        /^[ \t]*(model|model_reasoning_effort)[ \t]*=/ { print }
       ' "$target")
       if [ -n "$local_settings" ]; then
         while IFS= read -r setting; do
