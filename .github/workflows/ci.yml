@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '23 4 * * 1'
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install --yes shellcheck
+      - name: Shell syntax and lint
+        shell: bash
+        run: |
+          git ls-files -z '*.sh' | xargs -0 -r -n1 bash -n
+          shellcheck --severity=warning $(git ls-files '*.sh')
+      - name: Python tests
+        run: for file in scripts/test-*.py; do python3 "$file"; done
+      - name: Build
+        env:
+          REQUIRE_CODEX_SCHEMA: 'false'
+        run: bash scripts/build.sh --summary
+      - name: Bash tests
+        run: |
+          bash scripts/test-build-validation.sh --summary
+          bash scripts/test-install-guards.sh --summary
+          bash scripts/test-plugin-selection.sh --summary
+          bash scripts/test-quick-update.sh --summary
+          bash scripts/test-shell-packages.sh --summary
+          bash scripts/test-managed-install.sh --summary
