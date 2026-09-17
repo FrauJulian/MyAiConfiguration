@@ -76,3 +76,23 @@ jobs:
             & $_.FullName -Summary
           }
 
+  build:
+    name: Build and inspect generated packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [capabilities, python]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build packages
+        env:
+          REQUIRE_CODEX_SCHEMA: 'false'
+        run: bash scripts/build.sh --summary
+      - name: Run build validation
+        run: bash scripts/test-build-validation.sh --summary
+      - name: Check generated files are reproducible
+        run: |
+          before=$(find generated -type f -print0 | sort -z | xargs -0 sha256sum)
+          bash scripts/build.sh --summary
+          after=$(find generated -type f -print0 | sort -z | xargs -0 sha256sum)
+          test "$before" = "$after"
+
