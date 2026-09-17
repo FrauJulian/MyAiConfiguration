@@ -36,6 +36,7 @@ if [ "$dry_run" = false ]; then
 fi
 
 read_install_options
+reinstall_via_npm=$(read_cli_reinstall_option "$client" "$dry_run")
 
 build_args=()
 [ "$summary" = false ] || build_args+=(--summary)
@@ -55,6 +56,7 @@ selected_plugins=()
 deselected_plugins=()
 select_configured_plugins "$root" "$client" Install "$dry_run" selected_plugins deselected_plugins
 [ "$update_agents" = false ] || update_selected_agent_clis
+[ "$reinstall_via_npm" = false ] || invoke_cli_reinstall "$client" "$dry_run" "$summary"
 
 while IFS='|' read -r source destination; do
   ai_config_root=$destination
