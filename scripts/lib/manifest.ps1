@@ -86,7 +86,7 @@ function Sync-ManagedDestination {
         if ($relative -eq 'config.toml' -and (Test-Path -LiteralPath $target)) {
             $localConfig = [System.IO.File]::ReadAllText($target)
             $pluginTables = [regex]::Matches($localConfig, '(?m)^[ \t]*\[(?:plugins|marketplaces)(?:\.|\])[\s\S]*?(?=^[ \t]*\[|\z)')
-            $rootConfig = [regex]::Split($localConfig, '(?m)^[ \t]*\[', 2)[0]
+            $rootConfig = ([regex]::Split($localConfig, '(?m)^[ \t]*\[', 2)[0]).TrimStart([char]0xFEFF)
             $localSettings = [regex]::Matches($rootConfig, '(?m)^[ \t]*(?:model|model_reasoning_effort)[ \t]*=.*$')
             if ($localSettings.Count -gt 0) {
                 $content = [System.Text.Encoding]::UTF8.GetString($newBytes).TrimEnd([char[]]"`r`n")
@@ -95,7 +95,10 @@ function Sync-ManagedDestination {
                     $content = [regex]::Replace($content, "(?m)^[ \t]*$([regex]::Escape($name))[ \t]*=.*(?:\r?\n|$)", '')
                 }
                 $preservedSettings = ($localSettings | ForEach-Object { $_.Value.TrimEnd([char[]]"`r`n") }) -join "`n"
-                $newBytes = [System.Text.Encoding]::UTF8.GetBytes("$content`n$preservedSettings`n")
+                $firstTable = [regex]::Match($content, '(?m)^[ \t]*\[')
+                if ($firstTable.Success) { $content = $content.Insert($firstTable.Index, "$preservedSettings`n") }
+                else { $content = "$content`n$preservedSettings" }
+                $newBytes = [System.Text.Encoding]::UTF8.GetBytes("$content`n")
             }
             if ($pluginTables.Count -gt 0) {
                 $content = [System.Text.Encoding]::UTF8.GetString($newBytes).TrimEnd([char[]]"`r`n")
