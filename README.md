@@ -217,7 +217,7 @@ other local settings are not generally merged. Dry runs still rebuild `generated
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
 Codex skills; unchecked extensions are skipped on installation. Normal runs also ask whether to update
 the selected client CLIs, enable Flashbang, and enable Qwen3 semantic retrieval. These choices are saved for Quickupdate.
-Disabling retrieval on a later update removes its setup-owned runtime, index, and MCP registrations. Dry runs preview
+Disabling retrieval on a later update removes its setup-owned runtime and index. Dry runs preview
 changes without updating CLIs, extensions, or retrieval. See [Plugins](docs/plugins.md) for client-specific behavior.
 
 ## Update

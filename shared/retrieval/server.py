@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local MCP semantic search backed by Qwen3 embedding and reranking."""
+"""Local CLI semantic search backed by Qwen3 embedding and reranking."""
 
 from __future__ import annotations
 
@@ -8,10 +8,12 @@ import ast
 import hashlib
 import heapq
 import json
+import multiprocessing
 import os
 from pathlib import Path
 import re
 import sqlite3
+import sys
 import threading
 
 
@@ -24,10 +26,25 @@ DENSE_CANDIDATES = 50
 LEXICAL_CANDIDATES = 50
 RERANK_CANDIDATES = 50
 FINAL_RESULTS = 5
+CLI_TIMEOUT_SECONDS = 300
 RRF_K = 60
 INDEX_VERSION = 2
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
+
+
+def runtime_python(script=__file__, executable=sys.executable, system=os.name):
+    relative = Path('.venv') / ('Scripts/python.exe' if system == 'nt' else 'bin/python')
+    candidate = (Path(script).resolve().parent / relative)
+    if candidate.is_file() and candidate != Path(executable).resolve():
+        return candidate
+    return None
+
+
+def use_runtime_python():
+    runtime = runtime_python()
+    if runtime is not None:
+        os.execv(str(runtime), [str(runtime), str(Path(__file__).resolve()), *sys.argv[1:]])
 
 
 def sections(text: str, path: str):
@@ -118,6 +135,14 @@ def document_text(path: str, symbol: str, content: str):
     return f"Path: {path}\nSymbol: {symbol}\n\n{content}"
 
 
+def run_action(action: str, root: Path, data_dir: Path, model_cache: Path, query: str | None, top_k: int, output):
+    model_cache.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("HF_HOME", str(model_cache.resolve()))
+    index = Index(root, data_dir)
+    result = index.search(query, top_k) if action == "search" else {"chunks": index.rebuild()}
+    output.put((True, result))
+
+
 def preferred_device():
     import torch
     return "cuda" if torch.cuda.is_available() else "cpu"
@@ -144,6 +169,7 @@ class Index:
         self.db.execute("create index if not exists chunks_path on chunks (path)")
         self.db.execute("create virtual table if not exists lexical using fts5(document)")
         self.db.execute("create table if not exists files (path text primary key, digest text)")
+        self.db.execute("create table if not exists query_cache (cache_key text primary key, result text not null)")
         self.db.commit()
         self.lock = threading.RLock()
         self.model = None
@@ -234,6 +260,13 @@ class Index:
             for relative in previous:
                 self.delete_path(relative)
                 self.db.execute("delete from files where path = ?", (relative,))
+            if changed or previous:
+                self.db.execute("delete from query_cache")
+
+    def cache_key(self, query: str, top_k: int):
+        files = self.db.execute("select path, digest from files order by path").fetchall()
+        state = json.dumps(files, separators=(",", ":"))
+        return hashlib.sha256(f"{top_k}\0{query}\0{state}".encode("utf-8")).hexdigest()
 
     def search(self, query: str, top_k: int = FINAL_RESULTS):
         if not query.strip():
@@ -242,6 +275,14 @@ class Index:
             self.refresh()
             if not self.db.execute("select 1 from chunks limit 1").fetchone():
                 return []
+            key = self.cache_key(query, top_k)
+            cached = self.db.execute("select result from query_cache where cache_key = ?", (key,)).fetchone()
+            if cached:
+                try:
+                    return json.loads(cached[0])
+                except (TypeError, json.JSONDecodeError):
+                    with self.db:
+                        self.db.execute("delete from query_cache where cache_key = ?", (key,))
             import numpy as np
             vector = self.encoder().encode([query], prompt_name="query", normalize_embeddings=True)[0]
             if len(vector) != EMBEDDING_DIMENSIONS:
@@ -260,34 +301,42 @@ class Index:
                     for identifier, path, symbol, text in self.db.execute(
                         f"select rowid, path, symbol, text from chunks where rowid in ({placeholders})", identifiers)}
             candidates = [rows[identifier] for identifier in identifiers]
-            return self.rerank(query, candidates, max(1, min(top_k, FINAL_RESULTS)))
+            result = self.rerank(query, candidates, max(1, min(top_k, FINAL_RESULTS)))
+            with self.db:
+                self.db.execute("insert or replace into query_cache values (?, ?)",
+                                (key, json.dumps(result, ensure_ascii=False)))
+            return result
 
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=("search", "rebuild"))
+    parser.add_argument("--query")
+    parser.add_argument("--top-k", type=int, default=FINAL_RESULTS)
     parser.add_argument("--root", default=os.getcwd(), type=Path)
     parser.add_argument("--data-dir", required=True, type=Path)
     parser.add_argument("--model-cache", required=True, type=Path)
     args = parser.parse_args()
-    args.model_cache.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("HF_HOME", str(args.model_cache.resolve()))
-    from mcp.server.fastmcp import FastMCP
-
-    index = Index(args.root, args.data_dir)
-    mcp = FastMCP("my-ai-qwen3-retrieval")
-
-    @mcp.tool()
-    def semantic_search(query: str, top_k: int = FINAL_RESULTS) -> list[dict]:
-        """Search repository concepts, behavior, and implementation patterns first with Qwen3 embedding and reranking. Verify returned passages against current files; use direct reads for known paths."""
-        return index.search(query, top_k)
-
-    @mcp.tool()
-    def rebuild_index() -> str:
-        """Rebuild the local repository embedding index."""
-        return json.dumps({"chunks": index.rebuild()})
-
-    mcp.run()
+    if args.action == "search" and not args.query:
+        parser.error("search requires --query")
+    output = multiprocessing.Queue(1)
+    worker = multiprocessing.Process(target=run_action,
+                                     args=(args.action, args.root.resolve(), args.data_dir.resolve(),
+                                           args.model_cache.resolve(), args.query, args.top_k, output))
+    worker.start()
+    worker.join(CLI_TIMEOUT_SECONDS)
+    if worker.is_alive():
+        worker.terminate()
+        worker.join()
+        raise TimeoutError(f"Qwen retrieval exceeded the {CLI_TIMEOUT_SECONDS} second timeout.")
+    if worker.exitcode != 0 or output.empty():
+        raise RuntimeError("Qwen retrieval worker failed.")
+    success, result = output.get()
+    if not success:
+        raise RuntimeError(str(result))
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":
+    use_runtime_python()
     main()

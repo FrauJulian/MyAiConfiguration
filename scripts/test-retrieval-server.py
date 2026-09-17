@@ -27,6 +27,15 @@ def embedding():
 
 
 class RetrievalServerTests(unittest.TestCase):
+    def test_runtime_python_uses_adjacent_virtualenv(self):
+        with TemporaryDirectory() as temporary:
+            script = Path(temporary) / 'semantic-retrieval' / 'server.py'
+            runtime = script.parent / '.venv' / 'Scripts' / 'python.exe'
+            runtime.parent.mkdir(parents=True)
+            runtime.touch()
+
+            self.assertEqual(MODULE.runtime_python(script, 'C:/Python/python.exe', 'nt'), runtime.resolve())
+
     def test_preferred_device_uses_cuda_with_cpu_fallback(self):
         with patch.dict('sys.modules', torch=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))):
             self.assertEqual(MODULE.preferred_device(), 'cuda')
@@ -89,7 +98,7 @@ class RetrievalServerTests(unittest.TestCase):
                     encoded.clear()
                     with ThreadPoolExecutor(max_workers=1) as executor:
                         self.assertEqual(executor.submit(indexes[0].search, 'query', 5).result()[0]['text'], 'alpha')
-                    self.assertEqual(encoded, ['query'])
+                    self.assertEqual(encoded, [])
                     timestamp = file.stat()
                     file.write_text('bravo', encoding='utf-8')
                     os.utime(file, ns=(timestamp.st_atime_ns, timestamp.st_mtime_ns))
