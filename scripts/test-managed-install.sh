@@ -58,15 +58,17 @@ plugin_state='  [marketplaces.ponytail]
     enabled = true
   [plugins."disabled@market"]
     enabled = false'
-printf "model = 'new'\n" > "$source_dir/config.toml"
-printf "model = 'old'\n%s\n[other]\nvalue = true\n" "$plugin_state" > "$destination/config.toml"
+printf "model = 'new'\nreasoning_effort = 'low'\n" > "$source_dir/config.toml"
+printf "model = 'old'\nreasoning_effort = 'high'\n%s\n[other]\nvalue = true\n" "$plugin_state" > "$destination/config.toml"
 original_config=$(cat "$destination/config.toml")
 sync_managed_destination "$source_dir" "$destination" plugins-dry "" "" "" true > /dev/null
 [ "$(cat "$destination/config.toml")" = "$original_config" ] || { printf 'Dry run changed plugin configuration.\n' >&2; exit 1; }
 sync_managed_destination "$source_dir" "$destination" plugins "" "" "" false > /dev/null
 merged_config=$(cat "$destination/config.toml")
-[[ "$merged_config" == *"$plugin_state"* ]] || { printf 'Updating config.toml must preserve local marketplace and plugin tables, including disabled plugins.\n' >&2; exit 1; }
-[[ "$merged_config" == *"model = 'new'"* && "$merged_config" != *'[other]'* ]] || { printf 'Managed configuration must still be updated.\n' >&2; exit 1; }
+merged_config_normalized=${merged_config//$'\r'/}
+plugin_state_normalized=${plugin_state//$'\r'/}
+[[ "$merged_config_normalized" == *"$plugin_state_normalized"* ]] || { printf 'Updating config.toml must preserve local marketplace and plugin tables, including disabled plugins.\n' >&2; exit 1; }
+[[ "$merged_config" == *"model = 'old'"* && "$merged_config" == *"reasoning_effort = 'high'"* && "$merged_config" != *"model = 'new'"* && "$merged_config" != *"reasoning_effort = 'low'"* && "$merged_config" != *'[other]'* ]] || { printf 'Updating config.toml must preserve local model and reasoning effort while updating managed configuration.\n' >&2; exit 1; }
 [ "$(cat "$destination/backups/plugins/config.toml")" = "$original_config" ] || { printf 'Original plugin configuration must be backed up.\n' >&2; exit 1; }
 sync_managed_destination "$source_dir" "$destination" plugins-repeat "" "" "" false > /dev/null
 [ "$(cat "$destination/config.toml")" = "$merged_config" ] && [ ! -d "$destination/backups/plugins-repeat" ] || { printf 'Preserving plugin configuration must be idempotent.\n' >&2; exit 1; }
