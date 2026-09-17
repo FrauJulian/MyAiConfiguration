@@ -11,6 +11,22 @@
 It keeps rules, skills, agents, hooks, and orchestration guidance in shared source files. Client adapters turn those files
 into shell-specific packages that can be inspected before they are installed.
 
+## Capability check
+
+Check required tools, versions, repository files, and (by default) client/network access before setup. The command exits with an error when a requirement is missing. Use `--skip-external` or `-SkipExternal` only for an offline repository-only check.
+
+PowerShell:
+
+```powershell
+.\scripts\check-capabilities.ps1
+```
+
+Bash:
+
+```bash
+./scripts/check-capabilities.sh
+```
+
 ## Quickstart
 
 With the [requirements](#requirements) installed, clone the repository, build it, then install it.

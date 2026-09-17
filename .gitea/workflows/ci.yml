@@ -17,6 +17,8 @@ jobs:
           command -v pwsh >/dev/null || { echo 'pwsh is required on the Linux runner'; exit 1; }
       - name: Bash syntax
         run: find scripts shared/hooks -name '*.sh' -print0 | xargs -0 -n1 bash -n
+      - name: Capability checks
+        run: ./scripts/check-capabilities.sh --skip-external
       - name: Build
         run: ./scripts/build.sh --summary
       - name: Prompt budget
@@ -32,6 +34,7 @@ jobs:
         shell: pwsh
         run: |
           $env:REQUIRE_CODEX_SCHEMA = 'true'
+          ./scripts/check-capabilities.ps1 -SkipExternal
           ./scripts/build.ps1 -Summary
           ./scripts/doctor.ps1 -Summary
           ./scripts/test-shell-packages.ps1 -Summary
