@@ -118,6 +118,11 @@ def document_text(path: str, symbol: str, content: str):
     return f"Path: {path}\nSymbol: {symbol}\n\n{content}"
 
 
+def preferred_device():
+    import torch
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 def reciprocal_rank_fusion(*rankings):
     scores = {}
     for ranking in rankings:
@@ -165,13 +170,15 @@ class Index:
         if self.model is None:
             from sentence_transformers import SentenceTransformer
             self.model = SentenceTransformer(MODEL, truncate_dim=EMBEDDING_DIMENSIONS,
-                                             prompts={"query": f"Instruct: {RETRIEVAL_INSTRUCTION}\nQuery: "})
+                                             prompts={"query": f"Instruct: {RETRIEVAL_INSTRUCTION}\nQuery: "},
+                                             device=preferred_device())
         return self.model
 
     def reranker(self):
         if self.reranker_model is None:
             from sentence_transformers import CrossEncoder
-            self.reranker_model = CrossEncoder(RERANKER_MODEL, prompts={"query": RETRIEVAL_INSTRUCTION}, default_prompt_name="query")
+            self.reranker_model = CrossEncoder(RERANKER_MODEL, prompts={"query": RETRIEVAL_INSTRUCTION},
+                                               default_prompt_name="query", device=preferred_device())
         return self.reranker_model
 
     def rerank(self, query: str, rows: list[dict], limit: int):

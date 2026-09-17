@@ -27,6 +27,12 @@ def embedding():
 
 
 class RetrievalServerTests(unittest.TestCase):
+    def test_preferred_device_uses_cuda_with_cpu_fallback(self):
+        with patch.dict('sys.modules', torch=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))):
+            self.assertEqual(MODULE.preferred_device(), 'cuda')
+        with patch.dict('sys.modules', torch=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))):
+            self.assertEqual(MODULE.preferred_device(), 'cpu')
+
     @unittest.skipUnless(os.environ.get('QWEN_TEST_MODEL_CACHE'), 'Set QWEN_TEST_MODEL_CACHE to run the real-model check.')
     def test_real_models(self):
         os.environ['HF_HOME'] = os.environ['QWEN_TEST_MODEL_CACHE']
