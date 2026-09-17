@@ -21,7 +21,7 @@ Project instructions may specialize global defaults, but must not weaken securit
 
 ## Semantic repository search
 
-* In Codex and Claude Code, proactively use Qwen3-Embedding-0.6B through the `my-ai-qwen3-retrieval` MCP server's `semantic_search` tool whenever available and useful. Discover the tool if it is not already exposed.
+* In Codex and Claude Code, proactively use the `my-ai-qwen3-retrieval` MCP server's `semantic_search` tool whenever available and useful. It always uses Qwen3-Embedding-0.6B for retrieval and Qwen3-Reranker-0.6B for reranking. Discover the tool if it is not already exposed.
 * Use semantic search early to find unfamiliar code, understand responsibilities and relationships, locate similar implementations, or investigate behavior described without exact symbols. Reuse relevant results and search again when a new question would benefit.
 * Use direct file reads for known paths and exact text search for symbols, literals, and exhaustive caller checks. Combine these with semantic search when meaning-based discovery adds value.
 * Treat retrieved passages as leads: verify them against current files in the intended workspace before relying on them. Empty results do not prove absence; stale or unrelated results require direct inspection.
