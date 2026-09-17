@@ -56,7 +56,7 @@ for shell in powershell bash; do
       ! grep -q 'flashbang-if-input' "$package/$file"
       ! grep -Eq '^async[[:space:]]*=[[:space:]]*true[[:space:]]*$' "$package/$file"
       grep -q 'approvals_reviewer[[:space:]]*=[[:space:]]*"auto_review"' "$package/$file"
-      grep -Fq 'status_line = ["model", "reasoning", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]' "$package/$file"
+      grep -Fq 'status_line = ["model", "reasoning", "permissions", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]' "$package/$file"
     else
       python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); assert set(settings["hooks"]) == {"PreCompact", "SessionStart", "Stop"}' "$package/$file"
       ! grep -q 'flashbang-if-input' "$package/$file"

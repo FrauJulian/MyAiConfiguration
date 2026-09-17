@@ -3,7 +3,7 @@ approvals_reviewer = "auto_review"
 sandbox_mode = "workspace-write"
 
 [tui]
-status_line = ["model", "reasoning", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]
+status_line = ["model", "reasoning", "permissions", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]
 
 [agents]
 enabled = true
