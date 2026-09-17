@@ -110,9 +110,9 @@ Install and update also rebuild internally; the explicit build above lets you ch
 - Finish notifications, Claude session-state hooks, optional safety utilities, and compact status displays.
 - Separate install and update scripts: install refuses to run against an already-installed destination, update refuses
   to run against one that is not installed yet.
-- User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, Humanizer, Impeccable, and
+- User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, QMD, Humanizer, Impeccable, and
   Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
-  installed and recorded by this setup can be removed through deselection.
+  integrations installed and recorded by this setup can be removed through deselection.
 - Optional local semantic retrieval for both clients using Qwen3-Embedding-0.6B, disabled by default and removable
   through the install/update choice.
 
@@ -147,6 +147,7 @@ generated/
 - Python 3.11 or newer for configuration validation and task-state hooks/helpers (`python` for PowerShell scripts, `python3` for Bash scripts).
 - `jq` for Claude's Bash status line; without it, that status line produces no output.
 - Python `venv` and `pip` when the optional semantic retrieval layer is enabled.
+- Node.js 22 or newer and `npm` when QMD is selected.
 
 The Bash scripts do not require PowerShell. The PowerShell scripts remain compatible with PowerShell 5.1;
 PowerShell 7 can also run them.
