@@ -47,23 +47,23 @@ used_tokens_display=$(format_token_count "$used_tokens")
 context_window_display=$(format_token_count "$context_window")
 
 esc=$'\033'
-reset="$esc[0m"
-dim="$esc[90m"
-cyan="$esc[96m"
-magenta="$esc[95m"
-blue="$esc[94m"
-green="$esc[92m"
+reset="${esc}[0m"
+dim="${esc}[90m"
+cyan="${esc}[96m"
+magenta="${esc}[95m"
+blue="${esc}[94m"
+green="${esc}[92m"
 if [ "$used_percentage" = - ]; then
   context_color=$dim
 elif [ "$used_percentage" -ge 85 ]; then
-  context_color="$esc[31m"
+  context_color="${esc}[31m"
 elif [ "$used_percentage" -ge 60 ]; then
-  context_color="$esc[33m"
+  context_color="${esc}[33m"
 else
   context_color=$green
 fi
 if [ -n "${NO_COLOR:-}" ]; then
-  reset= dim= cyan= magenta= blue= green= context_color=
+  reset='' dim='' cyan='' magenta='' blue='' green='' context_color=''
 fi
 sep="${dim}·${reset}"
 
