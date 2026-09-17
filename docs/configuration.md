@@ -16,7 +16,7 @@ Codex sets `approval_policy = "on-request"`, `approvals_reviewer = "auto_review"
 
 ## Status displays
 
-Codex's native `tui.status_line` contains `model`, `reasoning`, `permissions`, `approval-mode`, `project-name`, `git-branch`, `context-window-size`, `context-used`, and `used-tokens`, in that order. `permissions` reports the active permission profile or sandbox summary, and `approval-mode` reports the active command approval mode. Rendering and colors are controlled by Codex; the adapter does not define custom colors per field.
+Codex's native `tui.status_line` contains `model`, `reasoning`, `approval-mode`, `project-name`, `git-branch`, `context-window-size`, `context-used`, and `used-tokens`, in that order. `approval-mode` reports the active command review mode. Rendering and colors are controlled by Codex; the adapter does not define custom colors per field.
 
 Claude runs `shared/statusline/statusline.ps1` for PowerShell or `statusline.sh` for Bash. Its two-line display is:
 
@@ -29,7 +29,7 @@ Model and context-window size are cyan, effort and cumulative tokens magenta, re
 
 `Ctx` is the context-window capacity; `Used` is the reported percentage occupied. `Tokens` adds the session's reported total input and output tokens, not just the current context. Counts use `k` and `M` suffixes. Missing model, effort, context size, or percentage is shown as `-`; missing token totals start at zero. Repository names fall back to the Git root or current directory; unavailable branches show `-`.
 
-Claude Code reruns its status-line command when the permission mode changes, but does not pass that mode in the status-line JSON. Its line therefore does not show a configured default as though it were the active mode.
+Claude's status line displays `permission_mode` or `permissionMode` when Claude provides it, and otherwise shows the configured `auto` review mode.
 
 ## Verification and installation
 
