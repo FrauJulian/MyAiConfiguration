@@ -120,6 +120,8 @@ class RetrievalServerTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'encoder failed'):
                     index.rebuild()
                 self.assertEqual(index.db.execute('select path, text from chunks').fetchall(), [('a.md', 'before')])
+                self.assertEqual(index.db.execute('select document from lexical').fetchall(),
+                                 [('Path: a.md\nSymbol: <module>\n\nbefore',)])
             finally:
                 index.db.close()
 

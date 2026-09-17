@@ -22,7 +22,7 @@ CHUNK_TOKENS = 400
 OVERLAP_TOKENS = 64
 RERANK_CANDIDATES = 20
 FINAL_RESULTS = 20
-INDEX_VERSION = 1
+INDEX_VERSION = 2
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
 
@@ -126,6 +126,7 @@ class Index:
         self.db = sqlite3.connect(self.data / database, check_same_thread=False, timeout=30)
         self.db.execute("create table if not exists chunks (path text, symbol text, text text, vector blob)")
         self.db.execute("create index if not exists chunks_path on chunks (path)")
+        self.db.execute("create virtual table if not exists lexical using fts5(document)")
         self.db.execute("create table if not exists files (path text primary key, digest text)")
         self.db.commit()
         self.lock = threading.RLock()
@@ -171,6 +172,7 @@ class Index:
         return sorted(candidates, key=lambda item: item["score"], reverse=True)[:min(limit, FINAL_RESULTS)]
 
     def delete_path(self, path):
+        self.db.execute("delete from lexical where rowid in (select rowid from chunks where path = ?)", (path,))
         self.db.execute("delete from chunks where path = ?", (path,))
 
     def rebuild(self):
@@ -192,11 +194,12 @@ class Index:
                 documents = [document_text(relative, symbol, value) for symbol, value in values]
                 vectors = self.encoder().encode(documents, normalize_embeddings=True) if documents else []
                 self.delete_path(relative)
-                for (symbol, value), vector in zip(values, vectors):
+                for (symbol, value), document, vector in zip(values, documents, vectors):
                     if len(vector) != EMBEDDING_DIMENSIONS:
                         raise ValueError("Embedding must have 1024 dimensions")
-                    self.db.execute("insert into chunks values (?, ?, ?, ?)",
+                    cursor = self.db.execute("insert into chunks values (?, ?, ?, ?)",
                                              (relative, symbol, value, vector.tobytes()))
+                    self.db.execute("insert into lexical(rowid, document) values (?, ?)", (cursor.lastrowid, document))
                 self.db.execute("insert or replace into files values (?, ?)", (relative, digest))
             for relative in previous:
                 self.delete_path(relative)
