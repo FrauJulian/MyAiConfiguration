@@ -1,6 +1,8 @@
 import hashlib
 import importlib.util
+import io
 import json
+from contextlib import redirect_stdout
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,6 +15,16 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SemanticRetrievalTests(unittest.TestCase):
+    def test_summary_dry_run_omits_details_without_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / 'home'
+            for enabled in (True, False):
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    MODULE.sync(ROOT, home, ['codex'], enabled, True, False, summary=True)
+                self.assertEqual(output.getvalue(), '')
+                self.assertFalse(home.exists())
+
     def test_claude_registration_places_name_before_environment(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / 'home'

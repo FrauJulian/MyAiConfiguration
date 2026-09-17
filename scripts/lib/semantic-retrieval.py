@@ -67,7 +67,7 @@ def save_state(path, state, dry_run):
         path.write_text(json.dumps(state, indent=2) + '\n', encoding='utf-8')
 
 
-def sync(root, home, clients, enabled, dry_run, update):
+def sync(root, home, clients, enabled, dry_run, update, summary=False):
     base = home / '.my-ai-configuration'
     target = base / 'semantic-retrieval'
     state_path = base / 'semantic-retrieval.json'
@@ -78,7 +78,8 @@ def sync(root, home, clients, enabled, dry_run, update):
     if not enabled:
         owned = [client for client in state['clients'] if client in clients]
         if dry_run:
-            print('DRYRUN disable semantic retrieval: ' + (', '.join(owned) if owned else 'nothing owned'))
+            if not summary:
+                print('DRYRUN disable semantic retrieval: ' + (', '.join(owned) if owned else 'nothing owned'))
             return
         for client in owned:
             command(client, [client, 'mcp', 'remove', NAME] + (['--scope', 'user'] if client == 'claude' else []), home, False)
@@ -96,7 +97,8 @@ def sync(root, home, clients, enabled, dry_run, update):
     if target.exists() and not state['files']:
         raise ValueError('Semantic retrieval directory exists without setup ownership; refusing to overwrite it.')
     if dry_run:
-        print('DRYRUN enable semantic retrieval: Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B')
+        if not summary:
+            print('DRYRUN enable semantic retrieval: Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B')
         return
     target.mkdir(parents=True, exist_ok=True)
     source = root / 'shared' / 'retrieval'
@@ -134,9 +136,10 @@ def main():
     parser.add_argument('--enabled', choices=('true', 'false'), required=True)
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--update', action='store_true')
+    parser.add_argument('--summary', action='store_true')
     args = parser.parse_args()
     clients = ('codex', 'claude') if args.client == 'both' else (args.client,)
-    sync(args.root.resolve(), args.home.resolve(), clients, args.enabled == 'true', args.dry_run, args.update)
+    sync(args.root.resolve(), args.home.resolve(), clients, args.enabled == 'true', args.dry_run, args.update, args.summary)
     print('SEMANTIC RETRIEVAL: reconciliation complete' + (' (dry run)' if args.dry_run else ''))
 
 
