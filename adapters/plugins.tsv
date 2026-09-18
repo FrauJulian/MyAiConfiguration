@@ -1,8 +1,8 @@
-name	claude_marketplace	claude_plugin	codex_marketplace	codex_plugin	codex_method	codex_source	codex_skill
+name	claude_marketplace	claude_plugin	codex_marketplace	codex_plugin	codex_method	codex_source	codex_skill	mcporter_name	mcporter_url
 Ponytail	DietrichGebert/ponytail	ponytail@ponytail	DietrichGebert/ponytail	ponytail@ponytail	plugin	-	-
 i-have-adhd	ayghri/i-have-adhd	i-have-adhd@i-have-adhd	ayghri/i-have-adhd	i-have-adhd@i-have-adhd	plugin	-	-
 Superpowers	-	superpowers@claude-plugins-official	openai-curated-remote	superpowers@openai-curated-remote	plugin	-	-
-Context7	upstash/context7	context7@context7-marketplace	upstash/context7	context7@context7-marketplace	plugin	-	-
+Context7	upstash/context7	context7@context7-marketplace	upstash/context7	context7@context7-marketplace	plugin	-	-	context7	https://mcp.context7.com/mcp
 Caveman	JuliusBrussee/caveman	caveman@caveman	thinkhome-org/caveman-codex	caveman@thinkhome-caveman	plugin	-	-
 QMD	tobi/qmd	qmd@qmd	-	-	qmd	@tobilu/qmd	qmd
 MCPorter	-	mcporter	-	mcporter	cli	mcporter	-

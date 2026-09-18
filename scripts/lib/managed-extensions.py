@@ -166,7 +166,7 @@ class Manager:
             raise ValueError('Invalid extension ownership ledger.')
         identities = set()
         for resource in self.state['resources']:
-            if not isinstance(resource, dict) or resource.get('client') not in ('codex', 'claude') or resource.get('kind') not in ('plugin', 'skill', 'qmd', 'cli'):
+            if not isinstance(resource, dict) or resource.get('client') not in ('codex', 'claude', 'shared') or resource.get('kind') not in ('plugin', 'skill', 'qmd', 'cli', 'mcp'):
                 raise ValueError('Invalid extension ownership record.')
             if not isinstance(resource.get('name'), str) or not resource['name']:
                 raise ValueError('Invalid extension ownership name.')
@@ -196,6 +196,8 @@ class Manager:
                 raise ValueError('Invalid owned QMD record.')
             elif resource['kind'] == 'cli' and not re.fullmatch(r'[a-z0-9@/_.-]+', resource.get('package', '')):
                 raise ValueError('Invalid owned CLI record.')
+            elif resource['kind'] == 'mcp' and (resource['client'] != 'shared' or not re.fullmatch(r'[a-z0-9-]+', resource.get('server', '')) or not re.fullmatch(r'https://[^\s]+', resource.get('url', ''))):
+                raise ValueError('Invalid owned MCP record.')
 
     def save(self):
         if not self.dry_run:
@@ -258,6 +260,8 @@ class Manager:
                     pass
             if record['files']:
                 return
+        elif record['kind'] == 'mcp':
+            self.command(['mcporter', '--config', str(self.home / '.mcporter/mcporter.json'), 'config', 'remove', record['server']])
         else:
             package = record['package']
             self.command(['npm', 'uninstall', '--global', package])
@@ -361,6 +365,20 @@ class Manager:
         self.state['resources'].append(dict(client='codex', name=entry['name'], kind='qmd', package=package))
         self.save()
 
+    def ensure_mcporter(self, entry):
+        server, url = entry['mcporter_name'], entry['mcporter_url']
+        if not re.fullmatch(r'[a-z0-9-]+', server) or not re.fullmatch(r'https://[^\s]+', url):
+            raise ValueError('Invalid MCPorter server definition.')
+        record = next((r for r in self.state['resources'] if r['client'] == 'shared' and r['name'] == entry['name']), None)
+        if record is not None and not self.update:
+            return
+        self.command(['mcporter', '--config', str(self.home / '.mcporter/mcporter.json'), 'config', 'add', server, url])
+        if record is None:
+            self.state['resources'].append(dict(client='shared', name=entry['name'], kind='mcp', server=server, url=url))
+        else:
+            record.update(server=server, url=url)
+        self.save()
+
     def ensure_skill(self, entry, record):
         skill = entry['codex_skill']
         if not re.fullmatch(r'[A-Za-z0-9_-]+', skill):
@@ -417,15 +435,21 @@ class Manager:
 
     def sync(self, entries, clients, selected, action='sync'):
         desired = {entry['name']: entry for entry in entries if entry['name'] in selected}
+        use_mcporter = 'MCPorter' in desired
+        mcporter_entries = {name: entry for name, entry in desired.items() if use_mcporter and entry.get('mcporter_name') and entry.get('mcporter_url') not in ('', '-')}
+        direct_entries = {name: entry for name, entry in desired.items() if name not in mcporter_entries}
         for record in list(self.state['resources']):
-            if record['client'] not in clients:
+            if record['client'] != 'shared' and record['client'] not in clients:
                 continue
-            if (action == 'sync' and record['name'] not in desired) or (action == 'remove' and record['name'] in selected):
+            selected_entries = mcporter_entries if record['client'] == 'shared' else direct_entries
+            if (action == 'sync' and record['name'] not in selected_entries) or (action == 'remove' and record['name'] in selected):
                 self.remove(record)
         if action != 'remove':
             for client in clients:
-                for entry in desired.values():
+                for entry in direct_entries.values():
                     self.ensure(client, entry)
+            for entry in mcporter_entries.values():
+                self.ensure_mcporter(entry)
         print('EXTENSIONS: reconciliation complete' + (' (dry run)' if self.dry_run else ''))
 
 
