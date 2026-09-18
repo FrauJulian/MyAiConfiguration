@@ -10,4 +10,4 @@ Start repository discovery with direct reads and `rg` for known paths, symbols, 
 
 Verify proportionally: run the cheapest check that detects likely failure; broaden for security, data loss, integration, or cross-component risk. Never claim unrun checks passed. Report failures and material gaps.
 
-Do not modify existing documentation or create new documentation unless requested. Do not add comments unless requested. Write repository content and user-facing output in English.
+Do not create documentation or explanatory comments without a clear need. Update existing documentation or comments only when directly affected by an API, configuration, or behavior change and necessary to keep them accurate. Write repository content and user-facing output in English.
