@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 # Bash equivalent of flashbang.ps1. The visual overlay is implemented with
 # Python's standard tkinter module because Bash itself cannot create windows.
@@ -10,7 +10,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 0
 fi
 
-exec python3 - "$@" <<'PY'
+python3 - "$@" 2>/dev/null <<'PY' || exit 0
 import argparse
 import re
 import shutil

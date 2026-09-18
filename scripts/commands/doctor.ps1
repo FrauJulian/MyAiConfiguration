@@ -83,7 +83,7 @@ foreach ($path in @('shared/rules','shared/skills','shared/agents','shared/hooks
 
 foreach ($client in @('codex','claude')) {
     $config = if ($client -eq 'codex') { Join-Path $root 'adapters/codex/config/config.toml' } else { Join-Path $root 'adapters/claude/config/settings.json' }
-    $registered = if ($client -eq 'codex') { (Get-Content $config -Raw) -match '\[\[hooks\.Stop\]\]' } else { ((Get-Content $config -Raw | ConvertFrom-Json).hooks.PSObject.Properties.Name -contains 'Stop') }
+    $registered = if ($client -eq 'codex') { (Get-Content $config -Raw) -match '\[\[hooks\.Stop\]\]' } else { (Get-Content $config -Raw) -match '"Stop"\s*:' }
     if ($registered) { Result 'PASS' "$client Stop hook is registered" } else { Result 'WARN' "$client ships hook utilities, but no Stop hook is registered" }
 }
 

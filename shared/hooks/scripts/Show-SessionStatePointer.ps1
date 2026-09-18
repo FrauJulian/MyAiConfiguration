@@ -1,4 +1,7 @@
 [CmdletBinding()]
 param()
-& python (Join-Path $PSScriptRoot 'session-state.py') --hook
-exit $LASTEXITCODE
+try {
+    $ErrorActionPreference = 'Stop'
+    & python (Join-Path $PSScriptRoot 'session-state.py') --hook 2>$null
+} catch {}
+exit 0

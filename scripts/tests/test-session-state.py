@@ -186,6 +186,36 @@ class SessionStateHookTests(unittest.TestCase):
                     self.assertEqual(self.run_hook(shell, executable, hook, config, workspace, ''), '')
                 self.assertEqual(list(workspace.iterdir()), [])
 
+    def test_hooks_ignore_missing_helper(self):
+        for shell, executable in SHELLS:
+            if not executable or not Path(executable).exists():
+                continue
+            with self.subTest(shell=shell), tempfile.TemporaryDirectory() as directory:
+                base = Path(directory)
+                config = base / 'config'
+                shutil.copytree(ROOT / 'shared/hooks/scripts', config / 'hooks/scripts')
+                (config / 'hooks/scripts/session-state.py').unlink()
+                workspace = base / 'workspace'
+                workspace.mkdir()
+                for hook in ('pointer', 'compact'):
+                    self.assertEqual(self.run_hook(shell, executable, hook, config, workspace, ''), '')
+
+    def test_flashbang_ignores_unavailable_runtime(self):
+        for shell, executable in SHELLS:
+            if not executable or not Path(executable).exists():
+                continue
+            with self.subTest(shell=shell):
+                environment = dict(os.environ)
+                if shell == 'powershell':
+                    environment['LOCALAPPDATA'] = ''
+                    command = [executable, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+                               str(ROOT / 'shared/hooks/flashbang.ps1')]
+                else:
+                    environment['PATH'] = ''
+                    command = [executable, str(ROOT / 'shared/hooks/flashbang.sh')]
+                result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

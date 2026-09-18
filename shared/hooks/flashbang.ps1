@@ -43,6 +43,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+try {
 # PowerShell 6+ runs on Linux and macOS, where none of this applies.
 if ($PSVersionTable.PSVersion.Major -ge 6 -and -not $IsWindows) { exit 0 }
 
@@ -149,4 +150,7 @@ try {
     }
 } finally {
     $form.Dispose()
+}
+} catch {
+    exit 0
 }
