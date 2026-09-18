@@ -15,6 +15,7 @@ CLAUDE_SANDBOX_KEYS = {"enabled", "allowUnsandboxedCommands"}
 CLAUDE_STATUS_LINE_KEYS = {"type", "command"}
 CLAUDE_HOOK_KEYS = {"type", "command", "timeout"}
 CLAUDE_PERMISSION_MODES = {"acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"}
+CLAUDE_VALID_TOOLS = {"Read", "Grep", "Glob", "Edit", "Write", "Bash", "PowerShell", "WebFetch", "WebSearch"}
 
 
 def fail(message: str) -> None:
@@ -72,6 +73,18 @@ def validate_rule_skills(package: Path) -> None:
             fail(f"{path}: skill description must be a quoted, nonempty string")
 
 
+def validate_agent_tools(package: Path) -> None:
+    for path in (package / "agents").glob("*.md"):
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+        tools_line = next((line for line in lines if line.startswith("tools: ")), None)
+        if tools_line is None:
+            continue
+        tools = [item.strip() for item in tools_line.removeprefix("tools: ").split(",")]
+        unknown = [tool for tool in tools if tool not in CLAUDE_VALID_TOOLS]
+        if unknown:
+            fail(f"{path}: unknown Claude tool name(s): {', '.join(unknown)}")
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         print("usage: validate-config.py <codex-toml> <claude-json>", file=sys.stderr)
@@ -79,6 +92,7 @@ def main() -> int:
     tomllib.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))
     validate_claude(Path(sys.argv[2]))
     validate_rule_skills(Path(sys.argv[2]).parent)
+    validate_agent_tools(Path(sys.argv[2]).parent)
     return 0
 
 
