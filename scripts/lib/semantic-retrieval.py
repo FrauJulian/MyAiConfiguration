@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 
-FILES = ('server.py', 'requirements.txt')
+FILES = ('server.py', 'benchmark.py', 'requirements.txt')
 CUDA_INDEX = 'https://download.pytorch.org/whl/cu126'
 
 
@@ -106,17 +106,55 @@ def sync(root, home, clients, enabled, dry_run, update, summary=False):
     save_state(state_path, state, False)
 
 
+def benchmark(root, home, dry_run, summary=False):
+    base = home / '.my-ai-configuration'
+    target = base / 'semantic-retrieval'
+    state_path = base / 'semantic-retrieval.json'
+    if dry_run:
+        if not summary:
+            print('DRYRUN benchmark semantic retrieval: Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B')
+        return True
+    state = load_state(state_path)
+    source = root / 'shared' / 'retrieval'
+    if target.exists() and not state['files']:
+        if not all((target / name).is_file() and digest(target / name) == digest(source / name) for name in FILES):
+            raise ValueError('Semantic retrieval directory exists without setup ownership; refusing to overwrite it.')
+    target.mkdir(parents=True, exist_ok=True)
+    for name in FILES:
+        shutil.copy2(source / name, target / name)
+        state['files'][name] = digest(target / name)
+    python = ensure_runtime(target, False)
+    result = subprocess.run([str(python), str(target / 'benchmark.py'), '--model-cache', str(target / 'model-cache')], check=True,
+                            stdout=subprocess.PIPE, text=True, timeout=300)
+    outcome = json.loads(result.stdout)
+    if not isinstance(outcome, dict) or not isinstance(outcome.get('recommended'), bool):
+        raise ValueError('Semantic retrieval benchmark returned an invalid result.')
+    if outcome['recommended']:
+        save_state(state_path, state, False)
+    else:
+        shutil.rmtree(target)
+        state_path.unlink(missing_ok=True)
+    if not summary:
+        print('Semantic retrieval benchmark: ' + ('recommended' if outcome['recommended'] else 'not recommended') + f" (embedding {outcome['embeddingSeconds']}s, reranking {outcome['rerankingSeconds']}s)")
+    return outcome['recommended']
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=('sync',))
+    parser.add_argument('action', choices=('sync', 'benchmark'))
     parser.add_argument('--root', required=True, type=Path)
     parser.add_argument('--home', required=True, type=Path)
-    parser.add_argument('--client', choices=('codex', 'claude', 'both'), required=True)
-    parser.add_argument('--enabled', choices=('true', 'false'), required=True)
+    parser.add_argument('--client', choices=('codex', 'claude', 'both'))
+    parser.add_argument('--enabled', choices=('true', 'false'))
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--update', action='store_true')
     parser.add_argument('--summary', action='store_true')
     args = parser.parse_args()
+    if args.action == 'benchmark':
+        recommended = benchmark(args.root.resolve(), args.home.resolve(), args.dry_run, args.summary)
+        raise SystemExit(0 if recommended else 2)
+    if args.client is None or args.enabled is None:
+        parser.error('sync requires --client and --enabled')
     clients = ('codex', 'claude') if args.client == 'both' else (args.client,)
     sync(args.root.resolve(), args.home.resolve(), clients, args.enabled == 'true', args.dry_run, args.update, args.summary)
     print('SEMANTIC RETRIEVAL: reconciliation complete' + (' (dry run)' if args.dry_run else ''))

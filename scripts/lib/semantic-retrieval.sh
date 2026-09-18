@@ -9,3 +9,12 @@ sync_semantic_retrieval() {
   [ "$summary" != true ] || arguments+=(--summary)
   python3 "${arguments[@]}"
 }
+
+test_semantic_retrieval_device() {
+  local root=$1 home_path=$2 summary=${3:-false}
+  local arguments=("$root/scripts/lib/semantic-retrieval.py" benchmark --root "$root" --home "$home_path")
+  [ "$summary" != true ] || arguments+=(--summary)
+  if python3 "${arguments[@]}" >&2; then return 0; fi
+  [ "$?" -eq 2 ] && return 1
+  return 2
+}

@@ -34,7 +34,28 @@ read_install_options() {
   [ "$dry_run" = false ] || return 0
   update_agents=$(read_install_boolean "Update selected agent CLIs ($client)?" "$update_agents") || return
   flashbang=$(read_install_boolean 'Enable the Flashbang notification hook?' "$flashbang") || return
-  semantic_retrieval=$(read_install_boolean 'Enable Qwen3 embedding and reranking semantic retrieval?' "$semantic_retrieval") || return
+  semantic_retrieval=$(read_semantic_retrieval_option "$semantic_retrieval") || return
+}
+
+read_semantic_retrieval_option() {
+  local default=$1 hint=y/N/a answer
+  [ "$default" = false ] || hint=Y/n/a
+  while :; do
+    printf 'Enable Qwen3 embedding and reranking semantic retrieval? [%s] ' "$hint" >&2
+    IFS= read -r answer || { printf 'Input ended before semantic retrieval was confirmed.\n' >&2; return 1; }
+    answer=${answer%$'\r'}
+    case "$answer" in
+      '') printf '%s\n' "$default"; return ;;
+      y|Y|yes|Yes|YES) printf 'true\n'; return ;;
+      n|N|no|No|NO) printf 'false\n'; return ;;
+      a|A|auto|Auto|AUTO)
+        if test_semantic_retrieval_device "$root" "$home_path"; then printf 'true\n'; return; fi
+        status=$?
+        [ "$status" -eq 1 ] && { printf 'false\n'; return; }
+        return "$status"
+        ;;
+    esac
+  done
 }
 
 global_npm_package() {
