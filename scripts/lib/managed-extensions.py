@@ -229,9 +229,35 @@ class Manager:
                 self.command(arguments)
                 self.cache[client].pop(selector, None)
         elif record['kind'] == 'skill':
+            empty_candidates = set()
+            for relative, expected in list(record['files'].items()):
+                path = safe_path(self.home, relative)
+                if path.exists():
+                    if not path.is_file() or digest(path) != expected:
+                        print(f'WARN Preserving modified skill file: {relative}')
+                        continue
+                    path.unlink()
+                parent = path.parent
+                directory = safe_path(self.home, record['directory'])
+                while parent != directory.parent:
+                    empty_candidates.add(parent)
+                    parent = parent.parent
+                del record['files'][relative]
+                self.save()
             directory = safe_path(self.home, record['directory'])
             if directory.exists():
-                shutil.rmtree(directory)
+                for path in sorted(empty_candidates, key=lambda p: len(p.parts), reverse=True):
+                    if path.is_dir() and not path.is_symlink():
+                        try:
+                            path.rmdir()
+                        except OSError:
+                            pass
+                try:
+                    directory.rmdir()
+                except OSError:
+                    pass
+            if record['files']:
+                return
         else:
             package = record['package']
             self.command(['npm', 'uninstall', '--global', package])
