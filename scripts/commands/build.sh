@@ -85,7 +85,7 @@ quote_toml() {
   printf '"%s"' "$value"
 }
 
-session_output=$(bash "$shared/hooks/scripts/tests/test-session-config.sh" "$root") || { printf '%s\n' "$session_output" >&2; exit 1; }
+session_output=$(bash "$shared/hooks/scripts/test-session-config.sh" "$root") || { printf '%s\n' "$session_output" >&2; exit 1; }
 if [ "$summary" = true ]; then
   printf '%s\n' "$session_output" | sed '/^PASS session configuration$/d'
 else
