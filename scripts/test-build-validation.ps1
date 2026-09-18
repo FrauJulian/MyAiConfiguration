@@ -38,6 +38,13 @@ Test-BuildFails 'duplicate agent name' {
     (Get-Content $architect -Raw) -replace 'name:\s*\S+', 'name: implementer' | Set-Content $architect -NoNewline
 }
 
+Test-BuildFails 'unknown Claude tool name in capability manifest' {
+    param($copy)
+    $manifest = Join-Path $copy 'adapters/claude/capabilities.tsv'
+    $lines = Get-Content $manifest | ForEach-Object { if ($_ -match '^architect\t') { "architect`tShell" } else { $_ } }
+    Set-Content $manifest $lines
+}
+
 Test-BuildFails 'duplicate plugin name' {
     param($copy)
     $manifest = Join-Path $copy 'adapters/plugins.tsv'
@@ -57,5 +64,5 @@ Test-BuildFails 'unknown placeholder beside an allowed installer placeholder' {
 }
 
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
-if ($Summary) { Write-Output 'Tests: PASS | build validation' } else { Write-Output 'PASS build validation: invalid JSON, duplicate agent, duplicate plugin, and leftover placeholders are all rejected' }
+if ($Summary) { Write-Output 'Tests: PASS | build validation' } else { Write-Output 'PASS build validation: invalid JSON, duplicate agent, unknown Claude tool name, duplicate plugin, and leftover placeholders are all rejected' }
 exit 0
