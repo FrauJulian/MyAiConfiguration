@@ -110,6 +110,10 @@ select_configured_plugins() {
       checked+=(true)
       continue
     fi
+    if [ "$(plugin_field "$root" "$name" codex_method)" = cli ]; then
+      if command -v "$(plugin_field "$root" "$name" codex_source)" >/dev/null 2>&1; then checked+=(true); else checked+=(false); fi
+      continue
+    fi
     if [ "$reference_client" = claude ]; then selector=$(plugin_field "$root" "$name" claude_plugin); else selector=$(plugin_field "$root" "$name" codex_plugin); fi
     if [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" = qmd ]; then
       if command -v qmd >/dev/null 2>&1; then checked+=(true); else checked+=(false); fi

@@ -96,6 +96,7 @@ function Select-ConfiguredPlugins {
     $idField = if ($referenceClient -eq 'Claude') { 'id' } else { 'pluginId' }
     $checked = @($toggleable | ForEach-Object {
         if ($Mode -eq 'Install') { $true; return }
+        if ($_.codex_method -eq 'cli') { return $null -ne (Get-Command $_.codex_source -ErrorAction SilentlyContinue) }
         $selector = if ($referenceClient -eq 'Claude') { $_.claude_plugin } else { $_.codex_plugin }
         if ($referenceClient -eq 'Codex' -and $_.codex_method -eq 'qmd') {
             $null -ne (Get-Command qmd -ErrorAction SilentlyContinue)

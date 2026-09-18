@@ -166,7 +166,7 @@ class Manager:
             raise ValueError('Invalid extension ownership ledger.')
         identities = set()
         for resource in self.state['resources']:
-            if not isinstance(resource, dict) or resource.get('client') not in ('codex', 'claude') or resource.get('kind') not in ('plugin', 'skill', 'qmd'):
+            if not isinstance(resource, dict) or resource.get('client') not in ('codex', 'claude') or resource.get('kind') not in ('plugin', 'skill', 'qmd', 'cli'):
                 raise ValueError('Invalid extension ownership record.')
             if not isinstance(resource.get('name'), str) or not resource['name']:
                 raise ValueError('Invalid extension ownership name.')
@@ -192,8 +192,10 @@ class Manager:
                     if not relative.startswith(directory + '/') or not re.fullmatch(r'[a-f0-9]{64}', value):
                         raise ValueError('Invalid owned skill file record.')
                     safe_path(self.home, relative)
-            elif resource.get('package') != '@tobilu/qmd' or resource['client'] != 'codex':
+            elif resource['kind'] == 'qmd' and (resource.get('package') != '@tobilu/qmd' or resource['client'] != 'codex'):
                 raise ValueError('Invalid owned QMD record.')
+            elif resource['kind'] == 'cli' and not re.fullmatch(r'[a-z0-9@/_.-]+', resource.get('package', '')):
+                raise ValueError('Invalid owned CLI record.')
 
     def save(self):
         if not self.dry_run:
@@ -227,41 +229,19 @@ class Manager:
                 self.command(arguments)
                 self.cache[client].pop(selector, None)
         elif record['kind'] == 'skill':
-            empty_candidates = set()
-            for relative, expected in list(record['files'].items()):
-                path = safe_path(self.home, relative)
-                if path.exists():
-                    if not path.is_file() or digest(path) != expected:
-                        print(f'WARN Preserving modified skill file: {relative}')
-                        continue
-                    path.unlink()
-                parent = path.parent
-                directory = safe_path(self.home, record['directory'])
-                while parent != directory.parent:
-                    empty_candidates.add(parent)
-                    parent = parent.parent
-                del record['files'][relative]
-                self.save()
             directory = safe_path(self.home, record['directory'])
             if directory.exists():
-                for path in sorted(empty_candidates, key=lambda p: len(p.parts), reverse=True):
-                    if path.is_dir() and not path.is_symlink():
-                        try:
-                            path.rmdir()
-                        except OSError:
-                            pass
-                try:
-                    directory.rmdir()
-                except OSError:
-                    pass
-            if record['files']:
-                return
+                shutil.rmtree(directory)
         else:
-            self.command([record['client'], 'mcp', 'remove', 'qmd'] + (['--scope', 'user'] if record['client'] == 'claude' else []))
+            package = record['package']
+            self.command(['npm', 'uninstall', '--global', package])
         self.state['resources'].remove(record)
         self.save()
 
     def ensure(self, client, entry):
+        if entry['codex_method'] == 'cli':
+            self.ensure_cli(client, entry)
+            return
         if entry['codex_method'] == 'qmd':
             self.ensure_qmd(client, entry)
             return
@@ -326,6 +306,18 @@ class Manager:
             self.save()
         self.cache[client][selector] = {'scope': 'user'}
 
+    def ensure_cli(self, client, entry):
+        package = entry['codex_source']
+        if not re.fullmatch(r'[a-z0-9@/_.-]+', package):
+            raise ValueError('Invalid CLI package.')
+        record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
+        if record is not None:
+            return
+        self.command(['npm', 'install', '--global', package])
+        if not self.dry_run:
+            self.state['resources'].append(dict(client=client, name=entry['name'], kind='cli', package=package))
+            self.save()
+
     def ensure_qmd(self, client, entry):
         package = entry['codex_source']
         if package != '@tobilu/qmd':
@@ -340,7 +332,6 @@ class Manager:
         record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
         if record is not None:
             return
-        self.command(['codex', 'mcp', 'add', 'qmd', '--', 'qmd', 'mcp'])
         self.state['resources'].append(dict(client='codex', name=entry['name'], kind='qmd', package=package))
         self.save()
 
