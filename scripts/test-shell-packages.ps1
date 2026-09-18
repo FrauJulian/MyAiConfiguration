@@ -31,7 +31,8 @@ foreach ($shell in @('powershell','bash')) {
         }
         if ($client -eq 'claude') { $settings = $content | ConvertFrom-Json }
         if (@(Get-ChildItem "$package/agents" -File).Count -ne $sourceAgentCount) { throw "Missing agents in $package" }
-        if ($client -eq 'claude' -and (Get-Content (Join-Path $package 'agents/reviewer.md') -Raw) -notmatch '(?m)^tools: Read,Diff,Search\r?$') { throw "Reviewer capability profile is missing in $package" }
+        $expectedReviewerShellTool = if ($shell -eq 'powershell') { 'PowerShell' } else { 'Bash' }
+        if ($client -eq 'claude' -and (Get-Content (Join-Path $package 'agents/reviewer.md') -Raw) -notmatch "(?m)^tools: Read,Grep,Glob,$expectedReviewerShellTool\r?`$") { throw "Reviewer capability profile is missing in $package" }
         $expectedSkillCount = if ($client -eq 'claude') { $sourceSkillCount + $ruleSkillCount } else { $sourceSkillCount }
         if (@(Get-ChildItem "$package/skills" -Filter SKILL.md -Recurse).Count -ne $expectedSkillCount) { throw "Missing skills in $package" }
         $expected = if ($shell -eq 'powershell') { '__POWERSHELL_COMMAND__ .*flashbang.ps1' } else { 'bash .*flashbang.sh' }
