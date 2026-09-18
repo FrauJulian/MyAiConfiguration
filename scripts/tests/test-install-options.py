@@ -154,6 +154,8 @@ class InstallOptionsTests(unittest.TestCase):
             with self.subTest(shell=kind), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory) / 'repo'
                 scripts = root / 'scripts'
+                commands = scripts / 'commands'
+                commands.mkdir(parents=True)
                 shutil.copytree(ROOT / 'scripts/lib', scripts / 'lib', ignore=shutil.ignore_patterns('__pycache__'))
                 home = Path(directory) / 'home'
                 home.mkdir()
@@ -168,10 +170,10 @@ class InstallOptionsTests(unittest.TestCase):
                     (package / ('config.toml' if client == 'codex' else 'settings.json')).write_text(config)
                 suffix = 'ps1' if kind == 'powershell' else 'sh'
                 for name in ('install', 'update'):
-                    content = (ROOT / 'scripts' / (name + '.' + suffix)).read_text(encoding='utf-8-sig')
+                    content = (ROOT / 'scripts/commands' / (name + '.' + suffix)).read_text(encoding='utf-8-sig')
                     content = content.replace("[Environment]::GetFolderPath('UserProfile')", '$env:TEST_INSTALL_HOME')
-                    (scripts / (name + '.' + suffix)).write_text(content)
-                (scripts / ('build.' + suffix)).write_text('param([switch]$Summary)' if kind == 'powershell' else 'exit 0\n')
+                    (commands / (name + '.' + suffix)).write_text(content)
+                (commands / ('build.' + suffix)).write_text('param([switch]$Summary)' if kind == 'powershell' else 'exit 0\n')
                 if kind == 'powershell':
                     (scripts / 'lib/plugins.ps1').write_text(
                         'function Select-ConfiguredPlugins { @{Selected=@(); Deselected=@()} }\n'
@@ -185,7 +187,7 @@ class InstallOptionsTests(unittest.TestCase):
                         'run_plugin_command() { printf "CLI-MOCK %s\\n" "$2"; }\n')
                 environment = dict(os.environ, HOME=home.as_posix(), TEST_INSTALL_HOME=str(home))
                 for name, quick, answers in [('install', False, 'y\nn\nn\nn\n'), ('update', True, '')]:
-                    entry = str(scripts / (name + '.' + suffix))
+                    entry = str(commands / (name + '.' + suffix))
                     command = ([executable, '-NoProfile', '-File', entry, '-Shell', 'Bash', '-Client', 'Both', '-Summary']
                                if kind == 'powershell' else [executable, entry, '--shell', 'bash', '--client', 'both', '--summary'])
                     if quick:
