@@ -42,11 +42,14 @@ if [ "$dry_run" = false ] && [ "$force" = false ]; then
   fi
   printf 'This removes the managed configuration, extensions, and semantic retrieval setup for %s under %s.\n' "$client" "$home_path"
   printf 'Backups already on disk are kept; anything this setup never installed is left untouched.\n'
-  read -r -p "Type 'yes' to continue: " confirm || confirm=""
-  if [ "$confirm" != yes ]; then
-    printf 'Cancelled, nothing was removed.\n'
-    exit 1
-  fi
+  read -r -p "Continue? [y/N]: " confirm || confirm=""
+  case "$confirm" in
+    [Yy]|[Yy][Ee][Ss]) ;;
+    *)
+      printf 'Cancelled, nothing was removed.\n'
+      exit 1
+      ;;
+  esac
 fi
 
 stamp=$(date +%Y%m%d-%H%M%S)
