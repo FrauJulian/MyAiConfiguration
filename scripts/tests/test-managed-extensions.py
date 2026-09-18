@@ -23,6 +23,16 @@ def skill():
     return dict(name='Humanizer', codex_method='skill', codex_source='blader/humanizer', codex_skill='humanizer', codex_plugin='-')
 
 
+def mcporter():
+    return dict(name='MCPorter', codex_method='cli', codex_source='mcporter', codex_plugin='-', codex_marketplace='-', claude_plugin='-', claude_marketplace='-')
+
+
+def mcp():
+    return dict(name='Context7', codex_method='plugin', codex_plugin='context7@test', codex_marketplace='-',
+                claude_plugin='context7@test', claude_marketplace='-', mcporter_name='context7',
+                mcporter_url='https://mcp.context7.com/mcp')
+
+
 class ManagedExtensionTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -185,6 +195,12 @@ class ManagedExtensionTests(unittest.TestCase):
         self.assertEqual(1, self.commands.count(['npm', 'install', '--global', '@tobilu/qmd']))
         self.assertIn(['claude', 'plugin', 'install', 'qmd@qmd', '--scope', 'user'], self.commands)
         self.assertNotIn(['codex', 'mcp', 'add', 'qmd', '--', 'qmd', 'mcp'], self.commands)
+
+    def test_mcporter_replaces_direct_context7_plugin(self):
+        self.manager().sync([mcp(), mcporter()], ['codex'], {'Context7', 'MCPorter'})
+        config = str(self.home / '.mcporter/mcporter.json')
+        self.assertIn(['mcporter', '--config', config, 'config', 'add', 'context7', 'https://mcp.context7.com/mcp'], self.commands)
+        self.assertNotIn(['codex', 'plugin', 'add', 'context7@test'], self.commands)
 
     def test_foreign_empty_directory_survives_skill_removal(self):
         self.manager().sync([skill()], ['codex'], {'Humanizer'})
