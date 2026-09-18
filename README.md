@@ -18,27 +18,27 @@ Check the selected shell's minimum version and required Python and `jq` tools be
 PowerShell:
 
 ```powershell
-.\scripts\check-capabilities.ps1
+.\scripts\commands\check-capabilities.ps1
 ```
 
 Bash:
 
 ```bash
-./scripts/check-capabilities.sh
+./scripts/commands/check-capabilities.sh
 ```
 
 ## Quickstart
 
 With the [requirements](#requirements) installed, clone the repository, build it, then install it.
-Stop if any command fails. Installation asks for the shell, client, CLI update, Flashbang, and extension choices.
+Stop if any command fails. Installation asks for the shell, client, CLI update, Flashbang, Qwen retrieval, and extension choices.
 
 PowerShell:
 
 ```powershell
 git clone https://git.lechner-systems.at/fraujulian/MyAiConfiguration.git
 cd MyAiConfiguration
-.\scripts\build.ps1 -Summary
-.\scripts\install.ps1 -Summary
+.\scripts\commands\build.ps1 -Summary
+.\scripts\commands\install.ps1 -Summary
 ```
 
 Bash:
@@ -46,54 +46,39 @@ Bash:
 ```bash
 git clone https://git.lechner-systems.at/fraujulian/MyAiConfiguration.git
 cd MyAiConfiguration
-./scripts/build.sh --summary
-./scripts/install.sh --summary
+./scripts/commands/build.sh --summary
+./scripts/commands/install.sh --summary
 ```
 
 For an already-installed configuration, use Quickupdate instead.
 
 ## Quickupdate
 
-Run these commands from the repository root. Quick reuses the shell, client, CLI update, Flashbang, and extension choices from the last
+Run these commands from the repository root. Quick reuses the shell, client, CLI update, Flashbang, retrieval, and extension choices from the last
 successful installation or update without opening selection menus. Stop if any command fails.
 
 PowerShell:
 
 ```powershell
 git pull --ff-only
-.\scripts\build.ps1 -Summary
-.\scripts\update.ps1 -Quick -Summary
+.\scripts\commands\build.ps1 -Summary
+.\scripts\commands\update.ps1 -Quick -Summary
 ```
 
 Bash:
 
 ```bash
 git pull --ff-only
-./scripts/build.sh --summary
-./scripts/update.sh --quick --summary
+./scripts/commands/build.sh --summary
+./scripts/commands/update.sh --quick --summary
 ```
 
-If no selection has been saved yet, or it predates the CLI update and Flashbang options, Quick stops with a hint. Run `scripts/update.ps1` or `./scripts/update.sh` once
+If no selection has been saved yet, or it predates a required option, Quick stops with a hint. Run `scripts/commands/update.ps1` or `./scripts/commands/update.sh` once
 without Quick to save your choices. They are stored in `~/.my-ai-configuration/selection.json`; dry runs and failed
 runs do not overwrite them. To change the selection later, run a normal update again. Quick does not automatically
 select newly added plugins.
 
 Install and update also rebuild internally; the explicit build above lets you check the packages before installation.
-
-## Documentation
-
-| Document | Contents |
-| --- | --- |
-| [Architecture](docs/architecture.md) | Shared sources, adapters, generated packages, and installation. |
-| [Configuration](docs/configuration.md) | Client settings, permission defaults, status displays, and verification. |
-| [Plugins](docs/plugins.md) | Plugin sources, selection, installation, updates, and removal. |
-| [Hooks](docs/hooks.md) | Registered events, session-state helpers, notifications, and optional utilities. |
-| [Agents](docs/agents.md) | Agent roles and when delegation is useful. |
-| [Skills](docs/skills.md) | Skill categories and conditional rule loading. |
-| [Codex adapter](adapters/codex/README.md) | Codex-specific configuration files. |
-| [Claude Code adapter](adapters/claude/README.md) | Claude-specific configuration files. |
-| [Hook package](shared/hooks/README.md) | Overview shipped with the hook scripts. |
-| [Repository instructions](AI-Instructions.md) | Rules for maintaining this repository. |
 
 ## Features
 
@@ -113,9 +98,21 @@ Install and update also rebuild internally; the explicit build above lets you ch
   never installed.
 - User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, QMD, Humanizer, Impeccable, and
   Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
-  integrations installed and recorded by this setup can be removed through deselection.
+  installed and recorded by this setup can be removed through deselection.
 - Optional local semantic retrieval for both clients using Qwen3-Embedding-0.6B embeddings and Qwen3-Reranker-0.6B
   reranking, disabled by default and removable through the install/update choice.
+
+## Requirements
+
+- PowerShell 5.1 or newer; PowerShell 7 is supported as well.
+- Bash 4.3 or newer, with standard utilities such as `awk`, `sed`, and `sha256sum`.
+- Python 3.11 or newer for configuration validation and task-state hooks/helpers (`python` for PowerShell scripts, `python3` for Bash scripts).
+- `jq` for Claude's Bash status line; without it, that status line produces no output.
+- Python `venv` and `pip` when the optional semantic retrieval layer is enabled.
+- Node.js 22 or newer and `npm` when QMD or MCPorter is selected.
+
+The Bash scripts do not require PowerShell. The PowerShell scripts remain compatible with PowerShell 5.1;
+PowerShell 7 can also run them.
 
 ## Architecture
 
@@ -128,7 +125,7 @@ shared definitions -> client adapters -> generated packages -> user installation
 | `shared/` | Client-independent rules, agents, skills, hooks, status lines, and global instructions. |
 | `adapters/` | Codex and Claude Code formats, settings, templates, and the plugin manifest. |
 | `generated/` | Reproducible PowerShell and Bash packages. This directory is ignored by Git. |
-| `scripts/` | Build, installation, update, diagnosis, and shell validation entry points. |
+| [`scripts/`](docs/scripts.md) | Build, installation, update, diagnosis, and validation scripts. |
 | `docs/` | Focused documentation about the configuration design. |
 
 The build creates:
@@ -141,37 +138,42 @@ generated/
 `-- claude-bash/
 ```
 
-## Requirements
+## Documentation
 
-- PowerShell 5.1 or newer; PowerShell 7 is supported as well.
-- Bash 4.3 or newer, with standard utilities such as `awk`, `sed`, and `sha256sum`.
-- Python 3.11 or newer for configuration validation and task-state hooks/helpers (`python` for PowerShell scripts, `python3` for Bash scripts).
-- `jq` for Claude's Bash status line; without it, that status line produces no output.
-- Python `venv` and `pip` when the optional semantic retrieval layer is enabled.
-- Node.js 22 or newer and `npm` when QMD is selected.
+| Document | Contents |
+| --- | --- |
+| [Architecture](docs/architecture.md) | Shared sources, adapters, generated packages, and installation. |
+| [Scripts](docs/scripts.md) | Commands, checks, tests, and internal script layout. |
+| [Configuration](docs/configuration.md) | Client settings, permission defaults, status displays, and verification. |
+| [Extending the configuration](docs/extending-configuration.md) | Add shared rules, skills, and agents. |
+| [Plugins](docs/plugins.md) | Plugin sources, selection, installation, updates, and removal. |
+| [Hooks](docs/hooks.md) | Registered events, session-state helpers, notifications, and optional utilities. |
+| [Agents](docs/agents.md) | Agent roles and when delegation is useful. |
+| [Skills](docs/skills.md) | Skill categories and conditional rule loading. |
+| [Codex adapter](adapters/codex/README.md) | Codex-specific configuration files. |
+| [Claude Code adapter](adapters/claude/README.md) | Claude-specific configuration files. |
+| [Hook package](shared/hooks/README.md) | Overview shipped with the hook scripts. |
+| [Repository instructions](AI-Instructions.md) | Rules for maintaining this repository. |
 
-The Bash scripts do not require PowerShell. The PowerShell scripts remain compatible with PowerShell 5.1;
-PowerShell 7 can also run them.
-
-## Build
+## Build Script
 
 Run the matching command from the repository root:
 
 PowerShell:
 ```powershell
-.\scripts\build.ps1
+.\scripts\commands\build.ps1
 ```
 
 Bash:
 ```bash
-./scripts/build.sh
+./scripts/commands/build.sh
 ```
 
 Rebuild when shared definitions, adapters, or generation logic change. Choose other verification according to the
 change's risk; documentation-only edits do not require a build. Building writes reproducible packages below
 `generated/` and may use temporary validation files; it does not install global user configuration.
 
-## Installation
+## Installation Script
 
 The installer asks for the target shell and client, unless they are passed as parameters, then refuses to continue
 if any selected destination is already installed (`Already installed, use the update script.`). Selecting PowerShell or
@@ -182,24 +184,24 @@ Preview an installation without changing user files, backups, or plugins:
 
 PowerShell:
 ```powershell
-.\scripts\install.ps1 -DryRun 
+.\scripts\commands\install.ps1 -DryRun
 ```
 
 Bash:
 ```bash
-./scripts/install.sh --dry-run 
+./scripts/commands/install.sh --dry-run
 ```
 
 Install the selected configuration interactively:
 
 PowerShell:
 ```powershell
-.\scripts\install.ps1 
+.\scripts\commands\install.ps1
 ```
 
 Bash:
 ```bash
-./scripts/install.sh 
+./scripts/commands/install.sh
 ```
 
 Omitting either target parameter opens its selection prompt. There is no automatic shell default.
@@ -230,7 +232,7 @@ not (for example, installed through a native installer or another package manage
 in place with a warning, and only a fresh `npm install -g` is run alongside it. Codex is skipped with a warning while
 `codex.exe` is running. A dry run never asks this question and never previews it, since the choice is not persisted.
 
-## Update
+## Update Script
 
 Once a destination is installed, use the update script (not the installer) to refresh its files and plugins. It refuses
 to continue if any selected destination is not installed yet (`Not installed, use the install script.`), also skipped
@@ -238,20 +240,20 @@ for a dry run.
 
 PowerShell:
 ```powershell
-.\scripts\update.ps1 
+.\scripts\commands\update.ps1
 ```
 
 Bash:
 ```bash
-./scripts/update.sh 
+./scripts/commands/update.sh
 ```
 
 It accepts the same `-DryRun`/`--dry-run`, `-Client`/`--client`, and `-Shell`/`--shell` parameters as the
-installer, re-syncs every managed file, and lets you revise the CLI update, Flashbang, and extension choices.
+installer, re-syncs every managed file, and lets you revise the CLI update, Flashbang, retrieval, and extension choices.
 Selected extensions are installed or updated. Deselection removes only extensions recorded as installed by this
 setup; pre-existing or manually installed extensions are retained. Quickupdate reuses the saved choices.
 
-## Uninstall
+## Uninstall Script
 
 Remove everything this setup previously installed for the selected client(s): managed files tracked in each
 destination's manifest, extensions and skills recorded in the extension ledger, an enabled semantic retrieval setup,
@@ -259,12 +261,12 @@ and the saved Quickupdate selection (once no destination remains installed for a
 
 PowerShell:
 ```powershell
-.\scripts\uninstall.ps1
+.\scripts\commands\uninstall.ps1
 ```
 
 Bash:
 ```bash
-./scripts/uninstall.sh
+./scripts/commands/uninstall.sh
 ```
 
 Omitting `-Client`/`--client` opens the same selection prompt as install and update. Uninstall refuses to continue
@@ -287,84 +289,11 @@ is only removed once uninstalling leaves no client installed at all, so uninstal
 Uninstall does not remove the CLI tools themselves (`codex`, `claude`), any plugin marketplace registrations they
 keep outside this setup's ledger, or files this setup never installed.
 
-## Doctor
+## Configuration overview
 
-Check client availability, generated packages, source directories, hooks, and installed managed files:
+Codex and Claude Code receive the same shared rules, skills, agents, hooks, and status data. Codex loads applicable rules from generated files, while Claude Code exposes technology- and situation-specific rules as generated skills.
 
-PowerShell:
-```powershell
-.\scripts\doctor.ps1 
-```
-
-Bash:
-```bash
-./scripts/doctor.sh 
-```
-
-Use `-Summary` (PowerShell) or `--summary` (Bash) with build, doctor, install, update, and test scripts for compact output.
-Omit the flag for detailed output. Summary mode retains warnings and failure status, but can suppress captured
-plugin-command output on failure. Set `AI_CONFIG_VERBOSE=1` when full plugin failure output is needed.
-
-## Configuration
-
-Codex receives global instructions, rules, skills, agent TOML files, hooks, and `config.toml`. Its defaults keep writes
-workspace-scoped and use automatic review for eligible escalation requests. Every rule ships as a plain file under
-`rules/`, and `AGENTS.md` tells Codex to load the matching one by path.
-
-Claude Code receives the equivalent global instructions, agents, hooks, and `settings.json`. General rules are embedded
-once in `CLAUDE.md` (and in Codex's `AGENTS.md`); every technology- or
-situation-specific rule (`adapters/rule-skills.tsv`) is generated as a skill under `skills/rules/` instead, so
-only its name and description are permanently visible and the full rule text loads only when Claude invokes it. Its
-generated settings use the supported automatic permission mode where available.
-
-Both clients receive the same logical agent roles:
-
-- Architect
-- Implementer
-- Researcher
-- Reviewer
-- Verifier
-
-Agent use is proportional to the task. Small changes can stay with the implementer, while additional roles are available
-when research, design, independent review, or focused verification adds value.
-
-Verification is also proportional: the agent selects checks based on changed behavior, affected callers, risk,
-and uncertainty. A small change may need only focused inspection; builds, tests, and separate reviews are not
-automatic. Explicit user and project requirements still apply.
-
-Both status displays include model, effort, repository, branch, context-window size, context used, and tokens used.
-Codex shows its review mode. Claude also shows its review mode in two colored lines, with context usage
-turning yellow at 60% and red at 85%. See
-[Configuration](docs/configuration.md) for details and limitations.
-
-## Extending the Configuration
-
-### Add a rule
-
-Create a focused Markdown file in `shared/rules/`. For a rule that applies only to a language, framework, tool, or
-change area, add one row to `adapters/rule-skills.tsv`. The build uses that manifest to generate both Claude's
-rule skill and Codex's rule-loading condition. Put always-applicable guidance in `general.md`, which the build embeds
-for both clients; a new rule file is not automatically embedded.
-
-### Add a skill
-
-Create `shared/skills/<category>/<skill>/SKILL.md` with valid YAML frontmatter and a concise workflow. Reference shared
-rules instead of repeating persistent standards.
-
-### Add an agent
-
-Create `shared/agents/<agent>/agent.yml` and `instructions.md`. Keep semantic behavior in these shared files; the build
-renders the Codex and Claude Code formats.
-
-Rebuild after every semantic change.
-
-## Security
-
-- Never store API keys, OAuth tokens, credentials, authentication state, or sensitive logs in this repository.
-- Review generated output and use the installer's dry-run before installation.
-- Global installation happens only through an explicit installer invocation.
-- Plugins execute with permissions granted by their client; review their upstream sources and trust prompts.
-- Codex keeps workspace sandboxing enabled and requires escalation outside expected development boundaries.
+The default configuration keeps writes workspace-scoped and enables automatic review for eligible escalation requests. Both clients include the same logical agent roles and compact status displays. See [Configuration](docs/configuration.md) for settings, permissions, and limitations.
 
 ## Support
 

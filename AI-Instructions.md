@@ -36,8 +36,8 @@ Write all repository content, generated instructions, scripts, prompts, document
 ## Workflow
 
 - Choose the smallest sufficient verification based on the change's behavior, affected consumers, risk, and remaining uncertainty. Inspection may suffice for low-risk changes; full builds, test suites, and independent reviews are not automatic.
-- Run `scripts/build.ps1 -Summary` to regenerate packages when shared definitions, adapters, or generation logic change. This generates configuration packages; it does not require building applications that use them.
-- Run `scripts/doctor.ps1 -Summary` when installation, client configuration, hooks, or environment changes need its checks. Changes to instruction wording alone do not require it.
+- Run `scripts/commands/build.ps1 -Summary` to regenerate packages when shared definitions, adapters, or generation logic change. This generates configuration packages; it does not require building applications that use them.
+- Run `scripts/commands/doctor.ps1 -Summary` when installation, client configuration, hooks, or environment changes need its checks. Changes to instruction wording alone do not require it.
 - Run focused script tests when script behavior changes. Broaden or repeat checks only when failures, affected dependencies, or unresolved risks justify it.
 - Preserve backward compatibility where practical.
 - Keep changes focused on the requested configuration behavior.
@@ -52,7 +52,7 @@ Write all repository content, generated instructions, scripts, prompts, document
 ## Installation and security
 
 - Do not install global configuration automatically.
-- Perform global installation only after explicit user instruction, using `scripts/install.ps1` so replaced managed files are backed up.
+- Perform global installation only after explicit user instruction, using `scripts/commands/install.ps1` so replaced managed files are backed up.
 - Do not add project-specific rules, secrets, credentials, authentication state, or generated runtime state.
 
 ## Version control

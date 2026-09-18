@@ -22,7 +22,7 @@ The shared [orchestration rule](../shared/rules/orchestration.md) defines the `R
 
 For long-running work, the main agent maintains one compact state containing `goal`, `decisions`, `changed`, `verified`, `open`, and `risks`. An existing task-state facility is preferred; the file fallback is `.ai-session/state.json` in the current workspace. Subagents may read it when needed, but send updates to the parent. Keep unrelated concurrent tasks in separate checkouts, and keep runtime state out of commits.
 
-The optional `scripts/session-state.ps1` and `scripts/session-state.sh` helpers update this workspace file. Omitted fields are preserved. Their `-Workspace`/`--workspace` option selects the workspace explicitly; the default is the current working directory. Both accept goal, decisions, changed files, completed verification, open items, and risks. `-Pointer`/`--pointer` only prints the existing file's location.
+The optional `scripts/commands/session-state.ps1` and `scripts/commands/session-state.sh` helpers update this workspace file. Omitted fields are preserved. Their `-Workspace`/`--workspace` option selects the workspace explicitly; the default is the current working directory. Both accept goal, decisions, changed files, completed verification, open items, and risks. `-Pointer`/`--pointer` only prints the existing file's location.
 
 Starting a different goal requires `-Reset -Goal ...` or `--reset --goal ...`, which clears the previous task's decisions and verification. Updates are atomic; legacy field names are migrated when reading existing state.
 
