@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import time
 import unittest
+import urllib.request
 from unittest.mock import patch
 
 
@@ -29,16 +30,32 @@ def embedding():
 
 def huggingface_available():
     try:
-        socket.getaddrinfo('huggingface.co', 443)
-    except socket.gaierror:
+        request = urllib.request.Request('https://huggingface.co', method='HEAD')
+        with urllib.request.urlopen(request, timeout=5):
+            pass
+    except OSError:
         return False
     return True
 
 
+def huggingface_network_unavailable(error):
+    while error:
+        if isinstance(error, socket.gaierror):
+            return True
+        error = error.__cause__ or error.__context__
+    return False
+
+
 class RetrievalServerTests(unittest.TestCase):
-    def test_huggingface_availability_handles_dns_failure(self):
-        with patch('socket.getaddrinfo', side_effect=socket.gaierror):
+    def test_huggingface_availability_handles_connection_failure(self):
+        with patch('urllib.request.urlopen', side_effect=OSError):
             self.assertFalse(huggingface_available())
+
+    def test_huggingface_network_failure_is_detected_from_cause_chain(self):
+        error = OSError('model download failed')
+        error.__cause__ = socket.gaierror('name resolution failed')
+        self.assertTrue(huggingface_network_unavailable(error))
+        self.assertFalse(huggingface_network_unavailable(OSError('model is missing')))
 
     def test_ci_disables_xet_for_model_downloads(self):
         for workflow in ('.github/workflows/ci.yml', '.gitea/workflows/ci.yml'):
@@ -75,6 +92,7 @@ class RetrievalServerTests(unittest.TestCase):
             (root / 'authentication.md').write_text('Password reset tokens are created by create_reset_token. The reset_password endpoint sends the user a password reset email.', encoding='utf-8')
             (root / 'weather.md').write_text('The weather service fetches temperature and rainfall forecasts for a city.', encoding='utf-8')
             index = MODULE.Index(root, root / 'data')
+            self.addCleanup(index.db.close)
             try:
                 tokenizer = index.encoder().tokenizer
                 for source in ['alpha beta gamma ' * 450, 'Grüße 世界 🙂 ' * 300]:
@@ -91,8 +109,10 @@ class RetrievalServerTests(unittest.TestCase):
                     self.assertEqual(len(results), 2)
                     self.assertGreater(results[0]['score'], results[1]['score'])
                     print(f'Qwen real search: {expected}, {time.monotonic() - started:.2f}s, embedding device {index.encoder().device}, reranker device {index.reranker().device}', flush=True)
-            finally:
-                index.db.close()
+            except OSError as error:
+                if huggingface_network_unavailable(error):
+                    self.skipTest('Hugging Face network is unavailable')
+                raise
 
     def test_isolation_freshness_and_incremental_encoding(self):
         with TemporaryDirectory() as temporary:
