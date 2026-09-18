@@ -18,7 +18,9 @@ import threading
 
 
 MODEL = "Qwen/Qwen3-Embedding-0.6B"
+MODEL_REVISION = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
 RERANKER_MODEL = "Qwen/Qwen3-Reranker-0.6B"
+RERANKER_MODEL_REVISION = "e61197ed45024b0ed8a2d74b80b4d909f1255473"
 EMBEDDING_DIMENSIONS = 1024
 CHUNK_TOKENS = 400
 OVERLAP_TOKENS = 64
@@ -163,6 +165,32 @@ def read_max_files():
     return parsed
 
 
+_shared_model_lock = threading.Lock()
+_shared_encoder = None
+_shared_reranker = None
+
+
+def shared_encoder():
+    global _shared_encoder
+    with _shared_model_lock:
+        if _shared_encoder is None:
+            from sentence_transformers import SentenceTransformer
+            _shared_encoder = SentenceTransformer(MODEL, revision=MODEL_REVISION, truncate_dim=EMBEDDING_DIMENSIONS,
+                                                   prompts={"query": f"Instruct: {RETRIEVAL_INSTRUCTION}\nQuery: "},
+                                                   device=preferred_device())
+        return _shared_encoder
+
+
+def shared_reranker():
+    global _shared_reranker
+    with _shared_model_lock:
+        if _shared_reranker is None:
+            from sentence_transformers import CrossEncoder
+            _shared_reranker = CrossEncoder(RERANKER_MODEL, revision=RERANKER_MODEL_REVISION, prompts={"query": RETRIEVAL_INSTRUCTION},
+                                             default_prompt_name="query", device=preferred_device())
+        return _shared_reranker
+
+
 def reciprocal_rank_fusion(*rankings):
     scores = {}
     for ranking in rankings:
@@ -187,8 +215,6 @@ class Index:
         self.db.execute("create table if not exists query_cache (cache_key text primary key, result text not null)")
         self.db.commit()
         self.lock = threading.RLock()
-        self.model = None
-        self.reranker_model = None
         self.max_files = read_max_files()
 
     def files(self):
@@ -212,19 +238,10 @@ class Index:
         return result
 
     def encoder(self):
-        if self.model is None:
-            from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer(MODEL, truncate_dim=EMBEDDING_DIMENSIONS,
-                                             prompts={"query": f"Instruct: {RETRIEVAL_INSTRUCTION}\nQuery: "},
-                                             device=preferred_device())
-        return self.model
+        return shared_encoder()
 
     def reranker(self):
-        if self.reranker_model is None:
-            from sentence_transformers import CrossEncoder
-            self.reranker_model = CrossEncoder(RERANKER_MODEL, prompts={"query": RETRIEVAL_INSTRUCTION},
-                                               default_prompt_name="query", device=preferred_device())
-        return self.reranker_model
+        return shared_reranker()
 
     def rerank(self, query: str, rows: list[dict], limit: int):
         candidates = rows[:RERANK_CANDIDATES]

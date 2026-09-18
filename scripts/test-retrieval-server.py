@@ -200,6 +200,18 @@ class RetrievalServerTests(unittest.TestCase):
             finally:
                 index.db.close()
 
+    def test_shared_encoder_and_reranker_are_cached_module_singletons(self):
+        with patch.object(MODULE, '_shared_encoder', None), patch.object(MODULE, '_shared_reranker', None), \
+             patch.object(MODULE, 'preferred_device', lambda: 'cpu'):
+            sentinel = SimpleNamespace()
+            with patch.dict('sys.modules', sentence_transformers=SimpleNamespace(
+                    SentenceTransformer=lambda *args, **kwargs: sentinel,
+                    CrossEncoder=lambda *args, **kwargs: sentinel)):
+                self.assertIs(MODULE.shared_encoder(), sentinel)
+                self.assertIs(MODULE.shared_encoder(), MODULE.shared_encoder())
+                self.assertIs(MODULE.shared_reranker(), sentinel)
+                self.assertIs(MODULE.shared_reranker(), MODULE.shared_reranker())
+
     def test_rerank_uses_cross_encoder_scores(self):
         index = MODULE.Index.__new__(MODULE.Index)
 
