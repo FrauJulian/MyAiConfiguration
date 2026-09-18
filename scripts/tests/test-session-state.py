@@ -78,9 +78,9 @@ class SessionStateHookTests(unittest.TestCase):
                 base = Path(directory)
                 repository = base / 'repository'
                 shutil.copytree(ROOT / 'shared/hooks/scripts', repository / 'shared/hooks/scripts')
-                (repository / 'scripts').mkdir()
+                (repository / 'scripts/commands').mkdir(parents=True)
                 for filename in ('session-state.ps1', 'session-state.sh'):
-                    shutil.copy(ROOT / 'scripts' / filename, repository / 'scripts' / filename)
+                    shutil.copy(ROOT / 'scripts/commands' / filename, repository / 'scripts/commands' / filename)
                 workspace = base / 'workspace ü'
                 workspace.mkdir()
                 environment = dict(os.environ, TASK_WORKSPACE=str(workspace),
