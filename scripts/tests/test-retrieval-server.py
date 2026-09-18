@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
 import re
+import socket
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import time
@@ -26,11 +27,28 @@ def embedding():
     return array('f', [1.0] + [0.0] * (MODULE.EMBEDDING_DIMENSIONS - 1))
 
 
+def huggingface_available():
+    try:
+        socket.getaddrinfo('huggingface.co', 443)
+    except socket.gaierror:
+        return False
+    return True
+
+
 class RetrievalServerTests(unittest.TestCase):
+    def test_huggingface_availability_handles_dns_failure(self):
+        with patch('socket.getaddrinfo', side_effect=socket.gaierror):
+            self.assertFalse(huggingface_available())
+
     def test_ci_disables_xet_for_model_downloads(self):
         for workflow in ('.github/workflows/ci.yml', '.gitea/workflows/ci.yml'):
             content = (ROOT / workflow).read_text(encoding='utf-8')
             self.assertIn("HF_HUB_DISABLE_XET: '1'", content)
+
+    def test_client_smoke_builds_packages(self):
+        for workflow in ('.github/workflows/ci.yml', '.gitea/workflows/ci.yml'):
+            content = (ROOT / workflow).read_text(encoding='utf-8')
+            self.assertIn('name: Build packages\n        run: bash scripts/commands/build.sh --summary', content)
 
     def test_runtime_python_uses_adjacent_virtualenv(self):
         with TemporaryDirectory() as temporary:
@@ -49,6 +67,8 @@ class RetrievalServerTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get('QWEN_TEST_MODEL_CACHE'), 'Set QWEN_TEST_MODEL_CACHE to run the real-model check.')
     def test_real_models(self):
+        if not huggingface_available():
+            self.skipTest('huggingface.co DNS is unavailable')
         os.environ['HF_HOME'] = os.environ['QWEN_TEST_MODEL_CACHE']
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
