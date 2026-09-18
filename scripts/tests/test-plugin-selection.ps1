@@ -39,11 +39,11 @@ if (-not $failed -or $diagnostics -notcontains 'download progress' -or $diagnost
 $global:LASTEXITCODE = 0
 function codex { $script:observedCodexHome = $env:CODEX_HOME; $script:observedProfile = $env:USERPROFILE; '{"installed":[{"pluginId":"ponytail@ponytail"},{"pluginId":"i-have-adhd@i-have-adhd"},{"pluginId":"superpowers@openai-curated-remote"},{"pluginId":"context7@context7-marketplace"},{"pluginId":"caveman@thinkhome-caveman"}],"available":[]}' }
 $testHome = Join-Path ([System.IO.Path]::GetTempPath()) 'ai-config-plugin-test-home'
-$previousCodexHome = $env:CODEX_HOME
-$previousProfile = $env:USERPROFILE
+$previousCodexHome = [Environment]::GetEnvironmentVariable('CODEX_HOME', 'Process')
+$previousProfile = [Environment]::GetEnvironmentVariable('USERPROFILE', 'Process')
 $null = Get-InstalledPlugins -Client Codex -HomePath $testHome
 if ($observedCodexHome -ne (Join-Path $testHome '.codex') -or $observedProfile -ne $testHome) { throw 'Plugin inspection must use the requested user home.' }
-if ($env:CODEX_HOME -ne $previousCodexHome -or $env:USERPROFILE -ne $previousProfile) { throw 'Plugin inspection must restore the process environment.' }
+if ([Environment]::GetEnvironmentVariable('CODEX_HOME', 'Process') -ne $previousCodexHome -or [Environment]::GetEnvironmentVariable('USERPROFILE', 'Process') -ne $previousProfile) { throw 'Plugin inspection must restore the process environment.' }
 $script:answers.Enqueue('done')
 $selection = Select-ConfiguredPlugins -RepositoryRoot (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) -Client Codex -Mode Update
 if (@($selection.Selected | Where-Object { $_.codex_method -eq 'plugin' }).Count -ne 5) { throw 'All installed Codex plugins must start checked when updating.' }
