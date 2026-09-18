@@ -44,6 +44,11 @@ mutate_duplicate_agent() {
 }
 test_build_fails 'duplicate agent name' mutate_duplicate_agent
 
+mutate_invalid_tool_name() {
+  sed -i 's/^architect\t.*/architect\tShell/' "$1/adapters/claude/capabilities.tsv"
+}
+test_build_fails 'unknown Claude tool name in capability manifest' mutate_invalid_tool_name
+
 mutate_duplicate_plugin() {
   local manifest="$1/adapters/plugins.tsv"
   sed -n '2p' "$manifest" >> "$manifest"
@@ -60,4 +65,4 @@ mutate_mixed_placeholders() {
 }
 test_build_fails 'unknown placeholder beside an allowed installer placeholder' mutate_mixed_placeholders
 
-if [ "$summary" = true ]; then printf 'Tests: PASS | build validation\n'; else printf 'PASS build validation: invalid JSON, duplicate agent, duplicate plugin, and leftover placeholders are all rejected\n'; fi
+if [ "$summary" = true ]; then printf 'Tests: PASS | build validation\n'; else printf 'PASS build validation: invalid JSON, duplicate agent, unknown Claude tool name, duplicate plugin, and leftover placeholders are all rejected\n'; fi
