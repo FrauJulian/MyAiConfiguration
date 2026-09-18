@@ -175,6 +175,9 @@ for client in codex claude; do
       printf 'name = %s\ndescription = %s\ndeveloper_instructions = %s\n' "$(quote_toml "$name")" "$(quote_toml "$description")" "$(quote_toml "$instructions")" > "$agents_output/$name.toml"
     else
       tools=${agent_tools[$name]:-}
+      shell_tool=Bash
+      [ "$shell" != powershell ] || shell_tool=PowerShell
+      tools=${tools//__SHELL__/$shell_tool}
       if [ -n "$tools" ]; then printf '%s\nname: %s\ndescription: %s\ntools: %s\n%s\n\n%s\n' '---' "$name" "$description" "$tools" '---' "$instructions" > "$agents_output/$name.md"; else printf '%s\nname: %s\ndescription: %s\n%s\n\n%s\n' '---' "$name" "$description" '---' "$instructions" > "$agents_output/$name.md"; fi
     fi
   done
