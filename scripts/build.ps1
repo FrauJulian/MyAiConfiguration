@@ -177,7 +177,9 @@ foreach ($shell in @('powershell','bash')) {
             if ($client -eq 'codex') {
                 Set-Content (Join-Path $agentsOutput "$name.toml") "name = $(Quote-Toml $name)`r`ndescription = $(Quote-Toml $description)`r`ndeveloper_instructions = $(Quote-Toml $instructions)" -Encoding UTF8
             } else {
+                $shellTool = if ($shell -eq 'powershell') { 'PowerShell' } else { 'Bash' }
                 $tools = $agentTools[$name]
+                if ($tools) { $tools = $tools.Replace('__SHELL__', $shellTool) }
                 $frontmatter = "---`r`nname: $name`r`ndescription: $description`r`n"
                 if ($tools) { $frontmatter += "tools: $tools`r`n" }
                 Set-Content (Join-Path $agentsOutput "$name.md") ($frontmatter + "---`r`n`r`n$instructions") -Encoding UTF8
