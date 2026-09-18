@@ -202,6 +202,16 @@ class ManagedExtensionTests(unittest.TestCase):
         self.assertIn(['mcporter', '--config', config, 'config', 'add', 'context7', 'https://mcp.context7.com/mcp'], self.commands)
         self.assertNotIn(['codex', 'plugin', 'add', 'context7@test'], self.commands)
 
+    def test_removes_mcporter_managed_mcp_before_mcporter(self):
+        self.manager().sync([mcp(), mcporter()], ['codex'], {'Context7', 'MCPorter'})
+        self.commands.clear()
+        self.manager().sync([], ['codex'], set())
+        config = str(self.home / '.mcporter/mcporter.json')
+        self.assertEqual([
+            ['mcporter', '--config', config, 'config', 'remove', 'context7'],
+            ['npm', 'uninstall', '--global', 'mcporter'],
+        ], self.commands)
+
     def test_foreign_empty_directory_survives_skill_removal(self):
         self.manager().sync([skill()], ['codex'], {'Humanizer'})
         foreign = self.home / '.agents/skills/humanizer/foreign-empty'

@@ -438,7 +438,7 @@ class Manager:
         use_mcporter = 'MCPorter' in desired
         mcporter_entries = {name: entry for name, entry in desired.items() if use_mcporter and entry.get('mcporter_name') and entry.get('mcporter_url') not in ('', '-')}
         direct_entries = {name: entry for name, entry in desired.items() if name not in mcporter_entries}
-        for record in list(self.state['resources']):
+        for record in sorted(self.state['resources'], key=lambda record: record['kind'] != 'mcp'):
             if record['client'] != 'shared' and record['client'] not in clients:
                 continue
             selected_entries = mcporter_entries if record['client'] == 'shared' else direct_entries
