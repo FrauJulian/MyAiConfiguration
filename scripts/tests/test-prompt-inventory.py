@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 
-SPEC = importlib.util.spec_from_file_location('prompt_inventory', Path(__file__).parent / 'lib/prompt-inventory.py')
+SPEC = importlib.util.spec_from_file_location('prompt_inventory', Path(__file__).parents[2] / 'scripts/lib/prompt-inventory.py')
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
