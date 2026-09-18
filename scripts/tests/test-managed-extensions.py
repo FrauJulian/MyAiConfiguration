@@ -1,4 +1,5 @@
 import contextlib
+import csv
 import importlib.util
 import io
 import json
@@ -11,7 +12,8 @@ import unittest
 from unittest.mock import patch
 
 
-spec = importlib.util.spec_from_file_location('extensions', Path(__file__).parents[2] / 'scripts/lib/managed-extensions.py')
+root = Path(__file__).parents[2]
+spec = importlib.util.spec_from_file_location('extensions', root / 'scripts/lib/managed-extensions.py')
 extensions = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(extensions)
 
@@ -184,11 +186,12 @@ class ManagedExtensionTests(unittest.TestCase):
             ['claude', 'plugin', 'enable', 'example@test'],
         ], self.commands)
 
-    def test_claude_refreshes_marketplace_before_install(self):
-        entry = plugin('Superpowers')
-        entry['claude_plugin'] = 'superpowers@claude-plugins-official'
+    def test_superpowers_adds_official_claude_marketplace_before_install(self):
+        with (root / 'adapters/plugins.tsv').open(encoding='utf-8-sig', newline='') as stream:
+            entry = next(entry for entry in csv.DictReader(stream, delimiter='\t') if entry['name'] == 'Superpowers')
         self.manager().sync([entry], ['claude'], {'Superpowers'})
         self.assertEqual([
+            ['claude', 'plugin', 'marketplace', 'add', 'anthropics/claude-plugins-official'],
             ['claude', 'plugin', 'marketplace', 'update', 'claude-plugins-official'],
             ['claude', 'plugin', 'install', 'superpowers@claude-plugins-official', '--scope', 'user'],
         ], self.commands)
