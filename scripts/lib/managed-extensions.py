@@ -344,10 +344,11 @@ class Manager:
         if not re.fullmatch(r'[a-z0-9@/_.-]+', package):
             raise ValueError('Invalid CLI package.')
         record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
-        if record is not None:
+        installed = shutil.which(package) is not None
+        if record is not None and installed and not self.update:
             return
-        self.command(['npm', 'install', '--global', package])
-        if not self.dry_run:
+        self.command(['npm', 'update' if record is not None and installed else 'install', '--global', package])
+        if not self.dry_run and record is None:
             self.state['resources'].append(dict(client=client, name=entry['name'], kind='cli', package=package))
             self.save()
 

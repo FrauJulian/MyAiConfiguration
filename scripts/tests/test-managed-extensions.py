@@ -272,6 +272,20 @@ class ManagedExtensionTests(unittest.TestCase):
         self.assertIn(['claude', 'plugin', 'install', 'qmd@qmd', '--scope', 'user'], self.commands)
         self.assertNotIn(['codex', 'mcp', 'add', 'qmd', '--', 'qmd', 'mcp'], self.commands)
 
+    def test_managed_mcporter_updates_when_requested(self):
+        self.manager().sync([mcporter()], ['codex'], {'MCPorter'})
+        self.commands.clear()
+        with patch.object(extensions.shutil, 'which', return_value='mcporter'):
+            self.manager(update=True).sync([mcporter()], ['codex'], {'MCPorter'})
+        self.assertEqual([['npm', 'update', '--global', 'mcporter']], self.commands)
+
+    def test_managed_mcporter_reinstalls_when_command_is_missing(self):
+        self.manager().sync([mcporter()], ['codex'], {'MCPorter'})
+        self.commands.clear()
+        with patch.object(extensions.shutil, 'which', return_value=None):
+            self.manager().sync([mcporter()], ['codex'], {'MCPorter'})
+        self.assertEqual([['npm', 'install', '--global', 'mcporter']], self.commands)
+
     def test_mcporter_replaces_direct_context7_plugin(self):
         self.manager().sync([mcp(), mcporter()], ['codex'], {'Context7', 'MCPorter'})
         config = str(self.home / '.mcporter/mcporter.json')
