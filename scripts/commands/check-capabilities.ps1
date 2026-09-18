@@ -13,8 +13,9 @@ Require-Command jq
 $pythonVersion = $null
 foreach ($python in @('python', 'python3')) {
     if (-not (Get-Command $python -ErrorAction SilentlyContinue)) { continue }
-    $candidate = (& $python --version 2>$null | Select-Object -First 1) -replace '^Python\s+', ''
-    if ($LASTEXITCODE -eq 0) { $pythonVersion = $candidate; break }
+    $candidate = & $python --version 2>$null
+    $pythonExitCode = $LASTEXITCODE
+    if ($pythonExitCode -eq 0) { $pythonVersion = $candidate -replace '^Python\s+', ''; break }
 }
 if ($null -ne $pythonVersion) { Check-Version 'Python' $pythonVersion ([version]'3.11') } else { Fail 'Python 3.11 or newer is required' }
 
