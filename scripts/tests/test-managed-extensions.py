@@ -4,6 +4,8 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -174,8 +176,79 @@ class ManagedExtensionTests(unittest.TestCase):
     def test_owned_disabled_claude_is_enabled(self):
         self.manager().sync([plugin()], ['claude'], {'Example'})
         self.installed['claude']['example@test']['enabled'] = False
+        self.commands.clear()
         self.manager(update=True).sync([plugin()], ['claude'], {'Example'})
-        self.assertEqual(['claude', 'plugin', 'enable', 'example@test'], self.commands[-1])
+        self.assertEqual([
+            ['claude', 'plugin', 'marketplace', 'update', 'test'],
+            ['claude', 'plugin', 'update', 'example@test'],
+            ['claude', 'plugin', 'enable', 'example@test'],
+        ], self.commands)
+
+    def test_claude_refreshes_marketplace_before_install(self):
+        entry = plugin('Superpowers')
+        entry['claude_plugin'] = 'superpowers@claude-plugins-official'
+        self.manager().sync([entry], ['claude'], {'Superpowers'})
+        self.assertEqual([
+            ['claude', 'plugin', 'marketplace', 'update', 'claude-plugins-official'],
+            ['claude', 'plugin', 'install', 'superpowers@claude-plugins-official', '--scope', 'user'],
+        ], self.commands)
+
+    def test_claude_failed_marketplace_refresh_does_not_install_or_claim(self):
+        with patch.object(extensions, 'run_command', side_effect=ValueError('refresh failed')) as command:
+            with self.assertRaisesRegex(ValueError, 'refresh failed'):
+                self.manager().sync([plugin()], ['claude'], {'Example'})
+        self.assertEqual(['claude', 'plugin', 'marketplace', 'update', 'test'], command.call_args.args[0])
+        self.assertEqual([], self.manager().state['resources'])
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows hook compatibility')
+    def test_owned_caveman_hook_repair_runs_in_powershell_and_is_idempotent(self):
+        entry = dict(plugin('Caveman'), codex_plugin='caveman@thinkhome-caveman')
+        root = self.home / '.codex/plugins/cache/thinkhome-caveman/caveman/1.0.0'
+        path = root / 'hooks/hooks.json'
+        path.parent.mkdir(parents=True)
+        hook = {'type': 'command', 'command': 'unchanged',
+                'commandWindows': 'node "%PLUGIN_ROOT%\\hooks\\caveman-hook.mjs"'}
+        path.write_text(json.dumps({'hooks': {event: [{'hooks': [dict(hook)]}]
+                                            for event in ['SessionStart', 'UserPromptSubmit', 'SubagentStart']}}))
+        upstream = path.read_bytes()
+        self.manager().sync([entry], ['codex'], {'Caveman'})
+        repaired = path.read_bytes()
+        for groups in json.loads(repaired)['hooks'].values():
+            self.assertNotIn('%PLUGIN_ROOT%', groups[0]['hooks'][0]['commandWindows'])
+            self.assertEqual('unchanged', groups[0]['hooks'][0]['command'])
+        self.manager().sync([entry], ['codex'], {'Caveman'})
+        self.assertEqual(repaired, path.read_bytes())
+        path.write_bytes(upstream)
+        self.manager(update=True).sync([entry], ['codex'], {'Caveman'})
+        self.assertEqual(repaired, path.read_bytes())
+        if not shutil.which('node'):
+            self.skipTest('Node is unavailable for launcher execution')
+        (root / 'hooks/caveman-hook.mjs').write_text("process.stdout.write('hook-ok');")
+        command = json.loads(repaired)['hooks']['SessionStart'][0]['hooks'][0]['commandWindows']
+        result = subprocess.run(['powershell', '-NoProfile', '-Command', command],
+                                env=dict(os.environ, PLUGIN_ROOT=str(root)), capture_output=True, text=True, timeout=10)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('hook-ok', result.stdout)
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows hook compatibility')
+    def test_caveman_repair_preserves_foreign_and_custom_hooks_and_dry_runs(self):
+        entry = dict(plugin('Caveman'), codex_plugin='caveman@thinkhome-caveman')
+        path = self.home / '.codex/plugins/cache/thinkhome-caveman/caveman/1.0.0/hooks/hooks.json'
+        path.parent.mkdir(parents=True)
+        original = json.dumps({'hooks': {'SessionStart': [{'hooks': [{'commandWindows':
+                    'node "%PLUGIN_ROOT%\\hooks\\caveman-hook.mjs"'}]}]}}).encode()
+        path.write_bytes(original)
+        self.installed['codex'][entry['codex_plugin']] = {}
+        self.manager().sync([entry], ['codex'], {'Caveman'})
+        self.assertEqual([], self.manager().state['resources'])
+        self.assertEqual(original, path.read_bytes())
+        self.installed['codex'].clear()
+        self.manager(dry_run=True).sync([entry], ['codex'], {'Caveman'})
+        self.assertEqual(original, path.read_bytes())
+        original = b'{"hooks":{"SessionStart":[{"hooks":[{"commandWindows":"custom"}]}]}}'
+        path.write_bytes(original)
+        self.manager().sync([entry], ['codex'], {'Caveman'})
+        self.assertEqual(original, path.read_bytes())
 
     def test_dry_run_summary_has_one_line(self):
         with contextlib.redirect_stdout(io.StringIO()) as output:

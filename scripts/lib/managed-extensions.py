@@ -307,6 +307,7 @@ class Manager:
                 record['version'] = item['version']; self.save()
             return
         if item is not None and client == 'claude':
+            self.command([client, 'plugin', 'marketplace', 'update', selector.rsplit('@', 1)[1]])
             self.command([client, 'plugin', 'update', selector])
             if item.get('enabled') is False:
                 self.command([client, 'plugin', 'enable', selector])
@@ -323,6 +324,8 @@ class Manager:
                 self.command([client, 'plugin', 'marketplace', 'upgrade', selector.rsplit('@', 1)[1]])
             else:
                 self.command([client, 'plugin', 'marketplace', 'add', marketplace])
+        if client == 'claude':
+            self.command([client, 'plugin', 'marketplace', 'update', selector.rsplit('@', 1)[1]])
         arguments = [client, 'plugin', 'install', selector, '--scope', 'user'] if client == 'claude' else [client, 'plugin', 'add', selector]
         self.command(arguments)
         resolved_version = None
@@ -347,6 +350,30 @@ class Manager:
         if not self.dry_run:
             self.state['resources'].append(dict(client=client, name=entry['name'], kind='cli', package=package))
             self.save()
+
+    def repair_caveman_windows_hooks(self):
+        if self.dry_run or os.name != 'nt':
+            return
+        if not any(r['client'] == 'codex' and r['kind'] == 'plugin'
+                   and r['selector'] == 'caveman@thinkhome-caveman' for r in self.state['resources']):
+            return
+        # ponytail: only the known 1.0.0 command; remove when upstream ships a portable launcher.
+        path = safe_path(self.home, '.codex/plugins/cache/thinkhome-caveman/caveman/1.0.0/hooks/hooks.json')
+        if not path.is_file():
+            return
+        content = json.loads(path.read_text(encoding='utf-8'))
+        changed = False
+        for groups in content.get('hooks', {}).values():
+            for group in groups:
+                for hook in group.get('hooks', []):
+                    if hook.get('commandWindows') == 'node "%PLUGIN_ROOT%\\hooks\\caveman-hook.mjs"':
+                        hook['commandWindows'] = ('node -e "import(require(\'node:url\').pathToFileURL('
+                                                  'require(\'node:path\').join(process.env.PLUGIN_ROOT,'
+                                                  '\'hooks\',\'caveman-hook.mjs\')).href)"')
+                        changed = True
+        if changed:
+            atomic_write(path, (json.dumps(content, indent=2) + '\n').encode('utf-8'))
+            print('Repaired Caveman Windows hook commands; review the changed hooks in Codex /hooks.')
 
     def ensure_qmd(self, client, entry):
         package = entry['codex_source']
@@ -448,6 +475,8 @@ class Manager:
             for client in clients:
                 for entry in direct_entries.values():
                     self.ensure(client, entry)
+                    if client == 'codex' and entry.get('codex_plugin') == 'caveman@thinkhome-caveman':
+                        self.repair_caveman_windows_hooks()
             for entry in mcporter_entries.values():
                 self.ensure_mcporter(entry)
         print('EXTENSIONS: reconciliation complete' + (' (dry run)' if self.dry_run else ''))
