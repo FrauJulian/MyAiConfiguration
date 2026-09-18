@@ -153,12 +153,13 @@ foreach ($shell in @('powershell','bash')) {
 
     $sharedTemplate = Get-Content (Join-Path $shared 'global-instructions.md') -Raw
     $generalContent = Get-Content (Join-Path $shared 'rules/general.md') -Raw
+    $credentialHelperExtension = if ($shell -eq 'powershell') { 'ps1' } else { 'sh' }
 
-    $agentsContent = $sharedTemplate.Replace('__RULE_LOADING__', $codexRuleLoading)
+    $agentsContent = $sharedTemplate.Replace('__RULE_LOADING__', $codexRuleLoading).Replace('__CLIENT__', 'codex').Replace('__SHELL__', $credentialHelperExtension)
     $agentsContent = $agentsContent.TrimEnd() + "`r`n`r`n---`r`n`r`n$generalContent"
     Set-Content (Join-Path $output "codex-$shell/AGENTS.md") $agentsContent -Encoding UTF8
 
-    $claudeContent = $sharedTemplate.Replace('__RULE_LOADING__', $claudeRuleLoading)
+    $claudeContent = $sharedTemplate.Replace('__RULE_LOADING__', $claudeRuleLoading).Replace('__CLIENT__', 'claude').Replace('__SHELL__', $credentialHelperExtension)
     $claudeContent = $claudeContent.TrimEnd() + "`r`n`r`n---`r`n`r`n$generalContent"
     Set-Content (Join-Path $output "claude-$shell/CLAUDE.md") $claudeContent -Encoding UTF8
 
