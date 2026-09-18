@@ -9,12 +9,15 @@ import hashlib
 import heapq
 import json
 import multiprocessing
+from multiprocessing.connection import Client, Listener
 import os
 from pathlib import Path
 import re
 import sqlite3
+import subprocess
 import sys
 import threading
+import time
 
 
 MODEL = "Qwen/Qwen3-Embedding-0.6B"
@@ -35,6 +38,13 @@ RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and d
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
 DEFAULT_MAX_FILES = 2000
 MAX_FILES_ENV = "SEMANTIC_RETRIEVAL_MAX_FILES"
+
+# A daemon keeps the embedding/reranker models resident in memory across CLI
+# invocations, since each `server.py search` call is otherwise a fresh process
+# that would reload both models from disk before it can answer a single query.
+DAEMON_IDLE_SECONDS = 1800
+DAEMON_READY_TIMEOUT_SECONDS = 120
+DAEMON_AUTHKEY = b"ai-config-semantic-retrieval"
 
 
 def runtime_python(script=__file__, executable=sys.executable, system=os.name):
@@ -199,6 +209,122 @@ def reciprocal_rank_fusion(*rankings):
     return sorted(scores, key=lambda identifier: (-scores[identifier], identifier))
 
 
+def daemon_lock_path(data_dir: Path) -> Path:
+    return data_dir / "daemon.starting"
+
+
+def daemon_address(data_dir: Path) -> str:
+    digest = hashlib.sha256(os.path.normcase(str(data_dir.resolve())).encode()).hexdigest()[:16]
+    if os.name == "nt":
+        return r"\\.\pipe\ai-config-retrieval-" + digest
+    return str(data_dir / f"daemon-{digest}.sock")
+
+
+def request_daemon(address: str, payload: dict):
+    with Client(address, authkey=DAEMON_AUTHKEY) as connection:
+        connection.send(payload)
+        if not connection.poll(CLI_TIMEOUT_SECONDS):
+            raise TimeoutError(f"Semantic retrieval daemon exceeded the {CLI_TIMEOUT_SECONDS} second timeout.")
+        success, result = connection.recv()
+    if not success:
+        raise RuntimeError(str(result))
+    return result
+
+
+def spawn_daemon(data_dir: Path, model_cache: Path) -> bool:
+    lock_path = daemon_lock_path(data_dir)
+    try:
+        os.close(os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+    except FileExistsError:
+        try:
+            if time.time() - lock_path.stat().st_mtime > DAEMON_READY_TIMEOUT_SECONDS:
+                lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return True
+    try:
+        subprocess.Popen(
+            [sys.executable, str(Path(__file__).resolve()), "daemon", "--data-dir", str(data_dir), "--model-cache", str(model_cache)],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=(os.name != "nt"),
+            creationflags=(subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0)
+        return True
+    except OSError:
+        lock_path.unlink(missing_ok=True)
+        return False
+
+
+def try_daemon(root: Path, data_dir: Path, model_cache: Path, action: str, query: str | None, top_k: int):
+    address = daemon_address(data_dir)
+    payload = {"action": action, "root": str(root), "query": query, "top_k": top_k}
+    try:
+        return request_daemon(address, payload)
+    except (OSError, EOFError):
+        pass
+    if not spawn_daemon(data_dir, model_cache):
+        return None
+    deadline = time.monotonic() + DAEMON_READY_TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            return request_daemon(address, payload)
+        except (OSError, EOFError):
+            time.sleep(0.5)
+    return None
+
+
+def run_daemon(data_dir: Path, model_cache: Path):
+    address = daemon_address(data_dir)
+    if os.name != "nt":
+        Path(address).unlink(missing_ok=True)
+    model_cache.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("HF_HOME", str(model_cache.resolve()))
+    indexes: dict[str, Index] = {}
+    activity_lock = threading.Lock()
+    last_activity = time.monotonic()
+
+    def watchdog():
+        while True:
+            time.sleep(5)
+            with activity_lock:
+                idle_for = time.monotonic() - last_activity
+            if idle_for > DAEMON_IDLE_SECONDS:
+                os._exit(0)
+
+    threading.Thread(target=watchdog, daemon=True).start()
+    listener = Listener(address, family="AF_PIPE" if os.name == "nt" else "AF_UNIX", authkey=DAEMON_AUTHKEY)
+    daemon_lock_path(data_dir).unlink(missing_ok=True)
+    try:
+        while True:
+            connection = listener.accept()
+            try:
+                response = (True, None)
+                try:
+                    request = connection.recv()
+                    index = indexes.get(request["root"])
+                    if index is None:
+                        if len(indexes) >= 8:
+                            indexes.pop(next(iter(indexes))).db.close()
+                        index = Index(Path(request["root"]), data_dir)
+                        indexes[request["root"]] = index
+                    if request["action"] == "search":
+                        response = (True, index.search(request["query"], request["top_k"]))
+                    else:
+                        response = (True, {"chunks": index.rebuild()})
+                except EOFError:
+                    continue
+                except Exception as error:
+                    response = (False, str(error))
+                connection.send(response)
+            except (OSError, EOFError):
+                pass
+            finally:
+                connection.close()
+                with activity_lock:
+                    last_activity = time.monotonic()
+    finally:
+        listener.close()
+
+
 class Index:
     def __init__(self, root: Path, data: Path):
         self.root = root.resolve()
@@ -344,21 +470,9 @@ class Index:
             return result
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("search", "rebuild"))
-    parser.add_argument("--query")
-    parser.add_argument("--top-k", type=int, default=FINAL_RESULTS)
-    parser.add_argument("--root", default=os.getcwd(), type=Path)
-    parser.add_argument("--data-dir", required=True, type=Path)
-    parser.add_argument("--model-cache", required=True, type=Path)
-    args = parser.parse_args()
-    if args.action == "search" and not args.query:
-        parser.error("search requires --query")
+def run_direct(action: str, root: Path, data_dir: Path, model_cache: Path, query: str | None, top_k: int):
     output = multiprocessing.Queue(1)
-    worker = multiprocessing.Process(target=run_action,
-                                     args=(args.action, args.root.resolve(), args.data_dir.resolve(),
-                                           args.model_cache.resolve(), args.query, args.top_k, output))
+    worker = multiprocessing.Process(target=run_action, args=(action, root, data_dir, model_cache, query, top_k, output))
     worker.start()
     worker.join(CLI_TIMEOUT_SECONDS)
     if worker.is_alive():
@@ -370,6 +484,31 @@ def main():
     success, result = output.get()
     if not success:
         raise RuntimeError(str(result))
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=("search", "rebuild", "daemon"))
+    parser.add_argument("--query")
+    parser.add_argument("--top-k", type=int, default=FINAL_RESULTS)
+    parser.add_argument("--root", default=os.getcwd(), type=Path)
+    parser.add_argument("--data-dir", required=True, type=Path)
+    parser.add_argument("--model-cache", required=True, type=Path)
+    args = parser.parse_args()
+    data_dir = args.data_dir.resolve()
+    model_cache = args.model_cache.resolve()
+    if args.action == "daemon":
+        data_dir.mkdir(parents=True, exist_ok=True)
+        run_daemon(data_dir, model_cache)
+        return
+    if args.action == "search" and not args.query:
+        parser.error("search requires --query")
+    root = args.root.resolve()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    result = try_daemon(root, data_dir, model_cache, args.action, args.query, args.top_k)
+    if result is None:
+        result = run_direct(args.action, root, data_dir, model_cache, args.query, args.top_k)
     print(json.dumps(result, ensure_ascii=False))
 
 

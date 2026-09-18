@@ -200,6 +200,17 @@ class RetrievalServerTests(unittest.TestCase):
             finally:
                 index.db.close()
 
+    def test_daemon_address_is_deterministic_and_platform_specific(self):
+        with TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            first = MODULE.daemon_address(data_dir)
+            second = MODULE.daemon_address(data_dir)
+            self.assertEqual(first, second)
+            if os.name == 'nt':
+                self.assertTrue(first.startswith(r'\\.\pipe\ai-config-retrieval-'))
+            else:
+                self.assertTrue(first.startswith(str(data_dir)))
+
     def test_shared_encoder_and_reranker_are_cached_module_singletons(self):
         with patch.object(MODULE, '_shared_encoder', None), patch.object(MODULE, '_shared_reranker', None), \
              patch.object(MODULE, 'preferred_device', lambda: 'cpu'):
