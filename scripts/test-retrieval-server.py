@@ -160,7 +160,7 @@ class RetrievalServerTests(unittest.TestCase):
             finally:
                 index.db.close()
 
-    def test_scan_prunes_ignored_directories_and_stops_at_limit(self):
+    def test_scan_prunes_ignored_directories_and_warns_at_limit(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
             index = MODULE.Index(root, root / 'data')
@@ -172,8 +172,31 @@ class RetrievalServerTests(unittest.TestCase):
             try:
                 self.assertEqual(index.files(), [(root / 'visible.md').resolve()])
                 filenames = ['visible.md'] * 2001
-                with patch.object(MODULE.os, 'walk', return_value=iter([(str(root), [], filenames)])):
+                with patch.object(MODULE.os, 'walk', return_value=iter([(str(root), [], filenames)])), \
+                     patch.object(MODULE.sys, 'stderr') as stderr:
                     self.assertEqual(len(index.files()), 2000)
+                self.assertIn('stopped scanning after 2000', stderr.write.call_args_list[0].args[0])
+            finally:
+                index.db.close()
+
+    def test_max_files_is_configurable_via_environment(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            index = MODULE.Index(root, root / 'data')
+            try:
+                with patch.dict(os.environ, {MODULE.MAX_FILES_ENV: '3'}):
+                    self.assertEqual(MODULE.read_max_files(), 3)
+                with patch.dict(os.environ, {MODULE.MAX_FILES_ENV: 'not-a-number'}):
+                    with self.assertRaises(ValueError):
+                        MODULE.read_max_files()
+                with patch.dict(os.environ, {}, clear=True):
+                    self.assertEqual(MODULE.read_max_files(), MODULE.DEFAULT_MAX_FILES)
+                (root / 'visible.md').write_text('visible', encoding='utf-8')
+                index.max_files = 3
+                filenames = ['visible.md'] * 5
+                with patch.object(MODULE.os, 'walk', return_value=iter([(str(root), [], filenames)])), \
+                     patch.object(MODULE.sys, 'stderr'):
+                    self.assertEqual(len(index.files()), 3)
             finally:
                 index.db.close()
 

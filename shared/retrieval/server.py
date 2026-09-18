@@ -31,6 +31,8 @@ RRF_K = 60
 INDEX_VERSION = 2
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
 TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
+DEFAULT_MAX_FILES = 2000
+MAX_FILES_ENV = "SEMANTIC_RETRIEVAL_MAX_FILES"
 
 
 def runtime_python(script=__file__, executable=sys.executable, system=os.name):
@@ -148,6 +150,19 @@ def preferred_device():
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
+def read_max_files():
+    value = os.environ.get(MAX_FILES_ENV)
+    if value is None:
+        return DEFAULT_MAX_FILES
+    try:
+        parsed = int(value)
+    except ValueError:
+        parsed = 0
+    if parsed <= 0:
+        raise ValueError(f"{MAX_FILES_ENV} must be a positive integer, got {value!r}")
+    return parsed
+
+
 def reciprocal_rank_fusion(*rankings):
     scores = {}
     for ranking in rankings:
@@ -174,6 +189,7 @@ class Index:
         self.lock = threading.RLock()
         self.model = None
         self.reranker_model = None
+        self.max_files = read_max_files()
 
     def files(self):
         ignored = {".git", ".venv", "generated", "node_modules", ".my-ai-configuration"}
@@ -188,7 +204,10 @@ class Index:
                 if path.is_symlink() or path.suffix.lower() not in TEXT_EXTENSIONS or not path.is_file() or path.stat().st_size > 524288:
                     continue
                 result.append(path)
-                if len(result) == 2000:
+                if len(result) == self.max_files:
+                    print(f"Semantic retrieval: stopped scanning after {self.max_files} indexable files; "
+                          f"some files under {self.root} were not indexed. Set {MAX_FILES_ENV} to raise this limit.",
+                          file=sys.stderr)
                     return result
         return result
 
