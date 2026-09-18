@@ -13,7 +13,8 @@
   },
   "sandbox": {
     "enabled": true,
-    "allowUnsandboxedCommands": false
+    "allowUnsandboxedCommands": false,
+    "failIfUnavailable": true
   },
   "env": {
     "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__"
