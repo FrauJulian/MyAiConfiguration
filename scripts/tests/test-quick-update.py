@@ -114,7 +114,7 @@ class SelectionTests(unittest.TestCase):
         original = self.path.read_bytes()
         source = (ROOT / 'scripts/commands/update.ps1').read_text(encoding='utf-8-sig')
         source = source.replace("[Environment]::GetFolderPath('UserProfile')", '$env:TEST_SELECTION_HOME')
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.tmp.ps1', dir=ROOT / 'scripts',
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tmp.ps1', dir=ROOT / 'scripts/commands',
                                          encoding='utf-8', delete=False) as stream:
             stream.write(source)
             entry = Path(stream.name)
