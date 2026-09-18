@@ -25,6 +25,12 @@ Run scripts from the repository root. PowerShell and Bash commands have equivale
 | `commands/repository-context.ps1`, `commands/repository-context.sh` | Refresh the local repository-context cache. |
 | `commands/session-state.ps1`, `commands/session-state.sh` | Read or update the local agent session state. |
 | `commands/telemetry.ps1`, `commands/telemetry.sh` | Append a local telemetry event. |
+| `commands/add-instruction.ps1`, `commands/add-instruction.sh` | Append a client-specific user instruction outside managed configuration. |
+| `commands/add-credentials.ps1`, `commands/add-credentials.sh` | Store a client-scoped tool credential in the operating-system credential store. |
+
+Custom instructions are read before generated rules, skills, and plugins. They remain under `~/.my-ai-configuration/instructions/`, so installation and update scripts never manage or reset them.
+
+On Windows, credentials are stored in Windows Credential Manager. Use `~/.my-ai-configuration/bin/with-credential.ps1` or `.sh` to run a tool with a stored key available only in that child process. The key must be a valid environment-variable name; its value is never written to configuration.
 
 Qwen retrieval uses `shared/retrieval/benchmark.py`; run it through `scripts/lib/semantic-retrieval.py benchmark --root . --home <home-directory>`.
 
@@ -53,6 +59,7 @@ Qwen retrieval uses `shared/retrieval/benchmark.py`; run it through `scripts/lib
 | Script | Purpose |
 | --- | --- |
 | `lib/install-options.ps1`, `lib/install-options.sh` | Read installation options and calculate client-specific choices. |
+| `lib/credentials.ps1`, `lib/with-credential.sh` | Write a tool credential to Windows Credential Manager and expose it to one child process. |
 | `lib/install-options.py` | Filter configuration templates according to installation options. |
 | `lib/install-targets.ps1`, `lib/install-targets.sh` | Resolve configuration targets for the selected client and shell. |
 | `lib/manifest.ps1`, `lib/manifest.sh` | Synchronize managed files and their ownership manifest. |
