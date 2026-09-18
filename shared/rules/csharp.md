@@ -70,7 +70,7 @@
 * Keep naming consistent and descriptive.
 * Avoid abbreviations unless they are established domain terminology.
 * Remove dead code instead of keeping it as commented-out code.
-* Do not add comments or API documentation unless the user explicitly requests them.
+* Add comments or API documentation when they clarify non-obvious decisions, public contracts, or project conventions require them; otherwise prefer self-explanatory code.
 * Follow existing project conventions unless there is a strong reason to change them.
 * Do not introduce new libraries when the BCL or existing dependencies already solve the problem adequately.
 * Prefer fewer dependencies.
@@ -84,9 +84,10 @@
 
 * Prefer modern, readable C# syntax and current .NET conventions.
 * Prefer simple, explicit code over outdated or unnecessarily verbose patterns.
-* Prefer concrete collection types for parameters, properties and local APIs when no abstraction is required.
-* Avoid interface collection types such as `IDictionary<TKey, TValue>`, `IList<T>` or `ICollection<T>` unless polymorphism or API abstraction is actually needed.
-* Prefer `Dictionary<TKey, TValue>`, `List<T>`, arrays or other concrete types when the implementation type is known and intentional.
+* Treat collection-type guidance as a default; follow established project conventions and public API contracts when they require a different choice.
+* Prefer concrete collection types for internal parameters, properties, and local APIs when they express the intended contract without reducing needed flexibility.
+* Do not introduce collection interfaces solely for abstraction. Use `IReadOnlyList<T>`, `IEnumerable<T>`, `IDictionary<TKey, TValue>`, `IList<T>`, or `ICollection<T>` only when a public API or boundary intentionally exposes that capability.
+* Prefer `Dictionary<TKey, TValue>`, `List<T>`, arrays, or other concrete types when the implementation type is known and intentional.
 * Prefer strongly typed models over `object`, `dynamic`, loosely typed dictionaries or string-based contracts.
 * Validate external input at system boundaries.
 * Fail fast on invalid arguments and impossible states.
