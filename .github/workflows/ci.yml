@@ -31,7 +31,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends shellcheck jq
       - name: Check capabilities
-        run: bash scripts/check-capabilities.sh
+        run: bash scripts/commands/check-capabilities.sh
       - name: Validate Bash syntax
         run: git ls-files -z '*.sh' | xargs -0 -r -n1 bash -n
       - name: Lint Bash
@@ -51,12 +51,12 @@ jobs:
       - name: Run Python tests
         run: |
           set -euo pipefail
-          for file in scripts/test-*.py; do
+          for file in scripts/tests/test-*.py; do
             echo "==> $file"
             python "$file"
           done
       - name: Validate generated configuration
-        run: python scripts/validate-config.py generated/codex-powershell/config.toml generated/claude-powershell/settings.json
+        run: python scripts/checks/validate-config.py generated/codex-powershell/config.toml generated/claude-powershell/settings.json
 
   powershell-on-ubuntu:
     name: PowerShell tests on Ubuntu
@@ -81,8 +81,8 @@ jobs:
         shell: bash
         run: |
           if [ "${POWERSHELL_AVAILABLE:-false}" != true ]; then exit 0; fi
-          pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/check-capabilities.ps1
-          for file in scripts/test-*.ps1; do
+          pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/commands/check-capabilities.ps1
+          for file in scripts/tests/test-*.ps1; do
             echo "==> $file"
             pwsh -NoLogo -NoProfile -NonInteractive -File "$file" -Summary
           done
@@ -97,13 +97,13 @@ jobs:
       - name: Build packages
         env:
           REQUIRE_CODEX_SCHEMA: 'false'
-        run: bash scripts/build.sh --summary
+        run: bash scripts/commands/build.sh --summary
       - name: Run build validation
-        run: bash scripts/test-build-validation.sh --summary
+        run: bash scripts/tests/test-build-validation.sh --summary
       - name: Check generated files are reproducible
         run: |
           before=$(find generated -type f -print0 | sort -z | xargs -0 sha256sum)
-          bash scripts/build.sh --summary
+          bash scripts/commands/build.sh --summary
           after=$(find generated -type f -print0 | sort -z | xargs -0 sha256sum)
           test "$before" = "$after"
 
@@ -117,19 +117,39 @@ jobs:
       - name: Run integration tests
         run: |
           set -euo pipefail
-          bash scripts/test-install-guards.sh --summary
-          bash scripts/test-plugin-selection.sh --summary
-          bash scripts/test-quick-update.sh --summary
-          bash scripts/test-managed-install.sh --summary
-          bash scripts/test-shell-packages.sh --summary
+          bash scripts/tests/test-install-guards.sh --summary
+          bash scripts/tests/test-plugin-selection.sh --summary
+          bash scripts/tests/test-quick-update.sh --summary
+          bash scripts/tests/test-managed-install.sh --summary
+          bash scripts/tests/test-shell-packages.sh --summary
       - name: Run doctor and prompt budget checks
         run: |
-          bash scripts/doctor.sh --summary
-          bash scripts/prompt-budget.sh --summary
+          bash scripts/commands/doctor.sh --summary
+          bash scripts/commands/prompt-budget.sh --summary
       - name: Verify dry-run installation safety
         run: |
-          bash scripts/install.sh --summary --dry-run --client both --shell bash
-          bash scripts/update.sh --summary --dry-run --client both --shell bash
+          bash scripts/commands/install.sh --summary --dry-run --client both --shell bash
+          bash scripts/commands/update.sh --summary --dry-run --client both --shell bash
+
+  client-smoke:
+    name: Installed client configuration smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v22.16.0
+        with:
+          node-version: '24'
+      - name: Install current client CLIs
+        run: npm install --global @openai/codex @anthropic-ai/claude-code
+      - name: Validate current Codex and Claude settings
+        run: |
+          set -euo pipefail
+          schema_home=$(mktemp -d)
+          cp generated/codex-powershell/config.toml "$schema_home/config.toml"
+          CODEX_HOME="$schema_home" codex --strict-config --help >/dev/null
+          claude --settings generated/claude-powershell/settings.json --help >/dev/null
 
   retrieval:
     name: Qwen retrieval integration
@@ -152,7 +172,7 @@ jobs:
       - name: Run retrieval tests with real models
         env:
           QWEN_TEST_MODEL_CACHE: ${{ github.workspace }}/.cache/huggingface
-        run: python scripts/test-retrieval-server.py
+        run: python scripts/tests/test-retrieval-server.py
 
   security:
     name: CI configuration security checks
