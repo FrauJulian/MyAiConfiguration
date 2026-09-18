@@ -13,12 +13,15 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 class TelemetryTests(unittest.TestCase):
     def test_bash_record_disable_and_summary(self):
         bash = shutil.which('bash')
+        if os.name == 'nt':
+            candidate = Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Git/bin/bash.exe'
+            bash = str(candidate) if candidate.exists() else None
         if not bash:
             self.skipTest('Bash unavailable')
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             script = root / 'scripts/commands/telemetry.sh'
-            script.parent.mkdir()
+            script.parent.mkdir(parents=True)
             shutil.copy(ROOT / 'scripts/commands/telemetry.sh', script)
             env = dict(os.environ, AI_CONFIG_TELEMETRY='1')
             result = subprocess.run([bash, str(script), 'record', 'subagent-stop', '--role', 'reviewer', '--filesRead', '3', '--outcome', 'findings'], env=env, capture_output=True, text=True)
