@@ -41,7 +41,9 @@ for shell in powershell bash; do
       done < "$root/adapters/rule-skills.tsv"
     fi
     test "$(find "$package/agents" -type f | wc -l)" -eq "$source_agent_count"
-    if [ "$client" = claude ]; then grep -q '^tools: Read,Diff,Search$' "$package/agents/reviewer.md"; fi
+    expected_reviewer_shell_tool=Bash
+    [ "$shell" != powershell ] || expected_reviewer_shell_tool=PowerShell
+    if [ "$client" = claude ]; then grep -q "^tools: Read,Grep,Glob,$expected_reviewer_shell_tool\$" "$package/agents/reviewer.md"; fi
     expected_skill_count=$source_skill_count
     [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
     test "$(find "$package/skills" -name SKILL.md | wc -l)" -eq "$expected_skill_count"
