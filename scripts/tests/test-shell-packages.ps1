@@ -48,7 +48,9 @@ foreach ($shell in @('powershell','bash')) {
             throw "Claude finish hook is incorrect in $package"
         } elseif ($content -notmatch '"defaultMode"\s*:\s*"auto"') {
             throw "Claude auto permission mode is missing in $package"
-        } elseif (-not $settings.sandbox.enabled -or $settings.sandbox.allowUnsandboxedCommands -ne $false -or $settings.sandbox.failIfUnavailable -ne $true) {
+        } elseif ($shell -eq 'powershell' -and ($settings.sandbox.enabled -ne $false -or $settings.sandbox.PSObject.Properties.Count -ne 1)) {
+            throw "Claude sandbox must be disabled in $package"
+        } elseif ($shell -eq 'bash' -and (-not $settings.sandbox.enabled -or $settings.sandbox.allowUnsandboxedCommands -ne $false -or $settings.sandbox.failIfUnavailable -ne $true)) {
             throw "Claude strict sandbox is missing in $package"
         } elseif (-not (Test-Path -LiteralPath (Join-Path $package "statusline/statusline.$(if ($shell -eq 'powershell') { 'ps1' } else { 'sh' })")) -or $settings.statusLine.command -notmatch "statusline\.$(if ($shell -eq 'powershell') { 'ps1' } else { 'sh' })") {
             throw "Claude status line is incorrect in $package"

@@ -40,8 +40,8 @@ def validate_claude(path: Path) -> None:
         if not isinstance(permissions.get(key), list) or not all(isinstance(item, str) for item in permissions[key]):
             fail(f"permissions.{key} must be an array of strings")
     sandbox = require_keys(settings.get("sandbox"), CLAUDE_SANDBOX_KEYS, "sandbox")
-    if sandbox.get("enabled") is not True or sandbox.get("allowUnsandboxedCommands") is not False or sandbox.get("failIfUnavailable") is not True:
-        fail("sandbox must be enabled, fail closed, and disallow unsandboxed command retries")
+    if sandbox != {"enabled": False} and sandbox != {"enabled": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True}:
+        fail("sandbox must be disabled or enabled with fail-closed settings")
     env = settings.get("env")
     if not isinstance(env, dict) or not all(isinstance(key, str) and isinstance(value, str) for key, value in env.items()):
         fail("env must be an object of string values")

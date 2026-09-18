@@ -11,11 +11,7 @@
       "Bash(Remove-Item -Recurse*)"
     ]
   },
-  "sandbox": {
-    "enabled": true,
-    "allowUnsandboxedCommands": false,
-    "failIfUnavailable": true
-  },
+  "sandbox": __CLAUDE_SANDBOX__,
   "env": {
     "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__"
   },

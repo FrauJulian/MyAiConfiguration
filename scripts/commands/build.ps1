@@ -194,9 +194,10 @@ foreach ($shell in @('powershell','bash')) {
         $script = if ($shell -eq 'powershell') { 'flashbang.ps1' } else { 'flashbang.sh' }
         $statusLineScript = if ($shell -eq 'powershell') { 'statusline.ps1' } else { 'statusline.sh' }
         $content = Get-Content -LiteralPath $path -Raw
+        $sandbox = if ($shell -eq 'powershell') { '{"enabled": false}' } else { '{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}' }
         $compactScript = if ($shell -eq 'powershell') { 'Record-Compact.ps1' } else { 'record-compact.sh' }
         $pointerScript = if ($shell -eq 'powershell') { 'Show-SessionStatePointer.ps1' } else { 'show-session-state-pointer.sh' }
-        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__POWERSHELL_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__POWERSHELL_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript)
+        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__POWERSHELL_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__POWERSHELL_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript).Replace('__CLAUDE_SANDBOX__', $sandbox)
         Set-Content -LiteralPath $path -Value $content -Encoding UTF8
     }
 

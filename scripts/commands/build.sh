@@ -200,6 +200,8 @@ for client in codex claude; do
   fi
   path="$output/$client-$shell/$file"
   content=$(<"$path")
+  sandbox='{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}'
+  [ "$shell" != powershell ] || sandbox='{"enabled": false}'
   content=${content//__HOOK_COMMAND__/$command}
   content=${content//__POWERSHELL_HOOK_COMMAND__/$command}
   content=${content//__HOOK_SCRIPT__/$script}
@@ -208,6 +210,7 @@ for client in codex claude; do
   content=${content//__SESSION_POINTER_SCRIPT__/$pointer_script}
   content=${content//__STATUSLINE_COMMAND__/$command}
   content=${content//__STATUSLINE_SCRIPT__/$statusline_script}
+  content=${content//__CLAUDE_SANDBOX__/$sandbox}
   printf '%s\n' "$content" > "$path"
 done
 

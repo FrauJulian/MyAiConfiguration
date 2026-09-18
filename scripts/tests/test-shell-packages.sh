@@ -65,7 +65,7 @@ for shell in powershell bash; do
       ! grep -q 'flashbang-if-input' "$package/$file"
       ! grep -q '"async"[[:space:]]*:[[:space:]]*true' "$package/$file"
       grep -q '"defaultMode"[[:space:]]*:[[:space:]]*"auto"' "$package/$file"
-      python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); assert settings["sandbox"] == {"enabled": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True}' "$package/$file"
+      python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); expected={"enabled": False} if sys.argv[2] == "powershell" else {"enabled": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True}; assert settings["sandbox"] == expected' "$package/$file" "$shell"
       statusline_extension='sh'
       [ "$shell" != powershell ] || statusline_extension=ps1
       test -f "$package/statusline/statusline.$statusline_extension"
