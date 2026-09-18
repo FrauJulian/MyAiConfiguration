@@ -271,7 +271,7 @@ Omitting `-Client`/`--client` opens the same selection prompt as install and upd
 if none of the selected destinations are installed (`Not installed, nothing to uninstall.`), unless previewing with
 `-DryRun`/`--dry-run`, which always works and never changes anything.
 
-Because this removes configuration rather than adding it, a real run asks for confirmation (type `yes`) before
+Because this removes configuration rather than adding it, a real run asks for confirmation (`Continue? [y/N]`) before
 touching anything, unless `-Force`/`--force` is passed; running without a terminal attached and without `-Force`/`--force`
 fails instead of hanging. Removal reuses the same manifest-sync logic as install and update: every managed file is
 backed up under `backups/<timestamp>/` before removal, and a file changed locally since the last install/update is
