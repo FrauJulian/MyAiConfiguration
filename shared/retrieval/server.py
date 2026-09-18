@@ -201,6 +201,18 @@ def shared_reranker():
         return _shared_reranker
 
 
+def preload_models(model_cache: Path):
+    model_cache.mkdir(parents=True, exist_ok=True)
+    os.environ["HF_HOME"] = str(model_cache.resolve())
+    query = "Verify semantic retrieval models."
+    embeddings = shared_encoder().encode([query], prompt_name="query")
+    if len(embeddings) != 1 or len(embeddings[0]) != EMBEDDING_DIMENSIONS:
+        raise ValueError("Embedding model returned unexpected dimensions.")
+    scores = shared_reranker().predict([(query, query)], show_progress_bar=False)
+    if len(scores) != 1:
+        raise ValueError("Reranking model returned unexpected scores.")
+
+
 def reciprocal_rank_fusion(*rankings):
     scores = {}
     for ranking in rankings:
@@ -489,15 +501,20 @@ def run_direct(action: str, root: Path, data_dir: Path, model_cache: Path, query
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("search", "rebuild", "daemon"))
+    parser.add_argument("action", choices=("search", "rebuild", "daemon", "preload"))
     parser.add_argument("--query")
     parser.add_argument("--top-k", type=int, default=FINAL_RESULTS)
     parser.add_argument("--root", default=os.getcwd(), type=Path)
-    parser.add_argument("--data-dir", required=True, type=Path)
+    parser.add_argument("--data-dir", type=Path)
     parser.add_argument("--model-cache", required=True, type=Path)
     args = parser.parse_args()
-    data_dir = args.data_dir.resolve()
     model_cache = args.model_cache.resolve()
+    if args.action == "preload":
+        preload_models(model_cache)
+        return
+    if args.data_dir is None:
+        parser.error(f"{args.action} requires --data-dir")
+    data_dir = args.data_dir.resolve()
     if args.action == "daemon":
         data_dir.mkdir(parents=True, exist_ok=True)
         run_daemon(data_dir, model_cache)

@@ -82,6 +82,25 @@ class RetrievalServerTests(unittest.TestCase):
         with patch.dict('sys.modules', torch=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))):
             self.assertEqual(MODULE.preferred_device(), 'cpu')
 
+    def test_preload_models_warms_embedding_and_reranking_from_model_cache(self):
+        with TemporaryDirectory() as temporary:
+            cache = Path(temporary) / 'model-cache'
+            calls = []
+            encoder = SimpleNamespace(encode=lambda values, **kwargs: calls.append(('encode', values, kwargs)) or [embedding()])
+            reranker = SimpleNamespace(predict=lambda pairs, **kwargs: calls.append(('predict', pairs, kwargs)) or [0.0])
+
+            with patch.object(MODULE, 'shared_encoder', return_value=encoder), \
+                 patch.object(MODULE, 'shared_reranker', return_value=reranker), \
+                 patch.dict(os.environ, {'HF_HOME': 'other-cache'}):
+                getattr(MODULE, 'preload_models', lambda _: None)(cache)
+                self.assertEqual(str(cache.resolve()), os.environ['HF_HOME'])
+
+            self.assertTrue(cache.is_dir())
+            self.assertEqual([
+                ('encode', ['Verify semantic retrieval models.'], {'prompt_name': 'query'}),
+                ('predict', [('Verify semantic retrieval models.', 'Verify semantic retrieval models.')], {'show_progress_bar': False}),
+            ], calls)
+
     @unittest.skipUnless(os.environ.get('QWEN_TEST_MODEL_CACHE'), 'Set QWEN_TEST_MODEL_CACHE to run the real-model check.')
     def test_real_models(self):
         if not huggingface_available():

@@ -10,6 +10,7 @@ import sys
 
 FILES = ('server.py', 'benchmark.py', 'requirements.txt')
 CUDA_INDEX = 'https://download.pytorch.org/whl/cu126'
+MODEL_PRELOAD_TIMEOUT = 900
 
 
 def digest(path):
@@ -39,6 +40,11 @@ def ensure_runtime(target, dry_run):
     else:
         subprocess.run(arguments, check=True, timeout=900)
     return python
+
+
+def ensure_models(python, target):
+    subprocess.run([str(python), str(target / 'server.py'), 'preload', '--model-cache', str(target / 'model-cache')],
+                   check=True, timeout=MODEL_PRELOAD_TIMEOUT)
 
 
 def load_state(path):
@@ -96,7 +102,9 @@ def sync(root, home, clients, enabled, dry_run, update, summary=False):
     for name in FILES:
         shutil.copy2(source / name, target / name)
         state['files'][name] = digest(target / name)
+    save_state(state_path, state, False)
     python = ensure_runtime(target, False)
+    ensure_models(python, target)
     state['clients'] = list(dict.fromkeys(state['clients']))
     save_state(state_path, state, False)
     for client in clients:

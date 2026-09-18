@@ -48,6 +48,19 @@ class SemanticRetrievalTests(unittest.TestCase):
             self.assertEqual(run.call_count, 2)
             self.assertNotIn('--extra-index-url', run.call_args.args[0])
 
+    def test_sync_preloads_models_after_installing_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / 'home'
+            target = home / '.my-ai-configuration/semantic-retrieval'
+            python = MODULE.python_path(target / '.venv')
+            with patch.object(MODULE, 'ensure_runtime', return_value=python), \
+                 patch.object(MODULE.subprocess, 'run') as run:
+                MODULE.sync(ROOT, home, ['codex'], True, False, False)
+
+            self.assertEqual([[
+                str(python), str(target / 'server.py'), 'preload', '--model-cache', str(target / 'model-cache')
+            ]], [call.args[0] for call in run.call_args_list])
+
     def test_summary_dry_run_omits_details_without_writes(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / 'home'
