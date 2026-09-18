@@ -57,7 +57,10 @@ function Get-InstalledPlugins {
         if ($Client -eq 'Claude') { return @($items) }
         return @($items.installed)
     } finally {
-        foreach ($name in $previousEnvironment.Keys) { [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process') }
+        foreach ($name in $previousEnvironment.Keys) {
+            if ($null -eq $previousEnvironment[$name]) { Remove-Item -LiteralPath ("Env:" + $name) -ErrorAction SilentlyContinue }
+            else { [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process') }
+        }
     }
 }
 
