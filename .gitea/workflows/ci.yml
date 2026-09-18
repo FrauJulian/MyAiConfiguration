@@ -172,6 +172,7 @@ jobs:
       - name: Run retrieval tests with real models
         env:
           QWEN_TEST_MODEL_CACHE: ${{ github.workspace }}/.cache/huggingface
+          HF_HUB_DISABLE_XET: '1'
         run: python scripts/tests/test-retrieval-server.py
 
   security:

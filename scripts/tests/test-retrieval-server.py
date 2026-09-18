@@ -27,6 +27,11 @@ def embedding():
 
 
 class RetrievalServerTests(unittest.TestCase):
+    def test_ci_disables_xet_for_model_downloads(self):
+        for workflow in ('.github/workflows/ci.yml', '.gitea/workflows/ci.yml'):
+            content = (ROOT / workflow).read_text(encoding='utf-8')
+            self.assertIn("HF_HUB_DISABLE_XET: '1'", content)
+
     def test_runtime_python_uses_adjacent_virtualenv(self):
         with TemporaryDirectory() as temporary:
             script = Path(temporary) / 'semantic-retrieval' / 'server.py'
