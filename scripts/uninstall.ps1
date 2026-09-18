@@ -26,9 +26,10 @@ if (-not $DryRun -and -not $Force) {
     }
     Write-Host "This removes the managed configuration, extensions, and semantic retrieval setup for $Client under $homePath."
     Write-Host 'Backups already on disk are kept; anything this setup never installed is left untouched.'
-    $confirm = [Console]::ReadLine()
-    if ($null -eq $confirm -or $confirm.Trim().ToLowerInvariant() -ne 'yes') {
-        Write-Output "Type 'yes' to continue: cancelled, nothing was removed."
+    $confirm = Read-Host -Prompt 'Continue? [y/N]'
+    if ($null -eq $confirm) { $confirm = '' }
+    if ($confirm.Trim().ToLowerInvariant() -notin @('y', 'yes')) {
+        Write-Output 'Cancelled, nothing was removed.'
         exit 1
     }
 }
