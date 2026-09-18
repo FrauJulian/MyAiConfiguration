@@ -75,7 +75,8 @@ for shell in powershell bash; do
     doc_file=AGENTS.md
     [ "$client" != claude ] || doc_file=CLAUDE.md
     doc_content=$(cat "$package/$doc_file")
-    printf '%s' "$doc_content" | grep -Fq 'Use MCP services only through the `mcporter` CLI.'
+    printf '%s' "$doc_content" | grep -Fq 'When MCPorter is active (installed and configured), use MCP services only through the `mcporter` CLI.'
+    printf '%s' "$doc_content" | grep -Fq 'If MCPorter is not active, use the direct native MCP service available to you.'
     occurrences=$(printf '%s' "$doc_content" | grep -o 'Apply instructions in this order' | wc -l)
     [ "$occurrences" -eq 1 ] || { printf '%s-%s must embed the priority rule exactly once\n' "$client" "$shell" >&2; exit 1; }
     if [ "$client" = codex ] && printf '%s' "$doc_content" | grep -q 'Always load and apply `rules/general\.md`'; then
