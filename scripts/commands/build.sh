@@ -153,8 +153,8 @@ ${claude_rule_loading_list%$'\n'}"
 
 shared_template=$(<"$shared/global-instructions.md")
 general_content=$(<"$shared/rules/general.md")
-credential_helper_extension=sh
-[ "$shell" != powershell ] || credential_helper_extension=ps1
+credential_helper_extension='sh'
+[ "$shell" != powershell ] || credential_helper_extension='ps1'
 
 agents_content=${shared_template//__RULE_LOADING__/$codex_rule_loading}
 agents_content=${agents_content//__CLIENT__/codex}
