@@ -14,7 +14,7 @@ Codex receives Caveman through its native plugin adapter. Humanizer, Impeccable,
 
 On Windows, installation and update repair the known Caveman 1.0.0 hook launcher in setup-owned Codex installations so it resolves the plugin path under PowerShell as well as Command Prompt. Custom commands and foreign installations are preserved. Review the changed hook definitions in Codex `/hooks`; setup does not grant hook trust automatically.
 
-[QMD](https://github.com/tobi/qmd) requires Node.js 22 or newer and `npm`. Selecting it installs `@tobilu/qmd` globally. Claude receives QMD's official `qmd@qmd` plugin; Codex registers `qmd mcp` as its MCP server. Deselecting QMD removes the client integration owned by this setup, but leaves the global `qmd` executable installed.
+[QMD](https://github.com/tobi/qmd) requires Node.js 22 or newer and `npm`. Selecting it installs `@tobilu/qmd` globally. Claude receives QMD's official `qmd@qmd` plugin; Codex can use the `qmd` CLI. Deselecting QMD removes setup-owned integrations and uninstalls the global package when the Codex-owned QMD record is removed.
 
 Normal installation and update also ask whether to update the selected client CLIs, enable Flashbang, and enable the optional Qwen3-Embedding-0.6B semantic retrieval layer. Retrieval uses a per-user virtual environment and index and is invoked through the installed `server.py search` CLI, disabled by default. Quickupdate reuses the saved shell, client, CLI update, Flashbang, retrieval, and extension choices without opening menus. Disabling retrieval removes its setup-owned runtime and index. Only successful runs save selections; dry runs do not update CLIs, extensions, or retrieval.
 
