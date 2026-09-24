@@ -4,19 +4,25 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory).Count
 $sourceSkillCount = @(Get-ChildItem (Join-Path $root 'shared/skills') -Filter 'SKILL.md' -Recurse).Count
-$ruleSkillCount = @(Import-Csv -LiteralPath (Join-Path $root 'adapters/rule-skills.tsv') -Delimiter ([char]9)).Count
+$rulesRoot = Join-Path $root 'shared/rules'
+$ruleSources = @()
+foreach ($ruleFile in Get-ChildItem $rulesRoot -File -Filter '*.md' | Where-Object Name -ne 'general.md') {
+    $ruleSources += [pscustomobject]@{ Path = $ruleFile.Name; Skill = "rules-$($ruleFile.BaseName)" }
+}
+foreach ($ruleDirectory in Get-ChildItem $rulesRoot -Directory) {
+    if (Test-Path (Join-Path $ruleDirectory.FullName 'index.md')) { $ruleSources += [pscustomobject]@{ Path = "$($ruleDirectory.Name)/index.md"; Skill = "rules-$($ruleDirectory.Name)" } }
+}
+$ruleSkillCount = $ruleSources.Count
+$globalInstructions = Get-Content (Join-Path $root 'shared/global-instructions.md') -Raw
+foreach ($ruleSource in $ruleSources) {
+    $ruleInstruction = [char]96 + "rules/$($ruleSource.Path)" + [char]96 + ' / ' + [char]96 + $ruleSource.Skill + [char]96
+    if (-not $globalInstructions.Contains($ruleInstruction)) { throw "Global instructions are missing rule loading entry: $($ruleSource.Path)" }
+}
 foreach ($shell in @('powershell','bash')) {
     foreach ($client in @('codex','claude')) {
         $package = Join-Path $root "generated/$client-$shell"
         $file = if ($client -eq 'codex') { 'config.toml' } else { 'settings.json' }
         $content = Get-Content -LiteralPath (Join-Path $package $file) -Raw
-        if ($client -eq 'codex') {
-            foreach ($entry in @(Import-Csv (Join-Path $root 'adapters/rule-skills.tsv') -Delimiter ([char]9))) {
-                $rulePath = $entry.rule_file
-                if (Test-Path (Join-Path $root "shared/rules/$($entry.rule_file)") -PathType Container) { $rulePath = "$($entry.rule_file)/index.md" }
-                if ((Get-Content (Join-Path $package 'AGENTS.md') -Raw) -notmatch [regex]::Escape("- rules/$rulePath for $($entry.trigger).")) { throw "Codex rule loading is missing $($entry.rule_file) in $package" }
-            }
-        }
         if ($client -eq 'claude') { $settings = $content | ConvertFrom-Json }
         if (@(Get-ChildItem "$package/agents" -File).Count -ne $sourceAgentCount) { throw "Missing agents in $package" }
         $expectedReviewerShellTool = if ($shell -eq 'powershell') { 'PowerShell' } else { 'Bash' }
@@ -45,6 +51,13 @@ foreach ($shell in @('powershell','bash')) {
         }
         $docFile = if ($client -eq 'codex') { 'AGENTS.md' } else { 'CLAUDE.md' }
         $docContent = Get-Content -LiteralPath (Join-Path $package $docFile) -Raw
+        if ($docContent -notmatch [regex]::Escape('rules/security.md')) { throw "$package is missing common rule loading instructions." }
+        if ($client -eq 'claude') {
+            foreach ($ruleSource in $ruleSources) {
+                $skillPath = Join-Path $package "skills/rules/$($ruleSource.Skill)/SKILL.md"
+                if (-not (Test-Path -LiteralPath $skillPath)) { throw "$package is missing generated skill $($ruleSource.Skill)." }
+            }
+        }
         if ($docContent -notmatch [regex]::Escape('Use the `mcporter` CLI for MCP services by default.')) { throw "$package must set the MCPorter default" }
         if ($docContent -notmatch [regex]::Escape('Use a native MCP connection when MCPorter is not active, or when the user explicitly requests it or selects a native MCP plugin in this configuration.')) { throw "$package must allow the selected native MCP route" }
         if (([regex]::Matches($docContent, [regex]::Escape('Apply instructions in this order'))).Count -ne 1) { throw "$client-$shell must embed the priority rule exactly once" }

@@ -2,7 +2,7 @@
 
 Codex receives a generated global `AGENTS.md`, agent TOML files, skills, rule files, and a `config.toml` adapter. It keeps workspace sandboxing, automatic approval review, `agents.enabled = true`, `agents.max_concurrent_threads_per_session = 5`, and `agents.max_depth = 1`. Claude Code receives a generated global `CLAUDE.md`, agent Markdown files, skills, and `settings.json` with `auto` permissions, explicit `Agent` permission, and five-operation concurrency. Installation resolves user paths at runtime; the repository contains no machine-specific paths.
 
-Both clients embed `shared/rules/general.md` in their global instructions. Codex loads applicable focused rules from `rules/`; Claude generates them as skills from the shared `adapters/rule-skills.tsv` manifest. Angular, WPF, and UI/UX rules have small entry points with references loaded by topic. `security.md` is the baseline for programming tasks; focused security rules cover authentication, web, API, data, files, network, cryptography, and supply-chain work.
+Both clients embed `shared/rules/general.md` and the rule-loading conditions from `shared/global-instructions.md`. Codex loads applicable focused rules from `rules/`; Claude generates a matching skill for each focused rule file or rule directory. Angular, WPF, and UI/UX rules have small entry points with references loaded by topic. `security.md` is the baseline for programming tasks; focused security rules cover authentication, web, API, data, files, network, cryptography, and supply-chain work.
 
 The Codex adapter sets `agents.max_depth = 1` and does not enable `features.multi_agent_v2`. Shared instructions also prohibit subagents from creating further subagents. Agent roles are optional, not stages that every task must run.
 

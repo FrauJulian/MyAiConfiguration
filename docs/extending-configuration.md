@@ -4,7 +4,7 @@ Shared definitions are the source of truth. Rebuild after every semantic change.
 
 ## Add a rule
 
-Create a focused Markdown file in `shared/rules/`. For a rule that applies only to a language, framework, tool, or change area, add one row to `adapters/rule-skills.tsv`. The build uses that manifest to generate both Claude's rule skill and Codex's rule-loading condition. Put always-applicable guidance in `general.md`, which the build embeds for both clients; a new rule file is not automatically embedded.
+Create a focused Markdown file in `shared/rules/` and add its loading condition to `shared/global-instructions.md`. Claude rule skills are generated from the rule filenames; Codex loads the referenced rule files directly. Put always-applicable guidance in `general.md`, which the build embeds for both clients; a new rule file is not automatically embedded.
 
 ## Add a skill
 

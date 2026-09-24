@@ -12,12 +12,11 @@ function Tokens([int64]$bytes) { return [int][Math]::Ceiling($bytes / 4.0) }
 $claude = (Get-Item (Join-Path $generated 'claude-bash/CLAUDE.md')).Length
 $codex = (Get-Item (Join-Path $generated 'codex-bash/AGENTS.md')).Length
 $skills = Measure-Tree (Join-Path $generated 'claude-bash/skills')
-$triggers = (Get-Item (Join-Path $root 'adapters/rule-skills.tsv')).Length
 $lazyItem = Get-ChildItem (Join-Path $root 'shared/rules') -File -Recurse | Sort-Object Length -Descending | Select-Object -First 1
 $lazy = if ($lazyItem) { [int64]$lazyItem.Length } else { 0 }
 $baseline = Join-Path $root 'adapters/prompt-budget-baseline.json'
 $old = if (Test-Path $baseline) { Get-Content $baseline -Raw | ConvertFrom-Json } else { $null }
-$rows = @([pscustomobject]@{Name='Claude permanent context';Bytes=$claude;Tokens=(Tokens $claude)},[pscustomobject]@{Name='Codex permanent context';Bytes=$codex;Tokens=(Tokens $codex)},[pscustomobject]@{Name='Claude skill files (lazy)';Bytes=$skills;Tokens=(Tokens $skills)},[pscustomobject]@{Name='Rule trigger metadata';Bytes=$triggers;Tokens=(Tokens $triggers)},[pscustomobject]@{Name='Largest lazy rule';Bytes=$lazy;Tokens=(Tokens $lazy)})
+$rows = @([pscustomobject]@{Name='Claude permanent context';Bytes=$claude;Tokens=(Tokens $claude)},[pscustomobject]@{Name='Codex permanent context';Bytes=$codex;Tokens=(Tokens $codex)},[pscustomobject]@{Name='Claude skill files (lazy)';Bytes=$skills;Tokens=(Tokens $skills)},[pscustomobject]@{Name='Largest lazy rule';Bytes=$lazy;Tokens=(Tokens $lazy)})
 $fail = $false
 $baselineValues = @{}
 if ($old) {

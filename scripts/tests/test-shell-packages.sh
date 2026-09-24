@@ -10,22 +10,23 @@ done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
-rule_skill_count=$(($(wc -l < "$root/adapters/rule-skills.tsv") - 1))
+mapfile -t rule_paths < <(find "$root/shared/rules" -mindepth 1 -maxdepth 2 -type f -name '*.md' ! -path '*/references/*' ! -name general.md -printf '%P\n' | sort)
+rule_skill_count=${#rule_paths[@]}
+global_instructions=$(<"$root/shared/global-instructions.md")
+for rule_path in "${rule_paths[@]}"; do
+  case "$rule_path" in
+    */index.md) skill_name="rules-${rule_path%/index.md}" ;;
+    *.md) skill_name="rules-${rule_path%.md}" ;;
+  esac
+  expected_rule="\`rules/$rule_path\` / \`$skill_name\`"
+  printf '%s' "$global_instructions" | grep -Fq -- "$expected_rule"
+done
 for shell in powershell bash; do
   for client in codex claude; do
     package="$root/generated/$client-$shell"
     file=config.toml
     [ "$client" != claude ] || file=settings.json
     test -f "$package/$file"
-    if [ "$client" = codex ]; then
-      while IFS=$'\t' read -r rule_file _ trigger; do
-        [ "$rule_file" = rule_file ] && continue
-        [ -n "$rule_file" ] || continue
-        rule_path=$rule_file
-        [ -d "$root/shared/rules/$rule_file" ] && rule_path="$rule_file/index.md"
-        grep -Fq -- "- rules/$rule_path for $trigger." "$package/AGENTS.md"
-      done < "$root/adapters/rule-skills.tsv"
-    fi
     test "$(find "$package/agents" -type f | wc -l)" -eq "$source_agent_count"
     expected_reviewer_shell_tool=Bash
     [ "$shell" != powershell ] || expected_reviewer_shell_tool=PowerShell
@@ -61,6 +62,16 @@ for shell in powershell bash; do
     doc_file=AGENTS.md
     [ "$client" != claude ] || doc_file=CLAUDE.md
     doc_content=$(cat "$package/$doc_file")
+    printf '%s' "$doc_content" | grep -Fq 'rules/security.md'
+    if [ "$client" = claude ]; then
+      for rule_path in "${rule_paths[@]}"; do
+        case "$rule_path" in
+          */index.md) skill_name="rules-${rule_path%/index.md}" ;;
+          *.md) skill_name="rules-${rule_path%.md}" ;;
+        esac
+        test -f "$package/skills/rules/$skill_name/SKILL.md"
+      done
+    fi
     printf '%s' "$doc_content" | grep -Fq 'Use the `mcporter` CLI for MCP services by default.'
     printf '%s' "$doc_content" | grep -Fq 'Use a native MCP connection when MCPorter is not active, or when the user explicitly requests it or selects a native MCP plugin in this configuration.'
     occurrences=$(printf '%s' "$doc_content" | grep -o 'Apply instructions in this order' | wc -l)

@@ -14,10 +14,10 @@ The current structure is organized by purpose:
 
 The files intentionally define only a small baseline. Detailed personal workflows and standards can be added later without changing the structure.
 
-Claude's generated package additionally has `skills/rules/`: one skill per technology- or situation-specific rule in
-`shared/rules/` (driven by the shared `adapters/rule-skills.tsv` manifest), so the full rule text loads only when Claude invokes the
-matching skill instead of sitting permanently in context. This category does not exist for Codex, which keeps loading
-applicable focused rules as plain files instead. Both clients embed the general rules in their global instructions.
+Claude's generated package additionally has `skills/rules/`: one skill per focused rule file or directory in
+`shared/rules/`. The rule-to-skill loading conditions live in `shared/global-instructions.md`, so full rule text loads
+only when Claude invokes a matching skill instead of sitting permanently in context. Codex reads the matching rule
+files directly. Both clients embed the general rules in their global instructions.
 Split Angular, WPF, and UI/UX rules load supporting references only for the topic being worked on. See [Configuration](configuration.md).
 
 Skills guide a task when needed; their availability does not require a full review, build, or test suite after every

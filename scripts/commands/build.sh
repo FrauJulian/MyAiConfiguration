@@ -12,50 +12,9 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 shared="$root/shared"
 output="$root/generated"
 plugin_manifest="$root/adapters/plugins.tsv"
-rule_skill_manifest="$root/adapters/rule-skills.tsv"
 capability_manifest="$root/adapters/claude/capabilities.tsv"
 
-[ -f "$plugin_manifest" ] || { printf 'Missing plugin manifest: %s\n' "$plugin_manifest" >&2; exit 1; }
-declare -A plugin_seen
-plugin_count=0
-while IFS=$'\t' read -r name _ claude_plugin _ codex_plugin; do
-  [ "$name" != name ] || continue
-  [ -n "$name" ] || continue
-  plugin_count=$((plugin_count + 1))
-  [ -n "$claude_plugin" ] || { printf 'Missing claude_plugin for plugin %s.\n' "$name" >&2; exit 1; }
-  [ -n "$codex_plugin" ] || { printf 'Missing codex_plugin for plugin %s.\n' "$name" >&2; exit 1; }
-  [ -z "${plugin_seen[$name]+x}" ] || { printf 'Duplicate plugin name in manifest: %s\n' "$name" >&2; exit 1; }
-  plugin_seen[$name]=1
-done < "$plugin_manifest"
-[ "$plugin_count" -gt 0 ] || { printf 'Plugin manifest must define at least one plugin.\n' >&2; exit 1; }
-
-[ -f "$rule_skill_manifest" ] || { printf 'Missing rule-skill manifest: %s\n' "$rule_skill_manifest" >&2; exit 1; }
 [ -f "$capability_manifest" ] || { printf 'Missing capability manifest: %s\n' "$capability_manifest" >&2; exit 1; }
-declare -A rule_skill_seen
-rule_skill_files=()
-rule_skill_names=()
-rule_skill_triggers=()
-while IFS=$'\t' read -r rule_file skill_name trigger; do
-  trigger=${trigger%$'\r'}
-  [ "$rule_file" != rule_file ] || continue
-  [ -n "$rule_file" ] || continue
-  [ -n "$skill_name" ] || { printf 'Missing skill_name in rule-skill manifest row for %s.\n' "$rule_file" >&2; exit 1; }
-  [ -n "$trigger" ] || { printf 'Missing trigger in rule-skill manifest row for %s.\n' "$rule_file" >&2; exit 1; }
-  [ -f "$shared/rules/$rule_file" ] || [ -d "$shared/rules/$rule_file" ] || { printf 'Rule-skill manifest references a missing rule file: %s\n' "$rule_file" >&2; exit 1; }
-  [ -z "${rule_skill_seen[$skill_name]+x}" ] || { printf 'Duplicate rule-skill name in manifest: %s\n' "$skill_name" >&2; exit 1; }
-  rule_skill_seen[$skill_name]=1
-  rule_skill_files+=("$rule_file")
-  rule_skill_names+=("$skill_name")
-  rule_skill_triggers+=("$trigger")
-done < <(tail -n +2 "$rule_skill_manifest" | sort -t$'\t' -k2,2)
-[ "${#rule_skill_names[@]}" -gt 0 ] || { printf 'Rule-skill manifest must define at least one entry.\n' >&2; exit 1; }
-codex_rule_loading_list=""
-for i in "${!rule_skill_names[@]}"; do
-  rule_file=${rule_skill_files[$i]}
-  rule_path="$rule_file"
-  [ -d "$shared/rules/$rule_file" ] && rule_path="$rule_file/index.md"
-  codex_rule_loading_list="${codex_rule_loading_list}- rules/${rule_path} for ${rule_skill_triggers[$i]}."$'\n'
-done
 declare -A agent_tools
 while IFS=$'\t' read -r role tools; do
   [ "$role" != role ] || continue
@@ -101,20 +60,6 @@ for agent_dir in "${agent_dirs[@]}"; do
   agent_seen[$name]=1
 done
 
-# Codex: general.md is embedded directly into AGENTS.md, the same way Claude embeds
-# it into CLAUDE.md, instead of only being referenced by path — guaranteed present
-# either way, and safe even if a subagent's AGENTS.md inheritance is not guaranteed.
-read -r -d '' codex_rule_loading <<'BLOCK' || true
-General rules are embedded below.
-
-When programming, always load and apply `rules/security.md`. This includes implementing, modifying, debugging, reviewing, testing, and configuring software, scripts, hooks, infrastructure, and integrations.
-
-Detect the languages, frameworks, tools, and change areas from the repository and the requested work. Load every applicable rule file before editing. Load all matching files when multiple technologies apply.
-
-Load rule files when their subject applies:
-BLOCK
-codex_rule_loading="${codex_rule_loading}"$'\n\n'"${codex_rule_loading_list%$'\n'}"
-
 for shell in powershell bash; do
 mkdir -p "$output/codex-$shell" "$output/claude-$shell"
 copy_directory "$shared/skills" "$output/codex-$shell/skills"
@@ -124,45 +69,31 @@ copy_directory "$shared/hooks" "$output/codex-$shell/hooks"
 copy_directory "$shared/hooks" "$output/claude-$shell/hooks"
 copy_directory "$shared/statusline" "$output/claude-$shell/statusline"
 
-mkdir -p "$output/claude-$shell/rules"
-
-claude_rule_loading_list=""
-for i in "${!rule_skill_names[@]}"; do
-  rule_file=${rule_skill_files[$i]}
-  skill_name=${rule_skill_names[$i]}
-  trigger=${rule_skill_triggers[$i]}
-  rule_source="$shared/rules/$rule_file"
-  rule_body="$rule_source"
-  [ -d "$rule_source" ] && rule_body="$rule_source/index.md"
+while IFS= read -r rule_path; do
+  case "$rule_path" in
+    general.md) continue ;;
+    */index.md) skill_name="rules-${rule_path%/index.md}"; rule_body="$shared/rules/$rule_path"; references_dir="${rule_body%/index.md}/references" ;;
+    *.md) skill_name="rules-${rule_path%.md}"; rule_body="$shared/rules/$rule_path"; references_dir='' ;;
+    *) continue ;;
+  esac
   skill_dir="$output/claude-$shell/skills/rules/$skill_name"
   mkdir -p "$skill_dir"
-  { printf -- '---\nname: %s\ndescription: %s\n---\n\n' "$skill_name" "$(quote_toml "Use for $trigger.")"; cat "$rule_body"; } > "$skill_dir/SKILL.md"
-  if [ -d "$rule_source/references" ]; then
-    copy_directory "$rule_source/references" "$skill_dir/references"
+  { printf -- '---\nname: %s\ndescription: %s\n---\n\n' "$skill_name" "$(quote_toml 'Use when its matching rule condition in global instructions applies.')"; cat "$rule_body"; } > "$skill_dir/SKILL.md"
+  if [ -n "$references_dir" ] && [ -d "$references_dir" ]; then
+    copy_directory "$references_dir" "$skill_dir/references"
   fi
-  claude_rule_loading_list="${claude_rule_loading_list}- ${skill_name} for ${trigger}.
-"
-done
-claude_rule_loading="General rules are embedded below.
-
-Detect the languages, frameworks, tools, and change areas from the repository and the requested work. Invoke every matching rule skill before editing. Invoke all matching rule skills when multiple technologies apply.
-
-Invoke rule skills when their subject applies:
-
-${claude_rule_loading_list%$'\n'}"
+done < <(find "$shared/rules" -mindepth 1 -maxdepth 2 -type f -name '*.md' -printf '%P\n' | sort)
 
 shared_template=$(<"$shared/global-instructions.md")
 general_content=$(<"$shared/rules/general.md")
 credential_helper_extension='sh'
 [ "$shell" != powershell ] || credential_helper_extension='ps1'
 
-agents_content=${shared_template//__RULE_LOADING__/$codex_rule_loading}
-agents_content=${agents_content//__CLIENT__/codex}
+agents_content=${shared_template//__CLIENT__/codex}
 agents_content=${agents_content//__SHELL__/$credential_helper_extension}
 printf '%s\n\n---\n\n%s\n' "${agents_content%$'\n'}" "$general_content" > "$output/codex-$shell/AGENTS.md"
 
-claude_content=${shared_template//__RULE_LOADING__/$claude_rule_loading}
-claude_content=${claude_content//__CLIENT__/claude}
+claude_content=${shared_template//__CLIENT__/claude}
 claude_content=${claude_content//__SHELL__/$credential_helper_extension}
 printf '%s\n\n---\n\n%s\n' "${claude_content%$'\n'}" "$general_content" > "$output/claude-$shell/CLAUDE.md"
 

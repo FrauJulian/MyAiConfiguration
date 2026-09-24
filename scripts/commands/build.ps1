@@ -5,7 +5,6 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $shared = Join-Path $root 'shared'
 $output = Join-Path $root 'generated'
 $pluginManifest = Join-Path $root 'adapters/plugins.tsv'
-$ruleSkillManifest = Join-Path $root 'adapters/rule-skills.tsv'
 $capabilityManifest = Join-Path $root 'adapters/claude/capabilities.tsv'
 
 if (-not (Test-Path -LiteralPath $pluginManifest)) { throw "Missing plugin manifest: $pluginManifest" }
@@ -20,31 +19,12 @@ foreach ($pluginEntry in $pluginEntries) {
     $pluginNames += $pluginEntry.name
 }
 
-if (-not (Test-Path -LiteralPath $ruleSkillManifest)) { throw "Missing rule-skill manifest: $ruleSkillManifest" }
 if (-not (Test-Path -LiteralPath $capabilityManifest)) { throw "Missing capability manifest: $capabilityManifest" }
-$ruleSkillEntries = @(Import-Csv -LiteralPath $ruleSkillManifest -Delimiter ([char]9) | Sort-Object skill_name)
-if ($ruleSkillEntries.Count -eq 0) { throw 'Rule-skill manifest must define at least one entry.' }
-$ruleSkillNames = @()
-foreach ($entry in $ruleSkillEntries) {
-    foreach ($field in @('rule_file','skill_name','trigger')) {
-        if ([string]::IsNullOrWhiteSpace($entry.$field)) { throw "Missing $field in rule-skill manifest row for $($entry.rule_file)." }
-    }
-    if (-not (Test-Path -LiteralPath (Join-Path $shared "rules/$($entry.rule_file)"))) { throw "Rule-skill manifest references a missing rule file: $($entry.rule_file)" }
-    if ($ruleSkillNames -contains $entry.skill_name) { throw "Duplicate rule-skill name in manifest: $($entry.skill_name)" }
-    $ruleSkillNames += $entry.skill_name
-}
 $agentTools = @{}
 foreach ($entry in @(Import-Csv -LiteralPath $capabilityManifest -Delimiter ([char]9))) {
     if ([string]::IsNullOrWhiteSpace($entry.role) -or [string]::IsNullOrWhiteSpace($entry.tools)) { throw 'Invalid capability manifest row.' }
     $agentTools[$entry.role] = $entry.tools
 }
-$codexRuleLoadingLines = @()
-foreach ($entry in $ruleSkillEntries) {
-    $rulePath = $entry.rule_file
-    if (Test-Path -LiteralPath (Join-Path $shared "rules/$($entry.rule_file)") -PathType Container) { $rulePath = "$($entry.rule_file)/index.md" }
-    $codexRuleLoadingLines += "- rules/$rulePath for $($entry.trigger)."
-}
-$codexRuleLoadingList = $codexRuleLoadingLines -join "`r`n"
 
 Remove-Item $output -Recurse -Force -ErrorAction SilentlyContinue
 New-Item $output -ItemType Directory -Force | Out-Null
@@ -104,22 +84,6 @@ foreach ($agentDir in $sourceAgentDirs) {
     $agentNames += $name
 }
 
-# Codex: general.md is embedded directly into AGENTS.md, the same way Claude embeds
-# it into CLAUDE.md, instead of only being referenced by path — guaranteed present
-# either way, and safe even if a subagent's AGENTS.md inheritance is not guaranteed.
-$codexRuleLoading = @'
-General rules are embedded below.
-
-When programming, always load and apply `rules/security.md`. This includes implementing, modifying, debugging, reviewing, testing, and configuring software, scripts, hooks, infrastructure, and integrations.
-
-Detect the languages, frameworks, tools, and change areas from the repository and the requested work. Load every applicable rule file before editing. Load all matching files when multiple technologies apply.
-
-Load rule files when their subject applies:
-
-__CODEX_RULE_LOADING__
-'@
-$codexRuleLoading = $codexRuleLoading.Replace('__CODEX_RULE_LOADING__', $codexRuleLoadingList)
-
 foreach ($shell in @('powershell','bash')) {
     New-Item (Join-Path $output "codex-$shell") -ItemType Directory -Force | Out-Null
     New-Item (Join-Path $output "claude-$shell") -ItemType Directory -Force | Out-Null
@@ -130,36 +94,37 @@ foreach ($shell in @('powershell','bash')) {
     Copy-Directory (Join-Path $shared 'hooks') (Join-Path $output "claude-$shell/hooks")
     Copy-Directory (Join-Path $shared 'statusline') (Join-Path $output "claude-$shell/statusline")
 
-    $claudeRulesDir = Join-Path $output "claude-$shell/rules"
-    New-Item $claudeRulesDir -ItemType Directory -Force | Out-Null
-
-    $claudeRuleSkillLines = @()
-    foreach ($entry in $ruleSkillEntries) {
-        $ruleSourcePath = Join-Path $shared "rules/$($entry.rule_file)"
-        $isDirectory = Test-Path -LiteralPath $ruleSourcePath -PathType Container
-        $ruleBodyPath = if ($isDirectory) { Join-Path $ruleSourcePath 'index.md' } else { $ruleSourcePath }
-        $skillDir = Join-Path $output "claude-$shell/skills/rules/$($entry.skill_name)"
-        New-Item $skillDir -ItemType Directory -Force | Out-Null
-        $ruleContent = Get-Content $ruleBodyPath -Raw
-        $skillBody = "---`r`nname: $($entry.skill_name)`r`ndescription: $(Quote-Toml "Use for $($entry.trigger).")`r`n---`r`n`r`n$ruleContent"
-        Set-Content (Join-Path $skillDir 'SKILL.md') $skillBody -Encoding UTF8
-        if ($isDirectory) {
-            $referencesSource = Join-Path $ruleSourcePath 'references'
-            if (Test-Path -LiteralPath $referencesSource) { Copy-Directory $referencesSource (Join-Path $skillDir 'references') }
-        }
-        $claudeRuleSkillLines += "- $($entry.skill_name) for $($entry.trigger)."
+    $rulesRoot = Join-Path $shared 'rules'
+    $ruleSkills = @()
+    foreach ($ruleFile in Get-ChildItem $rulesRoot -File -Filter '*.md' | Where-Object Name -ne 'general.md') {
+        $ruleSkills += [pscustomobject]@{ Name = "rules-$($ruleFile.BaseName)"; Body = $ruleFile.FullName; References = $null }
     }
-    $claudeRuleLoading = "General rules are embedded below.`r`n`r`nDetect the languages, frameworks, tools, and change areas from the repository and the requested work. Invoke every matching rule skill before editing. Invoke all matching rule skills when multiple technologies apply.`r`n`r`nInvoke rule skills when their subject applies:`r`n`r`n" + ($claudeRuleSkillLines -join "`r`n")
+    foreach ($ruleDirectory in Get-ChildItem $rulesRoot -Directory) {
+        $ruleBody = Join-Path $ruleDirectory.FullName 'index.md'
+        if (Test-Path -LiteralPath $ruleBody) {
+            $ruleSkills += [pscustomobject]@{ Name = "rules-$($ruleDirectory.Name)"; Body = $ruleBody; References = (Join-Path $ruleDirectory.FullName 'references') }
+        }
+    }
+    foreach ($ruleSkill in $ruleSkills | Sort-Object Name) {
+        $skillDir = Join-Path $output "claude-$shell/skills/rules/$($ruleSkill.Name)"
+        New-Item $skillDir -ItemType Directory -Force | Out-Null
+        $ruleContent = Get-Content $ruleSkill.Body -Raw
+        $skillBody = "---`r`nname: $($ruleSkill.Name)`r`ndescription: $(Quote-Toml 'Use when its matching rule condition in global instructions applies.')`r`n---`r`n`r`n$ruleContent"
+        Set-Content (Join-Path $skillDir 'SKILL.md') $skillBody -Encoding UTF8
+        if ($ruleSkill.References -and (Test-Path -LiteralPath $ruleSkill.References)) {
+            Copy-Directory $ruleSkill.References (Join-Path $skillDir 'references')
+        }
+    }
 
     $sharedTemplate = Get-Content (Join-Path $shared 'global-instructions.md') -Raw
     $generalContent = Get-Content (Join-Path $shared 'rules/general.md') -Raw
     $credentialHelperExtension = if ($shell -eq 'powershell') { 'ps1' } else { 'sh' }
 
-    $agentsContent = $sharedTemplate.Replace('__RULE_LOADING__', $codexRuleLoading).Replace('__CLIENT__', 'codex').Replace('__SHELL__', $credentialHelperExtension)
+    $agentsContent = $sharedTemplate.Replace('__CLIENT__', 'codex').Replace('__SHELL__', $credentialHelperExtension)
     $agentsContent = $agentsContent.TrimEnd() + "`r`n`r`n---`r`n`r`n$generalContent"
     Set-Content (Join-Path $output "codex-$shell/AGENTS.md") $agentsContent -Encoding UTF8
 
-    $claudeContent = $sharedTemplate.Replace('__RULE_LOADING__', $claudeRuleLoading).Replace('__CLIENT__', 'claude').Replace('__SHELL__', $credentialHelperExtension)
+    $claudeContent = $sharedTemplate.Replace('__CLIENT__', 'claude').Replace('__SHELL__', $credentialHelperExtension)
     $claudeContent = $claudeContent.TrimEnd() + "`r`n`r`n---`r`n`r`n$generalContent"
     Set-Content (Join-Path $output "claude-$shell/CLAUDE.md") $claudeContent -Encoding UTF8
 

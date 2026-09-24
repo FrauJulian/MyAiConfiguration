@@ -6,7 +6,7 @@ $cacheDir = Join-Path $root '.ai-session'
 $cachePath = Join-Path $cacheDir 'repository-context.json'
 $safeRoot = $root.Replace('\','/')
 $head = (& git -c "safe.directory=$safeRoot" -C $root rev-parse HEAD 2>$null).Trim()
-$inputs = @('AI-Instructions.md','adapters/plugins.tsv','adapters/rule-skills.tsv','adapters/claude/capabilities.tsv','adapters/prompt-budget-baseline.json','adapters/prompt-budget-baseline.tsv','adapters/codex/config/config.toml','adapters/claude/config/settings.json')
+$inputs = @('AI-Instructions.md','shared/global-instructions.md','adapters/plugins.tsv','adapters/claude/capabilities.tsv','adapters/prompt-budget-baseline.json','adapters/prompt-budget-baseline.tsv','adapters/codex/config/config.toml','adapters/claude/config/settings.json')
 $inputs += @(Get-ChildItem $root -File -Recurse | Where-Object { $_.FullName -notmatch '\\(generated|\.git|node_modules|bin|obj|vendor|\.ai-session)\\' -and $_.Extension -in @('.sln','.csproj','.fsproj','.ts','.tsx','.json','.toml','.yaml','.yml','.cs','.fs','.py','.sh','.ps1') } | ForEach-Object { $_.FullName.Substring($root.Length + 1) } | Sort-Object)
 $keyText = $head + "`n" + (($inputs | Sort-Object -Unique | ForEach-Object { $_ + ':' + (Get-FileHash (Join-Path $root $_) -Algorithm SHA256).Hash }) -join "`n")
 $key = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($keyText)).TrimEnd('=')

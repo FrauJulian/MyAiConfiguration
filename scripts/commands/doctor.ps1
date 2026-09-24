@@ -22,8 +22,8 @@ if (Get-Command jq -ErrorAction SilentlyContinue) { Result 'PASS' 'jq available 
 
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory -ErrorAction SilentlyContinue).Count
 $sourceSkillCount = @(Get-ChildItem (Join-Path $root 'shared/skills') -Filter 'SKILL.md' -Recurse -ErrorAction SilentlyContinue).Count
-$ruleSkillManifestPath = Join-Path $root 'adapters/rule-skills.tsv'
-$ruleSkillCount = if (Test-Path -LiteralPath $ruleSkillManifestPath) { @(Import-Csv -LiteralPath $ruleSkillManifestPath -Delimiter ([char]9)).Count } else { 0 }
+$rulesRoot = Join-Path $root 'shared/rules'
+$ruleSkillCount = @((Get-ChildItem $rulesRoot -File -Filter '*.md' | Where-Object Name -ne 'general.md')).Count + @((Get-ChildItem $rulesRoot -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'index.md') })).Count
 
 foreach ($shell in @('powershell','bash')) {
     if (Test-Path (Join-Path $root "generated/codex-$shell/AGENTS.md")) { Result 'PASS' "generated output present ($shell)" } else { Result 'FAIL' "generated output missing ($shell); run build" }
