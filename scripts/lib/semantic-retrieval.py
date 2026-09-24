@@ -149,7 +149,7 @@ def benchmark(root, home, dry_run, summary=False):
     outcome = json.loads(result.stdout)
     if not isinstance(outcome, dict) or not isinstance(outcome.get('recommended'), bool):
         raise ValueError('Semantic retrieval benchmark returned an invalid result.')
-    if outcome['recommended']:
+    if outcome['recommended'] or state['clients']:
         save_state(state_path, state, False)
     else:
         shutil.rmtree(target)

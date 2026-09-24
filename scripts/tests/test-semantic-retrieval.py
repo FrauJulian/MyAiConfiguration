@@ -85,6 +85,25 @@ class SemanticRetrievalTests(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertFalse(state_path.exists())
 
+    def test_negative_benchmark_keeps_active_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / 'home'
+            target = home / '.my-ai-configuration/semantic-retrieval'
+            target.mkdir(parents=True)
+            state_path = target.parent / 'semantic-retrieval.json'
+            files = {}
+            for name in MODULE.FILES:
+                content = (ROOT / 'shared/retrieval' / name).read_bytes()
+                (target / name).write_bytes(content)
+                files[name] = hashlib.sha256(content).hexdigest()
+            MODULE.save_state(state_path, {'version': 1, 'clients': ['codex'], 'files': files}, False)
+            result = type('Result', (), {'stdout': '{"recommended": false, "embeddingSeconds": 1, "rerankingSeconds": 1}'})()
+            with patch.object(MODULE, 'ensure_runtime', return_value=Path('python')), \
+                 patch.object(MODULE.subprocess, 'run', return_value=result):
+                self.assertFalse(MODULE.benchmark(ROOT, home, False, True))
+            self.assertTrue(target.is_dir())
+            self.assertEqual(MODULE.load_state(state_path)['clients'], ['codex'])
+
 
 if __name__ == '__main__':
     unittest.main()
