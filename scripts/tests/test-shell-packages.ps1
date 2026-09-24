@@ -57,8 +57,8 @@ foreach ($shell in @('powershell','bash')) {
         }
         $docFile = if ($client -eq 'codex') { 'AGENTS.md' } else { 'CLAUDE.md' }
         $docContent = Get-Content -LiteralPath (Join-Path $package $docFile) -Raw
-        if ($docContent -notmatch [regex]::Escape('When MCPorter is active (installed and configured), use MCP services only through the `mcporter` CLI.')) { throw "$package must route active MCPorter services through its CLI" }
-        if ($docContent -notmatch [regex]::Escape('If MCPorter is not active, use the direct native MCP service available to you.')) { throw "$package must allow direct native MCP without MCPorter" }
+        if ($docContent -notmatch [regex]::Escape('Use the `mcporter` CLI for MCP services by default.')) { throw "$package must set the MCPorter default" }
+        if ($docContent -notmatch [regex]::Escape('Use a native MCP connection when MCPorter is not active, or when the user explicitly requests it or selects a native MCP plugin in this configuration.')) { throw "$package must allow the selected native MCP route" }
         if (([regex]::Matches($docContent, [regex]::Escape('Apply instructions in this order'))).Count -ne 1) { throw "$client-$shell must embed the priority rule exactly once" }
         if ($client -eq 'codex' -and $docContent -match 'Always load and apply `rules/general\.md`') { throw "$package must not still instruct loading general.md by path" }
         if ($client -eq 'claude' -and (Test-Path (Join-Path $package 'rules/general.md'))) { throw 'Claude must not automatically load a second copy of general rules.' }

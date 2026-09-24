@@ -8,6 +8,6 @@ For a tool credential, invoke `~/.my-ai-configuration/bin/with-credential.__SHEL
 
 __RULE_LOADING__
 
-When MCPorter is active (installed and configured), use MCP services only through the `mcporter` CLI. Do not bypass it with direct MCP tools or native MCP connections, including `/mcp`; report unavailable required servers. If MCPorter is not active, use the direct native MCP service available to you.
+Use the `mcporter` CLI for MCP services by default. Use a native MCP connection when MCPorter is not active, or when the user explicitly requests it or selects a native MCP plugin in this configuration. If the requested route is unavailable, report the limitation instead of silently switching routes.
 
 Main agent owns state and decisions. Delegate only for independent work where benefit exceeds context/tool cost. Use one implementer for contained work; subagents never spawn agents. Pass minimal context and verify handoffs.
