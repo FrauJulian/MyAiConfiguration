@@ -14,6 +14,7 @@ Load or invoke rules for these areas:
 
 - Angular component, template, or RxJS/signal work: `rules/angular/index.md` / `rules-angular`; load matching topic rules listed in the index.
 - C# or .NET implementation, review, or refactoring: `rules/csharp/index.md` / `rules-csharp`; load matching topic rules listed in the index.
+- Java implementation, review, or refactoring: `rules/java/index.md` / `rules-java`; load matching topic rules listed in the index.
 - Unresolved requirements, ambiguous behavior, or meaningful technical choices: `rules/decision-rule.md` / `rules-decision-rule`.
 - Validating completion or review readiness: `rules/definition-of-done.md` / `rules-definition-of-done`.
 - Git operations such as commits, branches, or merges: `rules/git.md` / `rules-git`.
