@@ -3,11 +3,22 @@ set -euo pipefail
 
 plugin_installed() {
   local client=$1 plugin=$2
-  if [ "$client" = claude ]; then
-    claude plugin list --json 2>/dev/null | grep -Fq "\"id\": \"$plugin\""
-  else
-    codex plugin list --json 2>/dev/null | grep -Fq "\"pluginId\": \"$plugin\""
-  fi
+  local inventory
+  inventory=$("$client" plugin list --json) || return 2
+  printf '%s' "$inventory" | python3 -c '
+import json, sys
+try:
+    client, plugin = sys.argv[1:]
+    data = json.load(sys.stdin)
+    if client == "codex":
+        data = data["installed"]
+    if not isinstance(data, list) or any(not isinstance(item, dict) for item in data):
+        raise ValueError("Invalid plugin inventory")
+    sys.exit(0 if any(item.get("id" if client == "claude" else "pluginId") == plugin for item in data) else 1)
+except (ValueError, KeyError, TypeError) as error:
+    print("Invalid plugin inventory: " + str(error), file=sys.stderr)
+    sys.exit(2)
+' "$client" "$plugin"
 }
 
 run_plugin_command() {
@@ -121,7 +132,12 @@ select_configured_plugins() {
       local skill_name
       skill_name=$(plugin_field "$root" "$name" codex_skill)
       if [ -d "$HOME/.agents/skills/$skill_name" ] || [ -d "$HOME/.codex/skills/$skill_name" ]; then checked+=(true); else checked+=(false); fi
-    elif plugin_installed "$reference_client" "$selector"; then checked+=(true); else checked+=(false); fi
+    elif plugin_installed "$reference_client" "$selector"; then checked+=(true)
+    else
+      local status=$?
+      [ "$status" -eq 1 ] || return "$status"
+      checked+=(false)
+    fi
   done
 
   read_plugin_toggle_selection toggle_names checked
