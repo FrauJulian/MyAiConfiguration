@@ -4,6 +4,8 @@ The user-level plugin manifest is `adapters/plugins.tsv`. It maps each logical e
 
 The current baseline includes Ponytail, i-have-adhd, Superpowers, Context7, Caveman, QMD, Humanizer, Impeccable, and Anthropic Frontend Design. Both scripts operate at user scope and show a plugin selector unless running a dry run. Selections are collected before configuration changes. Both rebuild generated packages first.
 
+Selecting Context7 with MCPorter registers the server in MCPorter. Selecting Context7 without MCPorter installs its native client plugin; that explicit selection permits the native MCP route under the global instructions.
+
 `install.ps1`/`install.sh` starts every plugin checked by default; unchecking one skips it. It refuses to run against an already-installed destination (`Already installed, use the update script.`).
 
 `update.ps1`/`update.sh` lets you revise the saved extension selection. Checking an extension installs it if missing or updates it if owned; existing foreign installations are preserved. Deselection removes only extensions that this setup installed and recorded as owned. Pre-existing or manually installed plugins and skills are retained. Extensions removed from the manifest are also removed when recorded as owned; unrelated installations are retained. Update refuses to run if any selected destination lacks an installation manifest (`Not installed, use the install script.`).
