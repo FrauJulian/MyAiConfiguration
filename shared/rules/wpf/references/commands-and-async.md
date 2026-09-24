@@ -28,6 +28,7 @@
 ## UI Thread
 
 * Treat the UI thread as a scarce resource.
+* Keep the interface responsive and do not block the UI thread with I/O or expensive CPU work. Move CPU work off-thread only when needed and marshal UI changes back explicitly.
 * Avoid expensive loops, parsing, serialization, database access or network calls on the UI thread.
 * Avoid excessive Dispatcher invocations.
 * Batch UI updates where practical.

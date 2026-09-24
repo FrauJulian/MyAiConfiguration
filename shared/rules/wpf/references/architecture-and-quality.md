@@ -1,5 +1,8 @@
 ## Architecture
 
+* Use modern C# and current WPF conventions. Prefer MVVM for non-trivial views and keep code-behind limited to view-specific behavior.
+* Keep UI, application, and domain logic separate. Avoid business logic in views and direct service access from controls.
+* Keep dependencies explicit and testable; prefer composition over inheritance and avoid unnecessary abstractions or framework wrappers.
 * Keep presentation, application, domain and infrastructure concerns separated.
 * Avoid direct database access from views or ViewModels.
 * Avoid direct HTTP access from controls.
