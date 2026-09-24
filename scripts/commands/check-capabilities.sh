@@ -16,7 +16,8 @@ check_version() {
 }
 
 check_version Bash "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}" 4.3
-require_command awk; require_command sed; require_command sha256sum; require_command jq
+require_command awk; require_command sed; require_command sha256sum
+if command -v jq >/dev/null 2>&1; then pass 'jq available for Claude Bash status line'; else printf 'WARN jq unavailable; Claude Bash status line is disabled\n' >&2; fi
 require_command python3
 if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 11))' >/dev/null 2>&1; then
   pass "Python $(python3 --version 2>&1 | awk '{print $2}') (minimum 3.11)"

@@ -27,7 +27,7 @@
 
 ## Rules, checks, and documentation
 
-- [ ] Make `jq` conditional in capability checks. Both checks fail when it is absent, although the runtime doctor only warns and the requirement is limited to Claude's Bash status line. (`scripts/commands/check-capabilities.ps1:12`, `scripts/commands/check-capabilities.sh:19`, `README.md:110`)
+- [x] Make `jq` conditional in capability checks. Both checks fail when it is absent, although the runtime doctor only warns and the requirement is limited to Claude's Bash status line. (`scripts/commands/check-capabilities.ps1:12`, `scripts/commands/check-capabilities.sh:19`, `README.md:110`)
 - [ ] Review the global MCPorter-only rule's failure behavior. It prohibits all direct MCP use and requires stopping when MCPorter is unavailable, even for a user-authorized native connection; decide whether this restriction should be scoped to managed servers. (`shared/global-instructions.md:7`)
 - [ ] Align Context7 selection with the MCPorter-only rule. If Context7 is selected without MCPorter, reconciliation installs its native client plugin even though the generated instructions forbid using native MCP connections. Either require MCPorter for this entry or change the rule and menu together. (`scripts/lib/managed-extensions.py:465`, `adapters/plugins.tsv:5`, `shared/global-instructions.md:7`)
 - [ ] Clarify the decision rule for minor reversible UI choices. Its broad instruction to ask when UI/UX behavior is open to interpretation can block routine choices that `general.md` says to make independently unless materially ambiguous. (`shared/rules/decision-rule.md:6`, `shared/rules/general.md:5`)

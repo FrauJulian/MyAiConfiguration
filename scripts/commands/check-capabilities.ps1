@@ -9,7 +9,8 @@ function Version-AtLeast([string]$version, [version]$minimum) { try { return ([v
 function Check-Version([string]$name, [string]$version, [version]$minimum) { if (Version-AtLeast $version $minimum) { Pass "$name $version (minimum $minimum)" } else { Fail "$name $version is below minimum $minimum" } }
 
 Check-Version 'PowerShell' $PSVersionTable.PSVersion.ToString() ([version]'5.1')
-Require-Command jq
+if (Get-Command jq -ErrorAction SilentlyContinue) { Pass 'jq available for Claude Bash status line' }
+else { Write-Warning 'jq unavailable; Claude Bash status line is disabled' }
 $pythonVersion = $null
 foreach ($python in @('python', 'python3')) {
     if (-not (Get-Command $python -ErrorAction SilentlyContinue)) { continue }

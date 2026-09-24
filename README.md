@@ -13,7 +13,7 @@ into shell-specific packages that can be inspected before they are installed.
 
 ## Capability check
 
-Check the selected shell's minimum version and required Python and `jq` tools before setup. The command exits with an error when a requirement is missing.
+Check the selected shell's minimum version and required Python tools before setup. Missing `jq` produces a warning because only Claude's Bash status line needs it. The command exits with an error when a requirement is missing.
 
 PowerShell:
 
