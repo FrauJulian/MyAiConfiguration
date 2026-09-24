@@ -13,7 +13,7 @@
 
 ## Menus and reconciliation
 
-- [ ] Build update-menu checks per client when `Both` is selected. Both menus inspect Claude's installed plugins for every entry, so a Codex resource can start unchecked and the combined sync can remove it. (`scripts/lib/plugins.ps1:98`, `scripts/lib/plugins.sh:108`)
+- [x] Build update-menu checks per client when `Both` is selected. Both menus inspect Claude's installed plugins for every entry, so a Codex resource can start unchecked and the combined sync can remove it. (`scripts/lib/plugins.ps1:98`, `scripts/lib/plugins.sh:108`)
 - [ ] Keep shared MCPorter servers until neither client needs them. Reconciliation processes `shared` records even when only one client is selected; uninstalling that client with an empty selection removes servers still used by the other. (`scripts/lib/managed-extensions.py:463`, `scripts/commands/uninstall.ps1:59`, `scripts/commands/uninstall.sh:77`)
 - [ ] Manage global packages once across clients. With `--client both`, MCPorter is installed and recorded twice; QMD's global package can be removed during a Codex-only deselection while Claude still uses its plugin. (`scripts/lib/managed-extensions.py:342`, `scripts/lib/managed-extensions.py:378`, `scripts/lib/managed-extensions.py:463`)
 - [x] Fix Bash `auto` semantic retrieval selection. Both `test_semantic_retrieval_device()` and its caller read `$?` after a completed `if`, losing the benchmark's exit code; an unsuitable device produces an empty choice instead of `false`. (`scripts/lib/semantic-retrieval.sh:13`, `scripts/lib/install-options.sh:52`)

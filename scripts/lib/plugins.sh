@@ -112,10 +112,11 @@ select_configured_plugins() {
     return 0
   fi
 
-  local reference_client=claude
-  [ "$client" = codex ] && reference_client=codex
+  local reference_clients=(claude)
+  [ "$client" = codex ] && reference_clients=(codex)
+  [ "$client" = both ] && reference_clients=(claude codex)
 
-  local checked=() selector
+  local checked=() selector reference_client found
   for name in "${toggle_names[@]}"; do
     if [ "$mode" = Install ]; then
       checked+=(true)
@@ -125,19 +126,22 @@ select_configured_plugins() {
       if command -v "$(plugin_field "$root" "$name" codex_source)" >/dev/null 2>&1; then checked+=(true); else checked+=(false); fi
       continue
     fi
-    if [ "$reference_client" = claude ]; then selector=$(plugin_field "$root" "$name" claude_plugin); else selector=$(plugin_field "$root" "$name" codex_plugin); fi
-    if [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" = qmd ]; then
-      if command -v qmd >/dev/null 2>&1; then checked+=(true); else checked+=(false); fi
-    elif [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" != plugin ]; then
-      local skill_name
-      skill_name=$(plugin_field "$root" "$name" codex_skill)
-      if [ -d "$HOME/.agents/skills/$skill_name" ] || [ -d "$HOME/.codex/skills/$skill_name" ]; then checked+=(true); else checked+=(false); fi
-    elif plugin_installed "$reference_client" "$selector"; then checked+=(true)
-    else
-      local status=$?
-      [ "$status" -eq 1 ] || return "$status"
-      checked+=(false)
-    fi
+    found=false
+    for reference_client in "${reference_clients[@]}"; do
+      if [ "$reference_client" = claude ]; then selector=$(plugin_field "$root" "$name" claude_plugin); else selector=$(plugin_field "$root" "$name" codex_plugin); fi
+      if [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" = qmd ]; then
+        command -v qmd >/dev/null 2>&1 && found=true
+      elif [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" != plugin ]; then
+        local skill_name
+        skill_name=$(plugin_field "$root" "$name" codex_skill)
+        { [ -d "$HOME/.agents/skills/$skill_name" ] || [ -d "$HOME/.codex/skills/$skill_name" ]; } && found=true
+      elif plugin_installed "$reference_client" "$selector"; then found=true
+      else
+        local status=$?
+        [ "$status" -eq 1 ] || return "$status"
+      fi
+    done
+    checked+=("$found")
   done
 
   read_plugin_toggle_selection toggle_names checked

@@ -94,18 +94,26 @@ function Select-ConfiguredPlugins {
     $fixed = @($entries | Where-Object { $toggleable -notcontains $_ })
     if ($DryRun -or $toggleable.Count -eq 0) { return @{ Selected = $entries; Deselected = @() } }
 
-    $referenceClient = if ($Client -eq 'Codex') { 'Codex' } else { 'Claude' }
-    $installed = if ($Mode -eq 'Update') { @(Get-InstalledPlugins -Client $referenceClient -HomePath $HomePath) } else { @() }
-    $idField = if ($referenceClient -eq 'Claude') { 'id' } else { 'pluginId' }
+    $referenceClients = if ($Client -eq 'Both') { @('Claude','Codex') } else { @($Client) }
+    $installed = @{}
+    if ($Mode -eq 'Update') { foreach ($referenceClient in $referenceClients) { $installed[$referenceClient] = @(Get-InstalledPlugins -Client $referenceClient -HomePath $HomePath) } }
     $checked = @($toggleable | ForEach-Object {
         if ($Mode -eq 'Install') { $true; return }
         if ($_.codex_method -eq 'cli') { return $null -ne (Get-Command $_.codex_source -ErrorAction SilentlyContinue) }
-        $selector = if ($referenceClient -eq 'Claude') { $_.claude_plugin } else { $_.codex_plugin }
-        if ($referenceClient -eq 'Codex' -and $_.codex_method -eq 'qmd') {
-            $null -ne (Get-Command qmd -ErrorAction SilentlyContinue)
-        } elseif ($referenceClient -eq 'Codex' -and $_.codex_method -ne 'plugin') {
-            (Test-Path -LiteralPath (Join-Path $HomePath ('.agents/skills/' + $_.codex_skill))) -or (Test-Path -LiteralPath (Join-Path $HomePath ('.codex/skills/' + $_.codex_skill)))
-        } else { [bool](@($installed | Where-Object { $_.$idField -eq $selector }).Count) }
+        $entry = $_
+        $found = $false
+        foreach ($referenceClient in $referenceClients) {
+            $selector = if ($referenceClient -eq 'Claude') { $entry.claude_plugin } else { $entry.codex_plugin }
+            if ($referenceClient -eq 'Codex' -and $entry.codex_method -eq 'qmd') {
+                $found = $found -or ($null -ne (Get-Command qmd -ErrorAction SilentlyContinue))
+            } elseif ($referenceClient -eq 'Codex' -and $entry.codex_method -ne 'plugin') {
+                $found = $found -or (Test-Path -LiteralPath (Join-Path $HomePath ('.agents/skills/' + $entry.codex_skill))) -or (Test-Path -LiteralPath (Join-Path $HomePath ('.codex/skills/' + $entry.codex_skill)))
+            } else {
+                $idField = if ($referenceClient -eq 'Claude') { 'id' } else { 'pluginId' }
+                $found = $found -or [bool](@($installed[$referenceClient] | Where-Object { $_.$idField -eq $selector }).Count)
+            }
+        }
+        $found
     })
     $names = @($toggleable | ForEach-Object { $_.name })
     $checked = Read-PluginToggleSelection -Names $names -Checked $checked
