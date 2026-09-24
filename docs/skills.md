@@ -10,9 +10,9 @@ The current structure is organized by purpose:
 - `reviews/`: code, security, performance, WPF, UI/UX, business, API, and EF Core reviews
 - `implementation/`: SQL, unit-test, and integration-test writing
 - `verification/`: facts, work-item, and regression verification
-- `git/`: pull request responses and reviews
+- `git/`: pull request reviews
 
-The files intentionally define only a small baseline. Detailed personal workflows and standards can be added later without changing the structure.
+Each skill defines a focused workflow with the investigation, decision points, and output expected for that task. Keep guidance specific to the skill; shared repository constraints belong in the rules.
 
 Claude's generated package additionally has `skills/rules/`: one skill per focused rule file or directory in
 `shared/rules/`. The rule-to-skill loading conditions live in `shared/global-instructions.md`, so full rule text loads
