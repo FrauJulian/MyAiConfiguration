@@ -44,9 +44,10 @@ write_managed_manifest() {
   mkdir -p "$(dirname -- "$path")"
   {
     printf 'path\tsha256\n'
-    for rel in $(printf '%s\n' "${!in_ref[@]}" | sort); do
+    while IFS= read -r rel; do
+      [ -n "$rel" ] || continue
       printf '%s\t%s\n' "$rel" "${in_ref[$rel]}"
-    done
+    done < <(printf '%s\n' "${!in_ref[@]}" | sort)
   } > "$path"
 }
 
