@@ -6,7 +6,9 @@ For credentials, run the child command through `~/.my-ai-configuration/bin/with-
 
 ## Loading rules
 
-Detect affected technologies and concerns. Load every applicable rule: Codex reads its path; Claude invokes its `rules-*` skill. For directory indexes, load only matching topic rules listed there.
+Load rules just in time. First identify the changed area, languages, frameworks, tools, and security or workflow concerns from the task and nearby files. Then load the mandatory baseline and only rules whose triggers match; never preload or recursively read the complete rules tree.
+
+For Codex, read the listed rule path directly. For Claude, invoke the matching `rules-*` skill by its exact name. When a technology directory applies, load its index skill/file first, then load only the topic skills/files that match the work. An index is a small routing map, not a request to load every linked topic. Load cross-cutting rules independently when their stated trigger applies. If a needed rule is not listed or installed, continue with applicable rules and repository conventions.
 
 Every code, configuration, infrastructure, review, test, script, hook, or integration task: `rules/security/index.md` / `rules-security`.
 
