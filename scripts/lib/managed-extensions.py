@@ -202,6 +202,8 @@ class Manager:
                 raise ValueError('Invalid owned CLI record.')
             elif resource['kind'] == 'mcp' and (resource['client'] != 'shared' or not re.fullmatch(r'[a-z0-9-]+', resource.get('server', '')) or not re.fullmatch(r'https://[^\s]+', resource.get('url', ''))):
                 raise ValueError('Invalid owned MCP record.')
+            if 'clients' in resource and (not isinstance(resource['clients'], list) or any(client not in ('codex', 'claude') for client in resource['clients'])):
+                raise ValueError('Invalid shared extension clients.')
 
     def save(self):
         if not self.dry_run:
@@ -414,7 +416,7 @@ class Manager:
         self.state['resources'].append(dict(client='codex', name=entry['name'], kind='qmd', package=package))
         self.save()
 
-    def ensure_mcporter(self, entry):
+    def ensure_mcporter(self, entry, clients):
         server, url = entry['mcporter_name'], entry['mcporter_url']
         if not re.fullmatch(r'[a-z0-9-]+', server) or not re.fullmatch(r'https://[^\s]+', url):
             raise ValueError('Invalid MCPorter server definition.')
@@ -434,11 +436,14 @@ class Manager:
                 return
             if existing is not None and record is not None and existing.get('baseUrl') != record['url']:
                 raise ValueError('Owned MCPorter server changed locally; refusing to overwrite it.')
+        if record is not None:
+            record['clients'] = sorted(set(record.get('clients', ['claude', 'codex'])) | set(clients))
+            self.save()
         if record is not None and existing is not None and not self.update:
             return
         self.command(['mcporter', '--config', str(self.home / '.mcporter/mcporter.json'), 'config', 'add', server, url])
         if record is None:
-            self.state['resources'].append(dict(client='shared', name=entry['name'], kind='mcp', server=server, url=url))
+            self.state['resources'].append(dict(client='shared', name=entry['name'], kind='mcp', server=server, url=url, clients=sorted(clients)))
         else:
             record.update(server=server, url=url)
         self.save()
@@ -507,6 +512,12 @@ class Manager:
                 continue
             selected_entries = mcporter_entries if record['client'] == 'shared' else direct_entries
             if (action == 'sync' and record['name'] not in selected_entries) or (action == 'remove' and record['name'] in selected):
+                if record['kind'] == 'mcp':
+                    remaining = [client for client in record.get('clients', ['claude', 'codex']) if client not in clients]
+                    if remaining:
+                        record['clients'] = remaining
+                        self.save()
+                        continue
                 self.remove(record)
         if action != 'remove':
             for client in clients:
@@ -515,7 +526,7 @@ class Manager:
                     if client == 'codex' and entry.get('codex_plugin') == 'caveman@thinkhome-caveman':
                         self.repair_caveman_windows_hooks()
             for entry in mcporter_entries.values():
-                self.ensure_mcporter(entry)
+                self.ensure_mcporter(entry, clients)
         print('EXTENSIONS: reconciliation complete' + (' (dry run)' if self.dry_run else ''))
 
 
