@@ -98,7 +98,10 @@ def fetch_skill(entry):
     skill = entry['codex_skill']
     if not re.fullmatch(r'[A-Za-z0-9_-]+', skill):
         raise ValueError('Skill name is invalid.')
-    request = urllib.request.Request(f'https://codeload.github.com/{source}/zip/HEAD', headers={'User-Agent': 'MyAiConfiguration'})
+    revision = resolve_revision(source)
+    if revision is None:
+        raise ValueError('Cannot resolve an immutable skill revision.')
+    request = urllib.request.Request(f'https://codeload.github.com/{source}/zip/{revision}', headers={'User-Agent': 'MyAiConfiguration'})
     with urllib.request.urlopen(request, timeout=60) as response:
         if not response.url.startswith('https://codeload.github.com/'):
             raise ValueError('Unexpected skill download redirect.')
@@ -134,7 +137,7 @@ def fetch_skill(entry):
             if relative in files:
                 raise ValueError('Skill archive contains duplicate paths.')
             files[relative] = (archive.read(item), bool(item.external_attr >> 16 & 0o111))
-    return skill, files
+    return skill, files, revision
 
 
 def resolve_revision(source):
@@ -143,7 +146,7 @@ def resolve_revision(source):
         with urllib.request.urlopen(request, timeout=10) as response:
             payload = json.loads(response.read(1024 * 1024))
         revision = payload.get('sha') if isinstance(payload, dict) else None
-        return revision if isinstance(revision, str) and re.fullmatch(r'[0-9a-fA-F]{7,64}', revision) else None
+        return revision if isinstance(revision, str) and re.fullmatch(r'[0-9a-fA-F]{40}', revision) else None
     except (OSError, ValueError, json.JSONDecodeError):
         return None
 
@@ -428,7 +431,7 @@ class Manager:
             return
         fetched = fetch_skill(entry)
         _, files = fetched[:2]
-        revision = fetched[2] if len(fetched) > 2 else resolve_revision(entry['codex_source'])
+        revision = fetched[2] if len(fetched) > 2 else None
         if record is None:
             record = dict(client='codex', name=entry['name'], kind='skill', directory=directory, source=entry['codex_source'], files={}, complete=False)
             self.state['resources'].append(record)
