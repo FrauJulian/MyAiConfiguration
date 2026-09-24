@@ -23,7 +23,7 @@
 - [x] Keep terminal newlines in Bash-managed files that need substitution. Command substitution strips trailing newlines before Bash hashes and writes the content, while PowerShell retains them; switching installers causes needless file changes and backups. (`scripts/lib/manifest.sh:70`, `scripts/lib/manifest.ps1:75`)
 - [x] Parse the Bash plugin inventory as JSON and stop when listing fails. `plugin_installed()` searches for one exact spacing pattern and suppresses CLI errors; a minified response or listing failure marks installed plugins unchecked, allowing an update to remove owned plugins. PowerShell parses JSON and fails on a CLI error. (`scripts/lib/plugins.sh:4`, `scripts/lib/plugins.ps1:36`)
 - [x] Serialize Bash manifest entries without shell word splitting. `write_managed_manifest()` loops over command substitution; a managed filename containing spaces becomes multiple invalid entries and can no longer be reconciled correctly. (`scripts/lib/manifest.sh:47`)
-- [ ] Allow uninstall to reconcile owned extensions when file manifests are missing. Both uninstall commands stop with “Not installed” based only on destination manifests, even if `extensions.json` still owns plugins, skills, or MCP servers. (`scripts/commands/uninstall.ps1:21`, `scripts/commands/uninstall.sh:34`)
+- [x] Allow uninstall to reconcile owned extensions when file manifests are missing. Both uninstall commands stop with “Not installed” based only on destination manifests, even if `extensions.json` still owns plugins, skills, or MCP servers. (`scripts/commands/uninstall.ps1:21`, `scripts/commands/uninstall.sh:34`)
 
 ## Rules, checks, and documentation
 

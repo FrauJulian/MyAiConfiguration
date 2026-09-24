@@ -30,7 +30,7 @@ installed_count=0
 for target_pair in "${targets[@]}"; do
   [ -f "$(manifest_path "${target_pair#*|}")" ] && installed_count=$((installed_count + 1))
 done
-if [ "$dry_run" = false ] && [ "$installed_count" -eq 0 ]; then
+if [ "$dry_run" = false ] && [ "$installed_count" -eq 0 ] && [ ! -f "$home_path/.my-ai-configuration/extensions.json" ]; then
   printf 'Not installed, nothing to uninstall.\n' >&2
   exit 1
 fi

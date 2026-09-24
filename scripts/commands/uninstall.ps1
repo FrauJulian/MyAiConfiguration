@@ -18,7 +18,7 @@ $generated = Join-Path $root 'generated'
 $targets = @(Get-InstallTargets -Generated $generated -HomePath $homePath -Shell 'bash' -Client $Client)
 $installedTargets = @($targets | Where-Object { Test-Path -LiteralPath (Get-ManagedManifestPath $_.Destination) })
 
-if (-not $DryRun -and $installedTargets.Count -eq 0) { throw 'Not installed, nothing to uninstall.' }
+if (-not $DryRun -and $installedTargets.Count -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $homePath '.my-ai-configuration/extensions.json'))) { throw 'Not installed, nothing to uninstall.' }
 
 if (-not $DryRun -and -not $Force) {
     if ([Console]::IsInputRedirected -or $env:CI -eq 'true' -or $env:AI_CONFIG_NO_INTERACTIVE -eq '1') {
