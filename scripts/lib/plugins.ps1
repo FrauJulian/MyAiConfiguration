@@ -92,7 +92,7 @@ function Select-ConfiguredPlugins {
     $entries = @(Get-ConfiguredPluginEntries -RepositoryRoot $RepositoryRoot)
     $toggleable = @($entries)
     $fixed = @($entries | Where-Object { $toggleable -notcontains $_ })
-    if ($DryRun -or $toggleable.Count -eq 0) { return @{ Selected = $entries; Deselected = @() } }
+    if ($toggleable.Count -eq 0 -or ($DryRun -and $Mode -eq 'Install')) { return @{ Selected = $entries; Deselected = @() } }
 
     $referenceClients = if ($Client -eq 'Both') { @('Claude','Codex') } else { @($Client) }
     $installed = @{}
@@ -116,7 +116,7 @@ function Select-ConfiguredPlugins {
         $found
     })
     $names = @($toggleable | ForEach-Object { $_.name })
-    $checked = Read-PluginToggleSelection -Names $names -Checked $checked
+    if (-not $DryRun) { $checked = Read-PluginToggleSelection -Names $names -Checked $checked }
 
     $selected = @()
     $deselected = @()

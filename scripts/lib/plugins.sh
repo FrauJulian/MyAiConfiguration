@@ -107,7 +107,7 @@ select_configured_plugins() {
     if plugin_toggleable "$root" "$name" "$client"; then toggle_names+=("$name"); else fixed_names+=("$name"); fi
   done < <(get_plugin_names "$root")
 
-  if [ "$dry_run" = true ] || [ ${#toggle_names[@]} -eq 0 ]; then
+  if [ ${#toggle_names[@]} -eq 0 ] || { [ "$dry_run" = true ] && [ "$mode" = Install ]; }; then
     selected_ref=("${all_names[@]}")
     return 0
   fi
@@ -144,7 +144,7 @@ select_configured_plugins() {
     checked+=("$found")
   done
 
-  read_plugin_toggle_selection toggle_names checked
+  if [ "$dry_run" != true ]; then read_plugin_toggle_selection toggle_names checked; fi
 
   local i
   for ((i = 0; i < ${#toggle_names[@]}; i++)); do
