@@ -100,16 +100,29 @@ foreach ($shell in @('powershell','bash')) {
         $ruleSkills += [pscustomobject]@{ Name = "rules-$($ruleFile.BaseName)"; Body = $ruleFile.FullName; References = $null }
     }
     foreach ($ruleDirectory in Get-ChildItem $rulesRoot -Directory) {
-        $ruleBody = Join-Path $ruleDirectory.FullName 'index.md'
-        if (Test-Path -LiteralPath $ruleBody) {
-            $ruleSkills += [pscustomobject]@{ Name = "rules-$($ruleDirectory.Name)"; Body = $ruleBody; References = (Join-Path $ruleDirectory.FullName 'references') }
+        foreach ($ruleFile in Get-ChildItem $ruleDirectory.FullName -File -Filter '*.md' -Recurse) {
+            $relativeRulePath = $ruleFile.FullName.Substring($ruleDirectory.FullName.Length).TrimStart([char[]]@('\','/'))
+            if ($relativeRulePath -eq 'index.md') {
+                $ruleName = "rules-$($ruleDirectory.Name)"
+                $references = Join-Path $ruleDirectory.FullName 'references'
+            } else {
+                $ruleParts = $relativeRulePath.Substring(0, $relativeRulePath.Length - 3).Split([char[]]@('\','/'))
+                if ($ruleParts[0] -eq 'references') { $ruleParts = @($ruleParts | Select-Object -Skip 1) }
+                $ruleName = "rules-$($ruleDirectory.Name)-$($ruleParts -join '-')"
+                $references = $null
+            }
+            if ($ruleSkills.Name -contains $ruleName) { throw "Duplicate generated rule skill name: $ruleName" }
+            $ruleSkills += [pscustomobject]@{ Name = $ruleName; Body = $ruleFile.FullName; References = $references }
         }
     }
     foreach ($ruleSkill in $ruleSkills | Sort-Object Name) {
         $skillDir = Join-Path $output "claude-$shell/skills/rules/$($ruleSkill.Name)"
         New-Item $skillDir -ItemType Directory -Force | Out-Null
         $ruleContent = Get-Content $ruleSkill.Body -Raw
-        $skillBody = "---`r`nname: $($ruleSkill.Name)`r`ndescription: $(Quote-Toml 'Use when its matching rule condition in global instructions applies.')`r`n---`r`n`r`n$ruleContent"
+        $ruleTitle = (Get-Content $ruleSkill.Body | Where-Object { $_ -match '^#+\s+' } | Select-Object -First 1) -replace '^#+\s+', ''
+        if ([string]::IsNullOrWhiteSpace($ruleTitle)) { throw "Missing rule title in $($ruleSkill.Body)" }
+        $ruleDescription = "Use when the task concerns $ruleTitle."
+        $skillBody = "---`r`nname: $($ruleSkill.Name)`r`ndescription: $(Quote-Toml $ruleDescription)`r`n---`r`n`r`n$ruleContent"
         Set-Content (Join-Path $skillDir 'SKILL.md') $skillBody -Encoding UTF8
         if ($ruleSkill.References -and (Test-Path -LiteralPath $ruleSkill.References)) {
             Copy-Directory $ruleSkill.References (Join-Path $skillDir 'references')

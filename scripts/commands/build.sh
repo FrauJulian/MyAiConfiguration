@@ -69,20 +69,39 @@ copy_directory "$shared/hooks" "$output/codex-$shell/hooks"
 copy_directory "$shared/hooks" "$output/claude-$shell/hooks"
 copy_directory "$shared/statusline" "$output/claude-$shell/statusline"
 
+declare -A rule_skill_names=()
 while IFS= read -r rule_path; do
   case "$rule_path" in
     general.md) continue ;;
     */index.md) skill_name="rules-${rule_path%/index.md}"; rule_body="$shared/rules/$rule_path"; references_dir="${rule_body%/index.md}/references" ;;
+    */*.md)
+      rule_directory=${rule_path%%/*}
+      rule_relative=${rule_path#*/}
+      rule_relative=${rule_relative%.md}
+      rule_relative=${rule_relative#references/}
+      rule_relative=${rule_relative//\//-}
+      skill_name="rules-$rule_directory-$rule_relative"
+      rule_body="$shared/rules/$rule_path"
+      references_dir=''
+      ;;
     *.md) skill_name="rules-${rule_path%.md}"; rule_body="$shared/rules/$rule_path"; references_dir='' ;;
     *) continue ;;
   esac
+  if [[ -n "${rule_skill_names[$skill_name]:-}" ]]; then
+    printf 'Duplicate generated rule skill name: %s\n' "$skill_name" >&2
+    exit 1
+  fi
+  rule_skill_names[$skill_name]=1
   skill_dir="$output/claude-$shell/skills/rules/$skill_name"
   mkdir -p "$skill_dir"
-  { printf -- '---\nname: %s\ndescription: %s\n---\n\n' "$skill_name" "$(quote_toml 'Use when its matching rule condition in global instructions applies.')"; cat "$rule_body"; } > "$skill_dir/SKILL.md"
+  rule_title=$(sed -n 's/^#\{1,6\} *//p' "$rule_body" | head -n 1)
+  if [ -z "$rule_title" ]; then printf 'Missing rule title in %s\n' "$rule_body" >&2; exit 1; fi
+  rule_description="Use when the task concerns $rule_title."
+  { printf -- '---\nname: %s\ndescription: %s\n---\n\n' "$skill_name" "$(quote_toml "$rule_description")"; cat "$rule_body"; } > "$skill_dir/SKILL.md"
   if [ -n "$references_dir" ] && [ -d "$references_dir" ]; then
     copy_directory "$references_dir" "$skill_dir/references"
   fi
-done < <(find "$shared/rules" -mindepth 1 -maxdepth 2 -type f -name '*.md' -printf '%P\n' | sort)
+done < <(find "$shared/rules" -mindepth 1 -type f -name '*.md' -printf '%P\n' | sort)
 
 shared_template=$(<"$shared/global-instructions.md")
 general_content=$(<"$shared/rules/general.md")
