@@ -59,12 +59,11 @@ if [ "$quick" = false ]; then
   select_configured_plugins "$root" "$client" Update "$dry_run" selected_plugins deselected_plugins
 fi
 
-[ "$update_agents" = false ] || update_selected_agent_clis
 
 while IFS='|' read -r source destination; do
   ai_config_root=$destination
   command -v cygpath >/dev/null && ai_config_root=$(cygpath -m "$destination")
-  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang"
+  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang" 5 "$statusline"
 done < <(get_install_targets "$generated" "$home_path" "$shell" "$client")
 
 if [ "$quick" = true ]; then

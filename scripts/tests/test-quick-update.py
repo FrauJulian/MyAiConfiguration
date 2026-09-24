@@ -25,7 +25,7 @@ class SelectionTests(unittest.TestCase):
                               capture_output=True, text=True, timeout=10)
 
     def save(self, *arguments):
-        result = self.run_state('write', '--shell', 'powershell', '--update-agents', 'false', '--flashbang', 'false', '--client', 'both', *arguments)
+        result = self.run_state('write', '--shell', 'powershell', '--flashbang', 'false', '--statusline', 'false', '--client', 'both', *arguments)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_selection_fails_without_creating_state(self):
@@ -59,30 +59,31 @@ class SelectionTests(unittest.TestCase):
         self.assertIn('without Quick', result.stderr)
         migrated = json.loads(self.run_state('read', '--allow-legacy').stdout)
         self.assertEqual(migrated['shell'], 'powershell')
-        self.assertFalse(migrated['update_agents'])
         self.assertTrue(migrated['flashbang'])
+        self.assertTrue(migrated['statusline'])
 
     def test_boolean_options_are_required_and_preserved(self):
         self.save()
         state = json.loads(self.run_state('read').stdout)
-        self.assertFalse(state['update_agents'])
         self.assertFalse(state['flashbang'])
+        self.assertFalse(state['statusline'])
         state['flashbang'] = 'false'
         self.path.write_text(json.dumps(state))
         self.assertNotEqual(self.run_state('read').returncode, 0)
 
     def test_semantic_retrieval_option_round_trips(self):
-        result = self.run_state('write', '--shell', 'bash', '--client', 'both', '--update-agents', 'false',
-                                '--flashbang', 'true', '--semantic-retrieval', 'true')
+        result = self.run_state('write', '--shell', 'bash', '--client', 'both',
+                                '--flashbang', 'true', '--statusline', 'true', '--semantic-retrieval', 'true')
         self.assertEqual(result.returncode, 0, result.stderr)
         state = json.loads(self.run_state('read').stdout)
         self.assertTrue(state['semantic_retrieval'])
+        self.assertTrue(state['statusline'])
         self.assertIn('semantic_retrieval\ttrue', self.run_state('read', '--format', 'tsv').stdout)
 
     def test_invalid_write_preserves_last_selection(self):
         self.save('--selected', 'Superpowers')
         original = self.path.read_bytes()
-        result = self.run_state('write', '--shell', 'bash', '--update-agents', 'false', '--flashbang', 'true', '--client', 'codex', '--selected', 'Unknown')
+        result = self.run_state('write', '--shell', 'bash', '--flashbang', 'true', '--client', 'codex', '--selected', 'Unknown')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.path.read_bytes(), original)
 
@@ -108,7 +109,7 @@ class SelectionTests(unittest.TestCase):
         save = subprocess.run([shell, '-NoProfile', '-Command',
                                "$ErrorActionPreference = 'Stop'; . (Join-Path $env:TEST_REPOSITORY_ROOT 'scripts/lib/selection-state.ps1'); "
                                "Save-UpdateSelection -HomePath $env:TEST_SELECTION_HOME -RepositoryRoot $env:TEST_REPOSITORY_ROOT "
-                               "-Shell PowerShell -Client Both -UpdateAgents $false -Flashbang $false -Plugins @{ Selected = @([pscustomobject]@{name='Superpowers'}); Deselected = @() }"],
+                               "-Shell PowerShell -Client Both -Flashbang $false -StatusLine $false -Plugins @{ Selected = @([pscustomobject]@{name='Superpowers'}); Deselected = @() }"],
                               env=environment, capture_output=True, text=True, timeout=10)
         self.assertEqual(save.returncode, 0, save.stdout + save.stderr)
         original = self.path.read_bytes()
@@ -140,7 +141,7 @@ class SelectionTests(unittest.TestCase):
         if not shell:
             self.skipTest('Bash unavailable')
         save = subprocess.run([shell, '-c',
-                               'set -euo pipefail; root=$1; home_path=$2; shell=powershell; client=both; update_agents=false; flashbang=false; '
+                               'set -euo pipefail; root=$1; home_path=$2; shell=powershell; client=both; flashbang=false; statusline=false; '
                                'selected_plugins=(Superpowers); deselected_plugins=(); '
                                '. "$root/scripts/lib/selection-state.sh"; save_update_selection',
                                'test', ROOT.as_posix(), self.home.as_posix()],

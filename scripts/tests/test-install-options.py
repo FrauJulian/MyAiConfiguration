@@ -40,71 +40,6 @@ class InstallOptionsTests(unittest.TestCase):
             self.assertEqual(result['hooks']['Stop'][0]['hooks'], [{'command': 'echo keep'}])
             self.assertEqual(result['tui']['status_line'], ['model'])
 
-    def test_native_option_helpers_select_clients_and_restore_environment(self):
-        shells = [('powershell', shutil.which('powershell') or shutil.which('pwsh')),
-                  ('bash', str(Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Git/bin/bash.exe')
-                   if os.name == 'nt' else shutil.which('bash'))]
-        for kind, executable in shells:
-            if not executable or not Path(executable).exists():
-                continue
-            with self.subTest(shell=kind):
-                if kind == 'powershell':
-                    command = [executable, '-NoProfile', '-Command',
-                               "$ErrorActionPreference='Stop'; . ./scripts/lib/install-options.ps1; "
-                               "function Test-CodexProcessActive { $false }; function Test-GlobalNpmCodex { $false }; "
-                               "function Invoke-PluginCommand { param($Command,$Arguments,[switch]$DryRun,[switch]$Summary) "
-                               "Write-Output ($Command + ':' + ($Arguments -join ' ')) }; "
-                               "$env:CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE='original'; "
-                               "Update-SelectedAgentClis -Client Both; "
-                               "if ($env:CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE -ne 'original') { throw 'Environment leaked' }"]
-                else:
-                    command = [executable, '-c',
-                               '. ./scripts/lib/install-options.sh; '
-                               'codex_process_active() { return 1; }; global_npm_codex() { return 1; }; '
-                               'run_plugin_command() { shift; printf "%s:%s\\n" "$1" "$2"; }; '
-                               'client=both; dry_run=false; summary=false; '
-                               'CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE=original; update_selected_agent_clis; '
-                               '[ "$CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE" = original ]']
-                result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=20)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(result.stdout.splitlines(), ['codex:update', 'claude:update'])
-
-    def test_running_codex_is_skipped_and_npm_install_is_used_when_available(self):
-        shell = shutil.which('powershell') or shutil.which('pwsh')
-        if shell:
-            skipped = subprocess.run([
-                shell, '-NoProfile', '-Command',
-                "$ErrorActionPreference='Stop'; . ./scripts/lib/install-options.ps1; "
-                "function Test-CodexProcessActive { $true }; function Test-GlobalNpmCodex { $true }; "
-                "function Invoke-PluginCommand { param($Command,$Arguments,[switch]$DryRun,[switch]$Summary) Write-Output $Command }; "
-                "Update-SelectedAgentClis -Client Both"
-            ], cwd=ROOT, capture_output=True, text=True, timeout=20)
-            self.assertEqual(skipped.returncode, 0, skipped.stdout + skipped.stderr)
-            self.assertEqual(skipped.stdout.splitlines()[-1], 'claude')
-            self.assertIn('Codex CLI update skipped', skipped.stdout + skipped.stderr)
-            npm = subprocess.run([
-                shell, '-NoProfile', '-Command',
-                "$ErrorActionPreference='Stop'; . ./scripts/lib/install-options.ps1; "
-                "function Test-CodexProcessActive { $false }; function Test-GlobalNpmCodex { $true }; "
-                "function Invoke-PluginCommand { param($Command,$Arguments,[switch]$DryRun,[switch]$Summary) "
-                "Write-Output ($Command + ':' + ($Arguments -join ' ')) }; Update-SelectedAgentClis -Client Codex"
-            ], cwd=ROOT, capture_output=True, text=True, timeout=20)
-            self.assertEqual(npm.returncode, 0, npm.stdout + npm.stderr)
-            self.assertEqual(npm.stdout.strip(), 'npm:install -g @openai/codex@latest')
-
-        bash = (str(Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Git/bin/bash.exe')
-                if os.name == 'nt' else shutil.which('bash'))
-        if bash and Path(bash).exists():
-            result = subprocess.run([
-                bash, '-c',
-                '. ./scripts/lib/install-options.sh; codex_process_active() { return 0; }; '
-                'global_npm_codex() { return 0; }; run_plugin_command() { shift; printf "%s\\n" "$1"; }; '
-                'client=both; dry_run=false; summary=false; update_selected_agent_clis'
-            ], cwd=ROOT, capture_output=True, text=True, timeout=20)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(result.stdout.splitlines(), ['claude'])
-            self.assertIn('Codex CLI update skipped', result.stderr)
-
     def test_flashbang_toggle_is_applied_by_both_manifest_writers(self):
         shells = [('powershell', shutil.which('powershell') or shutil.which('pwsh')),
                   ('bash', str(Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Git/bin/bash.exe')
@@ -165,8 +100,13 @@ class InstallOptionsTests(unittest.TestCase):
                     package = root / 'generated' / (client + '-bash')
                     (package / 'skills').mkdir(parents=True)
                     (package / 'skills' / 'test.txt').write_text('managed')
+                    if client == 'claude':
+                        (package / 'statusline').mkdir()
+                        (package / 'statusline' / 'statusline.sh').write_text('managed status line')
                     config = ('[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ncommand = \'bash "__AI_CONFIG_ROOT__/flashbang.sh"\'\n'
-                              if client == 'codex' else '{"hooks":{"Stop":[{"hooks":[{"command":"bash flashbang.sh"}]}]}}')
+                              '[tui]\nstatus_line = ["model"]\n' if client == 'codex' else
+                              '{"hooks":{"Stop":[{"hooks":[{"command":"bash flashbang.sh"}]}]},'
+                              '"statusLine":{"type":"command","command":"bash statusline.sh"}}')
                     (package / ('config.toml' if client == 'codex' else 'settings.json')).write_text(config)
                 suffix = 'ps1' if kind == 'powershell' else 'sh'
                 for name in ('install', 'update'):
@@ -186,7 +126,7 @@ class InstallOptionsTests(unittest.TestCase):
                         'select_configured_plugins() { :; }\nsync_configured_plugins() { :; }\n'
                         'run_plugin_command() { printf "CLI-MOCK %s\\n" "$2"; }\n')
                 environment = dict(os.environ, HOME=home.as_posix(), TEST_INSTALL_HOME=str(home))
-                for name, quick, answers in [('install', False, 'y\nn\nn\nn\n'), ('update', True, '')]:
+                for name, quick, answers in [('install', False, 'n\nn\nn\n'), ('update', True, '')]:
                     entry = str(commands / (name + '.' + suffix))
                     command = ([executable, '-NoProfile', '-File', entry, '-Shell', 'Bash', '-Client', 'Both', '-Summary']
                                if kind == 'powershell' else [executable, entry, '--shell', 'bash', '--client', 'both', '--summary'])
@@ -194,16 +134,18 @@ class InstallOptionsTests(unittest.TestCase):
                         command.append('-Quick' if kind == 'powershell' else '--quick')
                     result = subprocess.run(command, env=environment, input=answers, capture_output=True, text=True, timeout=25)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertTrue('CLI-MOCK codex' in result.stdout or
-                                    'Codex CLI update skipped' in result.stdout + result.stderr)
-                    self.assertIn('CLI-MOCK claude', result.stdout)
+                    self.assertNotIn('CLI-MOCK', result.stdout)
                     if quick:
                         self.assertNotIn('Enable the Flashbang', result.stdout + result.stderr)
+                        self.assertNotIn('Apply the custom status line', result.stdout + result.stderr)
                     state = json.loads((home / '.my-ai-configuration/selection.json').read_text())
-                    self.assertTrue(state['update_agents'])
                     self.assertFalse(state['flashbang'])
+                    self.assertFalse(state['statusline'])
                     self.assertEqual(state['shell'], 'bash')
                     self.assertNotIn('Stop', json.loads((home / '.claude/settings.json').read_text()).get('hooks', {}))
+                    self.assertNotIn('statusLine', json.loads((home / '.claude/settings.json').read_text()))
+                    self.assertFalse((home / '.claude/statusline/statusline.sh').exists())
+                    self.assertNotIn('status_line', tomllib.loads((home / '.codex/config.toml').read_text()).get('tui', {}))
 
 
 if __name__ == '__main__':

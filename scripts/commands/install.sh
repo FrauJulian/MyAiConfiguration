@@ -36,7 +36,6 @@ if [ "$dry_run" = false ]; then
 fi
 
 read_install_options
-reinstall_via_npm=$(read_cli_reinstall_option "$client" "$dry_run")
 
 build_args=()
 [ "$summary" = false ] || build_args+=(--summary)
@@ -55,13 +54,11 @@ claude_concurrency=${CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY:-5}
 selected_plugins=()
 deselected_plugins=()
 select_configured_plugins "$root" "$client" Install "$dry_run" selected_plugins deselected_plugins
-[ "$update_agents" = false ] || update_selected_agent_clis
-[ "$reinstall_via_npm" = false ] || invoke_cli_reinstall "$client" "$dry_run" "$summary"
 
 while IFS='|' read -r source destination; do
   ai_config_root=$destination
   command -v cygpath >/dev/null && ai_config_root=$(cygpath -m "$destination")
-  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang" "$claude_concurrency"
+  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang" "$claude_concurrency" "$statusline"
 done < <(get_install_targets "$generated" "$home_path" "$shell" "$client")
 
 sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" false selected_plugins "$summary"

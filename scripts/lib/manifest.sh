@@ -70,9 +70,9 @@ write_managed_manifest() {
   } > "$path"
 }
 
-# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <powershell-command> <dry-run: true|false> [summary: true|false] [flashbang] [claude-concurrency]
+# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <powershell-command> <dry-run: true|false> [summary: true|false] [flashbang] [claude-concurrency] [statusline]
 sync_managed_destination() {
-  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 powershell_command=$6 dry_run=$7 summary=${8:-false} flashbang_enabled=${9:-true} claude_concurrency=${10:-5}
+  local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 powershell_command=$6 dry_run=$7 summary=${8:-false} flashbang_enabled=${9:-true} claude_concurrency=${10:-5} statusline_enabled=${11:-true}
   [ "$summary" = true ] || printf 'SOURCE %s -> %s\n' "$source" "$destination"
   local manifest
   manifest=$(manifest_path "$destination")
@@ -87,12 +87,13 @@ sync_managed_destination() {
     local relative target content needs_sub new_hash exists current_hash action backup
     relative=${source_file#"$source/"}
     if [ "${destination##*/}" = .codex ] && [[ "$relative" = skills/* ]]; then continue; fi
+    if [ "${destination##*/}" = .claude ] && [ "$statusline_enabled" = false ] && [[ "$relative" = statusline/* ]]; then continue; fi
     target=$(managed_target "$destination" "$relative") || return 1
     content=$(cat -- "$source_file" && printf '\034') || return
     content=${content%$'\034'}
     needs_sub=false
-    if [ "$flashbang_enabled" = false ] && [[ "$relative" = settings.json || "$relative" = config.toml ]]; then
-      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter --path "$source_file" --flashbang false && printf '\034') || return
+    if { [ "$flashbang_enabled" = false ] || [ "$statusline_enabled" = false ]; } && [[ "$relative" = settings.json || "$relative" = config.toml ]]; then
+      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter --path "$source_file" --flashbang "$flashbang_enabled" --statusline "$statusline_enabled" && printf '\034') || return
       content=${content%$'\034'}
       needs_sub=true
     fi

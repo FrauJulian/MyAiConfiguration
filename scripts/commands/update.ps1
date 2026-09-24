@@ -49,11 +49,9 @@ $plugins = if ($Quick) {
     Select-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -Mode 'Update' -DryRun:$DryRun
 }
 
-if ($options.update_agents) { Update-SelectedAgentClis -Client $Client -DryRun:$DryRun -Summary:$Summary }
-
 foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath -Shell $shell -Client $Client)) {
     Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp $stamp `
-        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -FlashbangEnabled $options.flashbang -DryRun:$DryRun -Summary:$Summary
+        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -FlashbangEnabled $options.flashbang -StatusLineEnabled $options.statusline -DryRun:$DryRun -Summary:$Summary
 }
 
 $previousPluginNonInteractive = $script:PluginNonInteractive
@@ -67,6 +65,6 @@ try {
     $env:CI = $previousCI
 }
 Sync-SemanticRetrieval -RepositoryRoot $root -HomePath $homePath -Client $Client -Enabled $options.semantic_retrieval -DryRun:$DryRun -Update -Summary:$Summary
-if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Shell $Shell -Client $Client -Plugins $plugins -UpdateAgents $options.update_agents -Flashbang $options.flashbang -SemanticRetrieval $options.semantic_retrieval }
+if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Shell $Shell -Client $Client -Plugins $plugins -Flashbang $options.flashbang -StatusLine $options.statusline -SemanticRetrieval $options.semantic_retrieval }
 if ($Summary) { Write-Output "Update: PASS | $Client, $Shell$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS update dry-run' } else { 'PASS update' })) }
 exit 0

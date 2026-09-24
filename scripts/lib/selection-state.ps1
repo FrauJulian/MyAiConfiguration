@@ -9,8 +9,8 @@ function Read-UpdateSelection {
 
 function Save-UpdateSelection {
     param([string]$HomePath, [string]$RepositoryRoot, [string]$Shell, [string]$Client, [hashtable]$Plugins,
-          [Parameter(Mandatory=$true)][bool]$UpdateAgents, [Parameter(Mandatory=$true)][bool]$Flashbang, [bool]$SemanticRetrieval = $false)
-    $arguments = @((Join-Path $PSScriptRoot 'selection-state.py'), 'write', '--home', $HomePath, '--manifest', (Join-Path $RepositoryRoot 'adapters/plugins.tsv'), '--shell', $Shell.ToLowerInvariant(), '--client', $Client.ToLowerInvariant(), '--update-agents', $UpdateAgents.ToString().ToLowerInvariant(), '--flashbang', $Flashbang.ToString().ToLowerInvariant(), '--semantic-retrieval', $SemanticRetrieval.ToString().ToLowerInvariant(), '--selected')
+          [Parameter(Mandatory=$true)][bool]$Flashbang, [bool]$StatusLine = $true, [bool]$SemanticRetrieval = $false)
+    $arguments = @((Join-Path $PSScriptRoot 'selection-state.py'), 'write', '--home', $HomePath, '--manifest', (Join-Path $RepositoryRoot 'adapters/plugins.tsv'), '--shell', $Shell.ToLowerInvariant(), '--client', $Client.ToLowerInvariant(), '--flashbang', $Flashbang.ToString().ToLowerInvariant(), '--statusline', $StatusLine.ToString().ToLowerInvariant(), '--semantic-retrieval', $SemanticRetrieval.ToString().ToLowerInvariant(), '--selected')
     $arguments += @($Plugins.Selected | ForEach-Object { $_.name })
     $arguments += '--deselected'
     $arguments += @($Plugins.Deselected | ForEach-Object { $_.name })
