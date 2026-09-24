@@ -9,11 +9,13 @@ import hashlib
 import heapq
 import json
 import multiprocessing
+from multiprocessing import AuthenticationError
 from multiprocessing.connection import Client, Listener
 import os
 from pathlib import Path
 import re
 import sqlite3
+import stat
 import subprocess
 import sys
 import threading
@@ -44,7 +46,7 @@ MAX_FILES_ENV = "SEMANTIC_RETRIEVAL_MAX_FILES"
 # that would reload both models from disk before it can answer a single query.
 DAEMON_IDLE_SECONDS = 1800
 DAEMON_READY_TIMEOUT_SECONDS = 120
-DAEMON_AUTHKEY = b"ai-config-semantic-retrieval"
+DAEMON_MESSAGE_LIMIT = 16 * 1024 * 1024
 
 
 def runtime_python(script=__file__, executable=sys.executable, system=os.name):
@@ -232,12 +234,35 @@ def daemon_address(data_dir: Path) -> str:
     return str(data_dir / f"daemon-{digest}.sock")
 
 
-def request_daemon(address: str, payload: dict):
-    with Client(address, authkey=DAEMON_AUTHKEY) as connection:
-        connection.send(payload)
+def daemon_authkey(data_dir: Path) -> bytes:
+    if data_dir.is_symlink():
+        raise OSError("Semantic retrieval data directory must not be a link.")
+    data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = data_dir / "daemon.key"
+    try:
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        pass
+    else:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(os.urandom(32))
+            stream.flush()
+            os.fsync(stream.fileno())
+    metadata = path.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or (os.name != "nt" and metadata.st_mode & 0o077):
+        raise OSError("Semantic retrieval daemon credential is not private.")
+    key = path.read_bytes()
+    if len(key) != 32:
+        raise OSError("Semantic retrieval daemon credential is incomplete.")
+    return key
+
+
+def request_daemon(address: str, payload: dict, data_dir: Path):
+    with Client(address, authkey=daemon_authkey(data_dir)) as connection:
+        connection.send_bytes(json.dumps(payload).encode("utf-8"))
         if not connection.poll(CLI_TIMEOUT_SECONDS):
             raise TimeoutError(f"Semantic retrieval daemon exceeded the {CLI_TIMEOUT_SECONDS} second timeout.")
-        success, result = connection.recv()
+        success, result = json.loads(connection.recv_bytes(DAEMON_MESSAGE_LIMIT))
     if not success:
         raise RuntimeError(str(result))
     return result
@@ -270,7 +295,9 @@ def try_daemon(root: Path, data_dir: Path, model_cache: Path, action: str, query
     address = daemon_address(data_dir)
     payload = {"action": action, "root": str(root), "query": query, "top_k": top_k}
     try:
-        return request_daemon(address, payload)
+        return request_daemon(address, payload, data_dir)
+    except AuthenticationError:
+        return None
     except (OSError, EOFError):
         pass
     if not spawn_daemon(data_dir, model_cache):
@@ -278,8 +305,8 @@ def try_daemon(root: Path, data_dir: Path, model_cache: Path, action: str, query
     deadline = time.monotonic() + DAEMON_READY_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
         try:
-            return request_daemon(address, payload)
-        except (OSError, EOFError):
+            return request_daemon(address, payload, data_dir)
+        except (OSError, EOFError, AuthenticationError):
             time.sleep(0.5)
     return None
 
@@ -303,7 +330,7 @@ def run_daemon(data_dir: Path, model_cache: Path):
                 os._exit(0)
 
     threading.Thread(target=watchdog, daemon=True).start()
-    listener = Listener(address, family="AF_PIPE" if os.name == "nt" else "AF_UNIX", authkey=DAEMON_AUTHKEY)
+    listener = Listener(address, family="AF_PIPE" if os.name == "nt" else "AF_UNIX", authkey=daemon_authkey(data_dir))
     daemon_lock_path(data_dir).unlink(missing_ok=True)
     try:
         while True:
@@ -311,7 +338,9 @@ def run_daemon(data_dir: Path, model_cache: Path):
             try:
                 response = (True, None)
                 try:
-                    request = connection.recv()
+                    request = json.loads(connection.recv_bytes(DAEMON_MESSAGE_LIMIT))
+                    if not isinstance(request, dict) or request.get("action") not in ("search", "rebuild") or not isinstance(request.get("root"), str):
+                        raise ValueError("Invalid semantic retrieval daemon request.")
                     index = indexes.get(request["root"])
                     if index is None:
                         if len(indexes) >= 8:
@@ -326,7 +355,7 @@ def run_daemon(data_dir: Path, model_cache: Path):
                     continue
                 except Exception as error:
                     response = (False, str(error))
-                connection.send(response)
+                connection.send_bytes(json.dumps(response).encode("utf-8"))
             except (OSError, EOFError):
                 pass
             finally:
