@@ -371,8 +371,9 @@ class Index:
         self.root = root.resolve()
         self.data = data.resolve()
         self.data.mkdir(parents=True, exist_ok=True)
-        identity = json.dumps([os.path.normcase(str(self.root)), MODEL, EMBEDDING_DIMENSIONS,
-                               INDEX_VERSION, CHUNK_TOKENS, OVERLAP_TOKENS])
+        identity = json.dumps([os.path.normcase(str(self.root)), MODEL, MODEL_REVISION,
+                               EMBEDDING_DIMENSIONS, RETRIEVAL_INSTRUCTION, INDEX_VERSION,
+                               CHUNK_TOKENS, OVERLAP_TOKENS])
         database = hashlib.sha256(identity.encode()).hexdigest() + ".sqlite3"
         self.db = sqlite3.connect(self.data / database, check_same_thread=False, timeout=30)
         self.db.execute("create table if not exists chunks (path text, symbol text, text text, vector blob)")
@@ -468,8 +469,12 @@ class Index:
 
     def cache_key(self, query: str, top_k: int):
         files = self.db.execute("select path, digest from files order by path").fetchall()
-        state = json.dumps(files, separators=(",", ":"))
-        return hashlib.sha256(f"{top_k}\0{query}\0{state}".encode("utf-8")).hexdigest()
+        identity = json.dumps([
+            query, top_k, files,
+            RERANKER_MODEL, RERANKER_MODEL_REVISION, RETRIEVAL_INSTRUCTION,
+            DENSE_CANDIDATES, LEXICAL_CANDIDATES, RERANK_CANDIDATES, FINAL_RESULTS, RRF_K,
+        ], ensure_ascii=False, separators=(",", ":"))
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
     def search(self, query: str, top_k: int = FINAL_RESULTS):
         if not query.strip():
