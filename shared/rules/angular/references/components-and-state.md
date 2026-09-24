@@ -1,5 +1,8 @@
 ## Components
 
+* Prefer standalone components, directives, and pipes for new work. Avoid introducing `NgModule` unless the existing architecture requires it.
+* Keep components small; move substantial business logic to a focused service or domain layer.
+* Keep dependencies explicit and follow the feature architecture. Avoid god components, god services, unnecessary wrappers, and abstractions without a concrete need.
 * Use `ChangeDetectionStrategy.OnPush` unless there is a concrete reason not to.
 * Prefer signal-based state for local component state.
 * Prefer `computed` for derived state.
