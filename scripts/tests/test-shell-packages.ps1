@@ -6,15 +6,29 @@ $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory
 $sourceSkillCount = @(Get-ChildItem (Join-Path $root 'shared/skills') -Filter 'SKILL.md' -Recurse).Count
 $rulesRoot = Join-Path $root 'shared/rules'
 $ruleSources = @()
+$ruleLoadEntries = @()
 foreach ($ruleFile in Get-ChildItem $rulesRoot -File -Filter '*.md' | Where-Object Name -ne 'general.md') {
     $ruleSources += [pscustomobject]@{ Path = $ruleFile.Name; Skill = "rules-$($ruleFile.BaseName)" }
+    $ruleLoadEntries += [pscustomobject]@{ Path = $ruleFile.Name; Skill = "rules-$($ruleFile.BaseName)" }
 }
 foreach ($ruleDirectory in Get-ChildItem $rulesRoot -Directory) {
-    if (Test-Path (Join-Path $ruleDirectory.FullName 'index.md')) { $ruleSources += [pscustomobject]@{ Path = "$($ruleDirectory.Name)/index.md"; Skill = "rules-$($ruleDirectory.Name)" } }
+    foreach ($ruleFile in Get-ChildItem $ruleDirectory.FullName -File -Filter '*.md' -Recurse) {
+        $relative = $ruleFile.FullName.Substring($ruleDirectory.FullName.Length).TrimStart([char[]]@('\','/')).Replace('\','/')
+        if ($relative -eq 'index.md') {
+            $skill = "rules-$($ruleDirectory.Name)"
+            $ruleLoadEntries += [pscustomobject]@{ Path = "$($ruleDirectory.Name)/index.md"; Skill = $skill }
+        } else {
+            $parts = $relative.Substring(0, $relative.Length - 3).Split([char[]]@('/'))
+            $parts = @($parts | Where-Object { $_ -ne 'references' })
+            $skill = "rules-$($ruleDirectory.Name)-$($parts -join '-')"
+        }
+        if ($ruleSources.Skill -contains $skill) { throw "Duplicate generated rule skill name: $skill" }
+        $ruleSources += [pscustomobject]@{ Path = "$($ruleDirectory.Name)/$relative"; Skill = $skill }
+    }
 }
 $ruleSkillCount = $ruleSources.Count
 $globalInstructions = Get-Content (Join-Path $root 'shared/global-instructions.md') -Raw
-foreach ($ruleSource in $ruleSources) {
+foreach ($ruleSource in $ruleLoadEntries) {
     $ruleInstruction = [char]96 + "rules/$($ruleSource.Path)" + [char]96 + ' / ' + [char]96 + $ruleSource.Skill + [char]96
     if (-not $globalInstructions.Contains($ruleInstruction)) { throw "Global instructions are missing rule loading entry: $($ruleSource.Path)" }
 }
@@ -51,7 +65,7 @@ foreach ($shell in @('powershell','bash')) {
         }
         $docFile = if ($client -eq 'codex') { 'AGENTS.md' } else { 'CLAUDE.md' }
         $docContent = Get-Content -LiteralPath (Join-Path $package $docFile) -Raw
-        if ($docContent -notmatch [regex]::Escape('rules/security.md')) { throw "$package is missing common rule loading instructions." }
+        if ($docContent -notmatch [regex]::Escape('rules/security/index.md')) { throw "$package is missing common rule loading instructions." }
         if ($client -eq 'claude') {
             foreach ($ruleSource in $ruleSources) {
                 $skillPath = Join-Path $package "skills/rules/$($ruleSource.Skill)/SKILL.md"

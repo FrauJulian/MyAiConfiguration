@@ -10,16 +10,26 @@ done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
-mapfile -t rule_paths < <(find "$root/shared/rules" -mindepth 1 -maxdepth 2 -type f -name '*.md' ! -path '*/references/*' ! -name general.md -printf '%P\n' | sort)
+mapfile -t rule_paths < <(find "$root/shared/rules" -mindepth 1 -type f -name '*.md' ! -name general.md -printf '%P\n' | sort)
 rule_skill_count=${#rule_paths[@]}
 global_instructions=$(<"$root/shared/global-instructions.md")
+rule_skill_name() {
+  local path=$1 directory relative
+  if [[ "$path" != */* ]]; then printf 'rules-%s' "${path%.md}"; return; fi
+  directory=${path%%/*}
+  relative=${path#*/}
+  if [[ "$relative" == index.md ]]; then printf 'rules-%s' "$directory"; return; fi
+  relative=${relative#references/}
+  relative=${relative%.md}
+  relative=${relative//\//-}
+  printf 'rules-%s-%s' "$directory" "$relative"
+}
 for rule_path in "${rule_paths[@]}"; do
-  case "$rule_path" in
-    */index.md) skill_name="rules-${rule_path%/index.md}" ;;
-    *.md) skill_name="rules-${rule_path%.md}" ;;
-  esac
-  expected_rule="\`rules/$rule_path\` / \`$skill_name\`"
-  printf '%s' "$global_instructions" | grep -Fq -- "$expected_rule"
+  if [[ "$rule_path" != */* || "$rule_path" == */index.md ]]; then
+    skill_name=$(rule_skill_name "$rule_path")
+    expected_rule="\`rules/$rule_path\` / \`$skill_name\`"
+    printf '%s' "$global_instructions" | grep -Fq -- "$expected_rule"
+  fi
 done
 for shell in powershell bash; do
   for client in codex claude; do
@@ -62,13 +72,10 @@ for shell in powershell bash; do
     doc_file=AGENTS.md
     [ "$client" != claude ] || doc_file=CLAUDE.md
     doc_content=$(cat "$package/$doc_file")
-    printf '%s' "$doc_content" | grep -Fq 'rules/security.md'
+    printf '%s' "$doc_content" | grep -Fq 'rules/security/index.md'
     if [ "$client" = claude ]; then
       for rule_path in "${rule_paths[@]}"; do
-        case "$rule_path" in
-          */index.md) skill_name="rules-${rule_path%/index.md}" ;;
-          *.md) skill_name="rules-${rule_path%.md}" ;;
-        esac
+        skill_name=$(rule_skill_name "$rule_path")
         test -f "$package/skills/rules/$skill_name/SKILL.md"
       done
     fi
