@@ -9,7 +9,7 @@
 - [ ] Preserve pre-existing global CLI packages. `ensure_cli()` and `ensure_qmd()` install and claim npm packages without checking whether they were already installed; later removal can uninstall a user's package. (`scripts/lib/managed-extensions.py:342`, `scripts/lib/managed-extensions.py:378`)
 - [ ] Fetch skill archives by an immutable commit and record that same commit. The archive uses GitHub `HEAD`, while `resolvedRevision` comes from a separate later request, so the recorded revision may not identify the installed payload. (`scripts/lib/managed-extensions.py:94`, `scripts/lib/managed-extensions.py:140`, `scripts/lib/managed-extensions.py:409`)
 - [ ] Protect the semantic retrieval daemon's IPC protocol. It uses a hardcoded authentication key and `multiprocessing.connection.recv()`, which deserializes messages; a process that can reach its socket or pipe can submit arbitrary roots and potentially crafted objects. Use a private per-install credential and a non-pickle wire format, or restrict the endpoint to the current user. (`shared/retrieval/server.py:47`, `shared/retrieval/server.py:306`, `shared/retrieval/server.py:314`)
-- [ ] Write semantic retrieval ownership state atomically. `save_state()` replaces the JSON with a direct write, unlike the extension and selection ledgers; interruption can leave it unreadable and block later reconciliation. (`scripts/lib/semantic-retrieval.py:63`)
+- [x] Write semantic retrieval ownership state atomically. `save_state()` replaces the JSON with a direct write, unlike the extension and selection ledgers; interruption can leave it unreadable and block later reconciliation. (`scripts/lib/semantic-retrieval.py:63`)
 
 ## Menus and reconciliation
 

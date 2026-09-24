@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
 
 FILES = ('server.py', 'benchmark.py', 'requirements.txt')
@@ -63,7 +64,18 @@ def load_state(path):
 def save_state(path, state, dry_run):
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state, indent=2) + '\n', encoding='utf-8')
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent, delete=False) as stream:
+                temporary = Path(stream.name)
+                json.dump(state, stream, indent=2)
+                stream.write('\n')
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
 
 def sync(root, home, clients, enabled, dry_run, update, summary=False):
