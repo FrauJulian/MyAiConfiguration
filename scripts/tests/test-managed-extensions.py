@@ -53,6 +53,8 @@ class ManagedExtensionTests(unittest.TestCase):
         self.addCleanup(self.output.__exit__, None, None, None)
 
     def command(self, args, summary, home=None):
+        if args[:2] == ['npm', 'list']:
+            return '{"dependencies":{}}'
         self.commands.append(args)
         if len(args) > 3 and args[2] in ('add', 'install') and args[1] == 'plugin':
             self.installed[args[0]][args[3]] = {'scope': 'user'}

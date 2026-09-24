@@ -163,6 +163,7 @@ class Manager:
             self.state = json.loads(self.path.read_text(encoding='utf-8'))
         self.validate()
         self.cache = {}
+        self.new_packages = set()
 
     def validate(self):
         if not isinstance(self.state, dict) or self.state.get('version') != 1 or not isinstance(self.state.get('resources'), list):
@@ -211,6 +212,14 @@ class Manager:
         if client not in self.cache:
             self.cache[client] = installed_plugins(client, self.home)
         return self.cache[client]
+
+    def global_packages(self):
+        if 'global_packages' not in self.cache:
+            result = json.loads(run_command(['npm', 'list', '--global', '--depth=0', '--json'], True, self.home))
+            if not isinstance(result, dict) or not isinstance(result.get('dependencies'), dict):
+                raise ValueError('Invalid global npm package inventory.')
+            self.cache['global_packages'] = set(result['dependencies'])
+        return self.cache['global_packages']
 
     def command(self, arguments):
         if self.dry_run:
@@ -347,10 +356,16 @@ class Manager:
         if not re.fullmatch(r'[a-z0-9@/_.-]+', package):
             raise ValueError('Invalid CLI package.')
         record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
-        installed = shutil.which(package) is not None
+        installed = package in self.global_packages()
+        if record is None and installed:
+            if not self.summary:
+                print(f'PASS Preserving pre-existing global package: {package}')
+            return
         if record is not None and installed and not self.update:
             return
         self.command(['npm', 'update' if record is not None and installed else 'install', '--global', package])
+        self.global_packages().add(package)
+        self.new_packages.add(package)
         if not self.dry_run and record is None:
             self.state['resources'].append(dict(client=client, name=entry['name'], kind='cli', package=package))
             self.save()
@@ -383,15 +398,18 @@ class Manager:
         package = entry['codex_source']
         if package != '@tobilu/qmd':
             raise ValueError('Invalid QMD package.')
-        if not getattr(self, 'qmd_ready', False):
+        record = next((r for r in self.state['resources'] if r['client'] == 'codex' and r['name'] == entry['name']), None)
+        pre_existing = record is None and package in self.global_packages() and package not in self.new_packages
+        if not getattr(self, 'qmd_ready', False) and not pre_existing and package not in self.global_packages():
             self.command(['npm', 'install', '--global', package])
-            self.qmd_ready = True
+            self.global_packages().add(package)
+            self.new_packages.add(package)
+        self.qmd_ready = True
         if client == 'claude':
             entry = dict(entry, codex_method='plugin')
             self.ensure(client, entry)
             return
-        record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
-        if record is not None:
+        if record is not None or pre_existing:
             return
         self.state['resources'].append(dict(client='codex', name=entry['name'], kind='qmd', package=package))
         self.save()
