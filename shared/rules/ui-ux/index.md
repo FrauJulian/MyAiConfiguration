@@ -32,7 +32,7 @@
 * Prefer familiar patterns over clever ones.
 * Prefer fewer clear choices over many ambiguous choices.
 * Prefer predictable behavior over surprising automation.
-* If a design decision introduces ambiguity, unnecessary complexity, or multiple equally valid UX directions, ask the user instead of deciding autonomously.
+* If multiple valid UX directions remain and the choice materially affects user workflow or safety, ask the user. Make minor reversible choices independently.
 
 ## Priority Order
 
