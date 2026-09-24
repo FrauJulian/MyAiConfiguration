@@ -30,6 +30,11 @@ out2=$(sync_managed_destination "$source_dir" "$destination" run2 "$destination"
 [ -z "$(printf '%s\n' "$out2" | grep -v '^UNCHANGED' | grep -v '^SOURCE ')" ] || { printf 'Second identical install was not a no-op:\n%s\n' "$out2" >&2; exit 1; }
 [ ! -d "$destination/backups/run2" ] || { printf 'Idempotent install must not create a backup.\n' >&2; exit 1; }
 
+printf 'root=__AI_CONFIG_ROOT__\n\n' > "$source_dir/newlines.txt"
+printf 'root=%s\n\n' "$destination" > "$work/expected-newlines.txt"
+sync_managed_destination "$source_dir" "$destination" newlines "$destination" bash bash false > /dev/null
+cmp -s "$work/expected-newlines.txt" "$destination/newlines.txt" || { printf 'Substitution changed terminal newlines.\n' >&2; exit 1; }
+
 printf 'mine' > "$destination/foreign.md"
 
 rm -f "$source_dir/b.md" "$source_dir/c.md"

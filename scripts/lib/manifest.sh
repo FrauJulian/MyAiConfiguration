@@ -68,10 +68,12 @@ sync_managed_destination() {
     relative=${source_file#"$source/"}
     if [ "${destination##*/}" = .codex ] && [[ "$relative" = skills/* ]]; then continue; fi
     target="$destination/$relative"
-    content=$(<"$source_file")
+    content=$(cat -- "$source_file" && printf '\034') || return
+    content=${content%$'\034'}
     needs_sub=false
     if [ "$flashbang_enabled" = false ] && [[ "$relative" = settings.json || "$relative" = config.toml ]]; then
-      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter --path "$source_file" --flashbang false) || return
+      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter --path "$source_file" --flashbang false && printf '\034') || return
+      content=${content%$'\034'}
       needs_sub=true
     fi
     if [[ "$needs_sub" = true || "$content" == *'__AI_CONFIG_ROOT__'* || "$content" == *'__HOOK_COMMAND__'* || "$content" == *'__POWERSHELL_HOOK_COMMAND__'* || "$content" == *'__POWERSHELL_COMMAND__'* || "$content" == *'__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__'* ]]; then
