@@ -21,7 +21,7 @@ Codex's native `tui.status_line` contains `model`, `reasoning`, `approval-mode`,
 Claude runs `shared/statusline/statusline.ps1` for PowerShell or `statusline.sh` for Bash. Its two-line display is:
 
 ```text
-Opus · Effort high · MyRepo @ main
+Opus · Review auto · Effort high · MyRepo @ main
 Ctx 200k · Used 42% · Tokens 16.7k
 ```
 
