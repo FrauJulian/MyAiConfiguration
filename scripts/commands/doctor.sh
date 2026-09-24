@@ -100,6 +100,17 @@ for path in shared/rules shared/skills shared/agents shared/hooks/scripts; do
   [ -e "$root/$path" ] && result PASS "source $path" || result FAIL "missing $path"
 done
 
+for client in codex claude; do
+  if [ "$client" = codex ]; then
+    config="$root/adapters/codex/config/config.toml"
+    pattern='\[\[hooks\.Stop\]\]'
+  else
+    config="$root/adapters/claude/config/settings.json"
+    pattern='"Stop"[[:space:]]*:'
+  fi
+  if grep -Eq "$pattern" "$config"; then result PASS "$client Stop hook is registered"; else result WARN "$client ships hook utilities, but no Stop hook is registered"; fi
+done
+
 if [ "$summary" = true ]; then
   if [ "$failed" = true ]; then
     for line in "${pass_buffer[@]}"; do printf '%s\n' "$line"; done
