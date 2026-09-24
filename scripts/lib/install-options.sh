@@ -49,8 +49,7 @@ read_semantic_retrieval_option() {
       y|Y|yes|Yes|YES) printf 'true\n'; return ;;
       n|N|no|No|NO) printf 'false\n'; return ;;
       a|A|auto|Auto|AUTO)
-        if test_semantic_retrieval_device "$root" "$home_path"; then printf 'true\n'; return; fi
-        status=$?
+        if test_semantic_retrieval_device "$root" "$home_path"; then printf 'true\n'; return; else status=$?; fi
         [ "$status" -eq 1 ] && { printf 'false\n'; return; }
         return "$status"
         ;;
