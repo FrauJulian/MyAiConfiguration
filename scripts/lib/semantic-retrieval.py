@@ -78,6 +78,23 @@ def save_state(path, state, dry_run):
                 temporary.unlink(missing_ok=True)
 
 
+def check_runtime(target, state):
+    if target.is_symlink():
+        raise ValueError('Semantic retrieval directory must not be a symbolic link.')
+    if not target.exists():
+        return
+    if not target.is_dir():
+        raise ValueError('Semantic retrieval target is not a directory.')
+    for name, expected in state['files'].items():
+        path = target / name
+        if path.is_symlink() or not path.is_file() or digest(path) != expected:
+            raise ValueError(f'Owned semantic retrieval file changed: {name}')
+    allowed = set(state['files']) | {'.venv', 'model-cache'}
+    for path in target.iterdir():
+        if path.is_symlink() or path.name not in allowed:
+            raise ValueError(f'Foreign or linked semantic retrieval path: {path.name}')
+
+
 def sync(root, home, clients, enabled, dry_run, update, summary=False):
     base = home / '.my-ai-configuration'
     target = base / 'semantic-retrieval'
@@ -96,13 +113,16 @@ def sync(root, home, clients, enabled, dry_run, update, summary=False):
         if state['clients']:
             save_state(state_path, state, False)
             return
-        if target.is_symlink():
-            raise ValueError('Semantic retrieval directory must not be a symbolic link.')
+        if not state['files']:
+            state_path.unlink(missing_ok=True)
+            return
+        check_runtime(target, state)
         if target.exists() and target.is_dir():
             shutil.rmtree(target)
         state_path.unlink(missing_ok=True)
         return
 
+    check_runtime(target, state)
     if target.exists() and not state['files']:
         raise ValueError('Semantic retrieval directory exists without setup ownership; refusing to overwrite it.')
     if dry_run:
@@ -136,9 +156,15 @@ def benchmark(root, home, dry_run, summary=False):
         return True
     state = load_state(state_path)
     source = root / 'shared' / 'retrieval'
+    if state['files']:
+        check_runtime(target, state)
+    elif target.is_symlink():
+        raise ValueError('Semantic retrieval directory must not be a symbolic link.')
     if target.exists() and not state['files']:
         if not all((target / name).is_file() and digest(target / name) == digest(source / name) for name in FILES):
             raise ValueError('Semantic retrieval directory exists without setup ownership; refusing to overwrite it.')
+        state['files'] = {name: digest(target / name) for name in FILES}
+        check_runtime(target, state)
     target.mkdir(parents=True, exist_ok=True)
     for name in FILES:
         shutil.copy2(source / name, target / name)
@@ -152,6 +178,7 @@ def benchmark(root, home, dry_run, summary=False):
     if outcome['recommended'] or state['clients']:
         save_state(state_path, state, False)
     else:
+        check_runtime(target, state)
         shutil.rmtree(target)
         state_path.unlink(missing_ok=True)
     if not summary:
