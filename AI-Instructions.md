@@ -15,7 +15,7 @@ Keep the architecture as:
 - Do not duplicate shared behavior in adapters.
 - Treat `generated/` as reproducible build output.
 - Maintain equivalent support for both Codex and Claude Code.
-- Keep technology-specific rules in separate files under `shared/rules/`.
+- Keep each language, framework, and library in its own directory under `shared/rules/`, with an index and focused Markdown rules. Keep security in `shared/rules/security/` and cross-cutting rules such as Git and Microsoft directly under `shared/rules/`.
 - Generate those rule files beside `AGENTS.md` and `CLAUDE.md`; load them only when their subject applies.
 
 ## Portability
@@ -59,5 +59,4 @@ Write all repository content, generated instructions, scripts, prompts, document
 
 - Never commit changes unless explicitly instructed.
 - Preserve unrelated user changes.
-
 

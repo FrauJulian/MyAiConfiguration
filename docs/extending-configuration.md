@@ -4,7 +4,7 @@ Shared definitions are the source of truth. Rebuild after every semantic change.
 
 ## Add a rule
 
-Create a focused Markdown file in `shared/rules/` and add its loading condition to `shared/global-instructions.md`. Claude rule skills are generated from the rule filenames; Codex loads the referenced rule files directly. Put always-applicable guidance in `general.md`, which the build embeds for both clients; a new rule file is not automatically embedded.
+Create cross-cutting rules such as Git or Microsoft guidance as focused Markdown files directly in `shared/rules/`. Put each language, framework, or library in its own directory with an `index.md` and focused files under `references/`; put security rules in `shared/rules/security/`. Add the matching loading condition and generated Claude skill name to `shared/global-instructions.md` and the directory index. The build copies rule trees to Codex and generates Claude skills from each rule file. Put always-applicable guidance in `general.md`, which the build embeds for both clients; a new rule file is not automatically embedded.
 
 ## Add a skill
 

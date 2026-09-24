@@ -18,7 +18,7 @@ Claude's generated package additionally has `skills/rules/`: one skill per focus
 `shared/rules/`. The rule-to-skill loading conditions live in `shared/global-instructions.md`, so full rule text loads
 only when Claude invokes a matching skill instead of sitting permanently in context. Codex reads the matching rule
 files directly. Both clients embed the general rules in their global instructions.
-Split Angular, WPF, and UI/UX rules load supporting references only for the topic being worked on. See [Configuration](configuration.md).
+Language, framework, library, and security rules use directory indexes plus focused topic files. Their generated Claude skills expose each focused rule separately; the index skills also include the references for contextual lookup. See [Configuration](configuration.md).
 
 Skills guide a task when needed; their availability does not require a full review, build, or test suite after every
 change. The shared Verification rules govern proportional checking, including when generic skill workflows call
