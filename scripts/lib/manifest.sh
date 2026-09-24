@@ -16,6 +16,24 @@ manifest_path() {
   printf '%s/.ai-config-manifest.tsv' "$1"
 }
 
+managed_target() {
+  local destination=$1 relative=$2 component target=$destination probe
+  [[ -n "$relative" && "$relative" != /* && "$relative" != */ && "$relative" != *//* && "$relative" != *\\* && "$relative" != *:* && "$relative" != *$'\t'* && "$relative" != *$'\r'* && "$relative" != *$'\n'* ]] || { printf 'Invalid managed path: %s\n' "$relative" >&2; return 1; }
+  local -a parts
+  IFS=/ read -r -a parts <<< "$relative"
+  for component in "${parts[@]}"; do
+    [[ -n "$component" && "$component" != . && "$component" != .. ]] || { printf 'Invalid managed path: %s\n' "$relative" >&2; return 1; }
+    target+=/$component
+  done
+  probe=$target
+  while :; do
+    [ ! -L "$probe" ] || { printf 'Managed path contains a link: %s\n' "$probe" >&2; return 1; }
+    [ "$probe" != "$destination" ] || break
+    probe=$(dirname -- "$probe")
+  done
+  printf '%s' "$target"
+}
+
 # read_managed_manifest <manifest-file> <assoc-array-name>
 read_managed_manifest() {
   local path=$1
@@ -31,6 +49,7 @@ read_managed_manifest() {
       [ "$rel" = path ] && continue
     fi
     [ -n "$rel" ] || continue
+    managed_target "$(dirname -- "$path")" "$rel" > /dev/null || return 1
     hash=$(printf '%s' "$hash" | tr '[:upper:]' '[:lower:]') # tolerate uppercase hashes from older manifests
     # shellcheck disable=SC2034
     out_ref[$rel]=$hash
@@ -57,8 +76,9 @@ sync_managed_destination() {
   [ "$summary" = true ] || printf 'SOURCE %s -> %s\n' "$source" "$destination"
   local manifest
   manifest=$(manifest_path "$destination")
+  managed_target "$destination" '.ai-config-manifest.tsv' > /dev/null || return 1
   declare -A old_manifest
-  read_managed_manifest "$manifest" old_manifest
+  read_managed_manifest "$manifest" old_manifest || return 1
   declare -A new_manifest
   local backup_root="$destination/backups/$stamp"
   local created=0 updated=0 unchanged=0 removed=0 warned=0
@@ -67,7 +87,7 @@ sync_managed_destination() {
     local relative target content needs_sub new_hash exists current_hash action backup
     relative=${source_file#"$source/"}
     if [ "${destination##*/}" = .codex ] && [[ "$relative" = skills/* ]]; then continue; fi
-    target="$destination/$relative"
+    target=$(managed_target "$destination" "$relative") || return 1
     content=$(cat -- "$source_file" && printf '\034') || return
     content=${content%$'\034'}
     needs_sub=false
@@ -150,7 +170,7 @@ sync_managed_destination() {
     fi
 
     if [ "$exists" = true ]; then
-      backup="$backup_root/$relative"
+      backup=$(managed_target "$destination" "backups/$stamp/$relative") || return 1
       mkdir -p "$(dirname -- "$backup")"
       cp -- "$target" "$backup"
       [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"
@@ -172,14 +192,14 @@ sync_managed_destination() {
   local relative target current_hash backup
   for relative in "${!old_manifest[@]}"; do
     [ -z "${new_manifest[$relative]+x}" ] || continue
-    target="$destination/$relative"
+    target=$(managed_target "$destination" "$relative") || return 1
     [ -f "$target" ] || continue
     if [ "$dry_run" = true ]; then
       [ "$summary" = true ] || printf 'DRYRUN REMOVE %s\n' "$target"
       removed=$((removed + 1))
       continue
     fi
-    backup="$backup_root/$relative"
+    backup=$(managed_target "$destination" "backups/$stamp/$relative") || return 1
     mkdir -p "$(dirname -- "$backup")"
     cp -- "$target" "$backup"
     [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"

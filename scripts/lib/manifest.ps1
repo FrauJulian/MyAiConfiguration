@@ -3,6 +3,24 @@ function Get-ManagedManifestPath {
     return (Join-Path $Destination '.ai-config-manifest.tsv')
 }
 
+function Resolve-ManagedPath {
+    param([Parameter(Mandatory=$true)][string]$Destination, [Parameter(Mandatory=$true)][string]$Relative)
+    $parts = $Relative -split '/', 0, 'SimpleMatch'
+    if ($Relative.StartsWith('/') -or $Relative.Contains('\') -or $Relative.Contains(':') -or $Relative.Contains("`t") -or $Relative.Contains("`r") -or $Relative.Contains("`n") -or @($parts | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0) {
+        throw "Invalid managed path: $Relative"
+    }
+    $target = $Destination
+    foreach ($part in $parts) { $target = Join-Path $target $part }
+    $probe = $target
+    while ($true) {
+        $item = Get-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+        if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Managed path contains a link: $probe" }
+        if ($probe -eq $Destination) { break }
+        $probe = Split-Path $probe -Parent
+    }
+    return $target
+}
+
 function Get-Sha256Hash {
     param([Parameter(Mandatory=$true)][string]$Path)
     # Lowercase to match sha256sum's output, since the manifest must be readable by
@@ -22,7 +40,10 @@ function Read-ManagedManifest {
     $entries = @{}
     if (Test-Path -LiteralPath $ManifestPath) {
         # Lowercase to tolerate an older manifest written before hashes were normalized.
-        Import-Csv -LiteralPath $ManifestPath -Delimiter ([char]9) | ForEach-Object { $entries[$_.path] = $_.sha256.ToLowerInvariant() }
+        Import-Csv -LiteralPath $ManifestPath -Delimiter ([char]9) | ForEach-Object {
+            $null = Resolve-ManagedPath -Destination (Split-Path $ManifestPath -Parent) -Relative $_.path
+            $entries[$_.path] = $_.sha256.ToLowerInvariant()
+        }
     }
     return $entries
 }
@@ -63,6 +84,7 @@ function Sync-ManagedDestination {
     )
     if (-not $Summary) { Write-Output "SOURCE $Source -> $Destination" }
     $manifestPath = Get-ManagedManifestPath $Destination
+    $null = Resolve-ManagedPath -Destination $Destination -Relative '.ai-config-manifest.tsv'
     $oldManifest = Read-ManagedManifest $manifestPath
     $newManifest = @{}
     $backupRoot = Join-Path $Destination "backups/$Stamp"
@@ -71,7 +93,7 @@ function Sync-ManagedDestination {
     Get-ChildItem $Source -File -Recurse | ForEach-Object {
         $relative = $_.FullName.Substring($Source.Length).TrimStart([char[]]@('\','/')).Replace('\','/')
         if ((Split-Path $Destination -Leaf) -eq '.codex' -and $relative.StartsWith('skills/')) { return }
-        $target = Join-Path $Destination $relative
+        $target = Resolve-ManagedPath -Destination $Destination -Relative $relative
         $rawContent = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
         $filterFlashbang = -not $FlashbangEnabled -and $relative -in @('settings.json', 'config.toml')
         if ($filterFlashbang) {
@@ -121,7 +143,7 @@ function Sync-ManagedDestination {
         if ($DryRun) { if (-not $Summary) { Write-Output "DRYRUN $action $target" }; if ($action -eq 'CREATE') { $tally.Created++ } else { $tally.Updated++ }; return }
         if ($exists) {
             $wasManaged = $oldManifest.ContainsKey($relative)
-            $backup = Join-Path $backupRoot $relative
+            $backup = Resolve-ManagedPath -Destination $Destination -Relative "backups/$Stamp/$relative"
             New-Item (Split-Path $backup -Parent) -ItemType Directory -Force | Out-Null
             Copy-Item -LiteralPath $target $backup -Force
             if (-not $Summary) { Write-Output "BACKUP $target -> $backup" }
@@ -134,10 +156,10 @@ function Sync-ManagedDestination {
     }
 
     foreach ($relative in @($oldManifest.Keys | Where-Object { -not $newManifest.ContainsKey($_) })) {
-        $target = Join-Path $Destination $relative
+        $target = Resolve-ManagedPath -Destination $Destination -Relative $relative
         if (-not (Test-Path -LiteralPath $target)) { continue }
         if ($DryRun) { if (-not $Summary) { Write-Output "DRYRUN REMOVE $target" }; $tally.Removed++; continue }
-        $backup = Join-Path $backupRoot $relative
+        $backup = Resolve-ManagedPath -Destination $Destination -Relative "backups/$Stamp/$relative"
         New-Item (Split-Path $backup -Parent) -ItemType Directory -Force | Out-Null
         Copy-Item -LiteralPath $target $backup -Force
         if (-not $Summary) { Write-Output "BACKUP $target -> $backup" }
