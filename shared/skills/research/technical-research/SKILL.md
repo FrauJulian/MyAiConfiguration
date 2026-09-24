@@ -1,12 +1,18 @@
 ---
 name: technical-research
-description: Investigate technical options and relevant evidence before implementation.
+description: Use before implementation when an unfamiliar or changing technology, API, standard, or technical trade-off needs current evidence. Prefer primary sources; do not use for repository-only code discovery.
 ---
 
 # Technical Research
 
-Use when an implementation depends on unfamiliar technology, APIs, tools, or trade-offs.
+Use before implementation when an unfamiliar technology, API, current product behavior, or technical trade-off could change the solution.
 
-Gather relevant evidence, compare viable options, and identify unknowns.
+## Workflow
 
-Return concise findings with sources, assumptions, and a recommendation when appropriate. Do not implement the change.
+1. Turn the implementation question into specific facts or decisions that need evidence.
+2. Prefer current primary sources: official product documentation, standards, release notes, or the original research. Check version and date when behavior may have changed.
+3. Compare only viable options against the user's constraints, compatibility needs, security properties, and maintenance cost.
+4. Separate source-backed facts from interpretation. Record assumptions and any material evidence that is missing or conflicting.
+5. Recommend an option only when evidence supports it. Explain the deciding trade-off briefly.
+
+Return concise findings with direct sources and an implementation-relevant conclusion. Do not implement the change.
