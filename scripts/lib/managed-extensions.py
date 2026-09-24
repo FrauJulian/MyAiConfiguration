@@ -163,7 +163,7 @@ class Manager:
             self.state = json.loads(self.path.read_text(encoding='utf-8'))
         self.validate()
         self.cache = {}
-        self.new_packages = set()
+        self.updated_packages = set()
 
     def validate(self):
         if not isinstance(self.state, dict) or self.state.get('version') != 1 or not isinstance(self.state.get('resources'), list):
@@ -196,7 +196,7 @@ class Manager:
                     if not relative.startswith(directory + '/') or not re.fullmatch(r'[a-f0-9]{64}', value):
                         raise ValueError('Invalid owned skill file record.')
                     safe_path(self.home, relative)
-            elif resource['kind'] == 'qmd' and (resource.get('package') != '@tobilu/qmd' or resource['client'] != 'codex'):
+            elif resource['kind'] == 'qmd' and (resource.get('package') != '@tobilu/qmd' or resource['client'] not in ('codex', 'shared')):
                 raise ValueError('Invalid owned QMD record.')
             elif resource['kind'] == 'cli' and not re.fullmatch(r'[a-z0-9@/_.-]+', resource.get('package', '')):
                 raise ValueError('Invalid owned CLI record.')
@@ -222,6 +222,24 @@ class Manager:
                 raise ValueError('Invalid global npm package inventory.')
             self.cache['global_packages'] = set(result['dependencies'])
         return self.cache['global_packages']
+
+    def normalize_global_records(self):
+        for name in {record['name'] for record in self.state['resources'] if record['kind'] in ('cli', 'qmd')}:
+            records = [record for record in self.state['resources'] if record['name'] == name and record['kind'] in ('cli', 'qmd')]
+            legacy = [record for record in records if record['client'] != 'shared']
+            if not legacy:
+                continue
+            shared = next((record for record in records if record['client'] == 'shared'), None)
+            if shared is None:
+                shared = dict(legacy[0], client='shared')
+                self.state['resources'].append(shared)
+            users = set(shared.get('clients', [])) | {record['client'] for record in legacy}
+            if shared['kind'] == 'qmd' and any(record['client'] == 'claude' and record['name'] == name and record['kind'] == 'plugin' for record in self.state['resources']):
+                users.add('claude')
+            shared['clients'] = sorted(users)
+            for record in legacy:
+                self.state['resources'].remove(record)
+            self.save()
 
     def command(self, arguments):
         if self.dry_run:
@@ -357,19 +375,22 @@ class Manager:
         package = entry['codex_source']
         if not re.fullmatch(r'[a-z0-9@/_.-]+', package):
             raise ValueError('Invalid CLI package.')
-        record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
+        record = next((r for r in self.state['resources'] if r['client'] == 'shared' and r['name'] == entry['name']), None)
         installed = package in self.global_packages()
         if record is None and installed:
             if not self.summary:
                 print(f'PASS Preserving pre-existing global package: {package}')
             return
-        if record is not None and installed and not self.update:
+        if record is not None:
+            record['clients'] = sorted(set(record.get('clients', ['claude', 'codex'])) | {client})
+            self.save()
+        if installed and (not self.update or package in self.updated_packages):
             return
         self.command(['npm', 'update' if record is not None and installed else 'install', '--global', package])
         self.global_packages().add(package)
-        self.new_packages.add(package)
-        if not self.dry_run and record is None:
-            self.state['resources'].append(dict(client=client, name=entry['name'], kind='cli', package=package))
+        self.updated_packages.add(package)
+        if record is None:
+            self.state['resources'].append(dict(client='shared', name=entry['name'], kind='cli', package=package, clients=[client]))
             self.save()
 
     def repair_caveman_windows_hooks(self):
@@ -400,21 +421,23 @@ class Manager:
         package = entry['codex_source']
         if package != '@tobilu/qmd':
             raise ValueError('Invalid QMD package.')
-        record = next((r for r in self.state['resources'] if r['client'] == 'codex' and r['name'] == entry['name']), None)
-        pre_existing = record is None and package in self.global_packages() and package not in self.new_packages
-        if not getattr(self, 'qmd_ready', False) and not pre_existing and package not in self.global_packages():
+        record = next((r for r in self.state['resources'] if r['client'] == 'shared' and r['name'] == entry['name']), None)
+        installed = package in self.global_packages()
+        if record is not None:
+            record['clients'] = sorted(set(record.get('clients', ['claude', 'codex'])) | {client})
+            self.save()
+        if record is None and installed and not self.summary:
+            print(f'PASS Preserving pre-existing global package: {package}')
+        if (record is not None or not installed) and (not installed or (self.update and package not in self.updated_packages)):
             self.command(['npm', 'install', '--global', package])
             self.global_packages().add(package)
-            self.new_packages.add(package)
-        self.qmd_ready = True
+            self.updated_packages.add(package)
+            if record is None:
+                self.state['resources'].append(dict(client='shared', name=entry['name'], kind='qmd', package=package, clients=[client]))
+                self.save()
         if client == 'claude':
             entry = dict(entry, codex_method='plugin')
             self.ensure(client, entry)
-            return
-        if record is not None or pre_existing:
-            return
-        self.state['resources'].append(dict(client='codex', name=entry['name'], kind='qmd', package=package))
-        self.save()
 
     def ensure_mcporter(self, entry, clients):
         server, url = entry['mcporter_name'], entry['mcporter_url']
@@ -503,6 +526,7 @@ class Manager:
         self.save()
 
     def sync(self, entries, clients, selected, action='sync'):
+        self.normalize_global_records()
         desired = {entry['name']: entry for entry in entries if entry['name'] in selected}
         use_mcporter = 'MCPorter' in desired
         mcporter_entries = {name: entry for name, entry in desired.items() if use_mcporter and entry.get('mcporter_name') and entry.get('mcporter_url') not in ('', '-')}
@@ -510,9 +534,9 @@ class Manager:
         for record in sorted(self.state['resources'], key=lambda record: record['kind'] != 'mcp'):
             if record['client'] != 'shared' and record['client'] not in clients:
                 continue
-            selected_entries = mcporter_entries if record['client'] == 'shared' else direct_entries
+            selected_entries = mcporter_entries if record['kind'] == 'mcp' else direct_entries
             if (action == 'sync' and record['name'] not in selected_entries) or (action == 'remove' and record['name'] in selected):
-                if record['kind'] == 'mcp':
+                if record['client'] == 'shared':
                     remaining = [client for client in record.get('clients', ['claude', 'codex']) if client not in clients]
                     if remaining:
                         record['clients'] = remaining
