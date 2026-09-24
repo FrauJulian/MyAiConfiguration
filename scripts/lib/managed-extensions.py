@@ -401,6 +401,20 @@ class Manager:
         if not re.fullmatch(r'[a-z0-9-]+', server) or not re.fullmatch(r'https://[^\s]+', url):
             raise ValueError('Invalid MCPorter server definition.')
         record = next((r for r in self.state['resources'] if r['client'] == 'shared' and r['name'] == entry['name']), None)
+        config_path = safe_path(self.home, '.mcporter/mcporter.json')
+        if config_path.exists():
+            config = json.loads(config_path.read_text(encoding='utf-8'))
+            if not isinstance(config, dict) or not isinstance(config.get('mcpServers', {}), dict):
+                raise ValueError('Invalid MCPorter server configuration.')
+            existing = config.get('mcpServers', {}).get(server)
+            if existing is not None and not isinstance(existing, dict):
+                raise ValueError('Invalid MCPorter server entry.')
+            if existing is not None and record is None:
+                if not self.summary:
+                    print(f'PASS Preserving pre-existing MCPorter server: {server}')
+                return
+            if existing is not None and record is not None and existing.get('baseUrl') != record['url']:
+                raise ValueError('Owned MCPorter server changed locally; refusing to overwrite it.')
         if record is not None and not self.update:
             return
         self.command(['mcporter', '--config', str(self.home / '.mcporter/mcporter.json'), 'config', 'add', server, url])
