@@ -30,7 +30,7 @@ Bash:
 ## Quickstart
 
 With the [requirements](#requirements) installed, clone the repository, build it, then install it.
-Stop if any command fails. Installation asks for the shell, client, CLI update, Flashbang, Qwen retrieval, and extension choices.
+Stop if any command fails. Installation asks for the shell, client, Flashbang, status line, Qwen retrieval, and extension choices.
 
 PowerShell:
 
@@ -54,7 +54,7 @@ For an already-installed configuration, use Quickupdate instead.
 
 ## Quickupdate
 
-Run these commands from the repository root. Quick reuses the shell, client, CLI update, Flashbang, retrieval, and extension choices from the last
+Run these commands from the repository root. Quick reuses the shell, client, Flashbang, status line, retrieval, and extension choices from the last
 successful installation or update without opening selection menus. Stop if any command fails.
 
 PowerShell:
@@ -218,19 +218,11 @@ Local Codex `model`, `model_reasoning_effort`, `plugins`, and `marketplaces` set
 other local settings are not generally merged. Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
-Codex skills; unchecked extensions are skipped on installation. Normal runs also ask whether to update
-the selected client CLIs, enable Flashbang, and enable Qwen3 semantic retrieval. These choices are saved for Quickupdate.
-Disabling retrieval on a later update removes its setup-owned runtime and index. Dry runs preview
-changes without updating CLIs, extensions, or retrieval. See [Plugins](docs/plugins.md) for client-specific behavior.
-
-Install also always asks `Uninstall Codex/Claude/Both and reinstall via npm?` (default no), scoped to whatever client
-was selected. This choice is independent of the "update selected agent CLIs" choice above, is never saved, and is not
-asked again by Quickupdate or by the update script. Answering yes uninstalls and reinstalls, per selected client, the
-matching CLI (`@openai/codex` for Codex, `@anthropic-ai/claude-code` for Claude) through `npm uninstall -g`
-followed by `npm install -g <package>@latest`, when that CLI is currently found as a global npm package. When it is
-not (for example, installed through a native installer or another package manager), that prior installation is left
-in place with a warning, and only a fresh `npm install -g` is run alongside it. Codex is skipped with a warning while
-`codex.exe` is running. A dry run never asks this question and never previews it, since the choice is not persisted.
+Codex skills; unchecked extensions are skipped on installation. Normal install and update ask whether to enable
+Flashbang, apply the custom status line, and enable Qwen3 semantic retrieval. Choices are saved for Quickupdate.
+The status line defaults to enabled to preserve existing behavior. Disabling it removes the custom client setting and,
+for Claude, the setup-owned status line script. Disabling retrieval on update removes its setup-owned runtime and index.
+Dry runs preview changes without updating extensions or retrieval. See [Plugins](docs/plugins.md) for client-specific behavior.
 
 ## Update Script
 
@@ -249,7 +241,7 @@ Bash:
 ```
 
 It accepts the same `-DryRun`/`--dry-run`, `-Client`/`--client`, and `-Shell`/`--shell` parameters as the
-installer, re-syncs every managed file, and lets you revise the CLI update, Flashbang, retrieval, and extension choices.
+installer, re-syncs every managed file, and lets you revise the status line, Flashbang, retrieval, and extension choices.
 Selected extensions are installed or updated. Deselection removes only extensions recorded as installed by this
 setup; pre-existing or manually installed extensions are retained. Quickupdate reuses the saved choices.
 
