@@ -36,6 +36,8 @@ Qwen retrieval uses `shared/retrieval/benchmark.py`; run it through `scripts/lib
 
 ## Checks and tests
 
+Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
+
 | Script | Purpose |
 | --- | --- |
 | `checks/validate-config.py` | Validate generated Codex TOML and Claude JSON. |
@@ -51,7 +53,10 @@ Qwen retrieval uses `shared/retrieval/benchmark.py`; run it through `scripts/lib
 | `tests/test-retrieval-server.py` | Validate retrieval indexing, ranking, and optional real-model execution. |
 | `tests/test-semantic-retrieval.py` | Validate retrieval installation and removal. |
 | `tests/test-session-state.py` | Validate session-state helpers. |
-| `tests/test-shell-packages.ps1`, `tests/test-shell-packages.sh` | Validate generated packages and shell entry points. |
+| `tests/test-shell-packages.ps1`, `tests/test-shell-packages.sh` | Validate generated package contents and client settings. |
+| `tests/test-runtime-status.ps1`, `tests/test-runtime-status.sh` | Validate build summaries and status-line output. |
+| `tests/test-install-selections.ps1`, `tests/test-install-selections.sh` | Validate dry-run shell and client selections. |
+| `tests/test-command-summaries.ps1`, `tests/test-command-summaries.sh` | Validate doctor, install, and update summary output. |
 | `tests/test-telemetry.py` | Validate telemetry output. |
 
 ## Internal helpers

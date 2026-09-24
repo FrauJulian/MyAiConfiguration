@@ -122,6 +122,9 @@ jobs:
           bash scripts/tests/test-quick-update.sh --summary
           bash scripts/tests/test-managed-install.sh --summary
           bash scripts/tests/test-shell-packages.sh --summary
+          bash scripts/tests/test-runtime-status.sh --summary
+          bash scripts/tests/test-install-selections.sh --summary
+          bash scripts/tests/test-command-summaries.sh --summary
       - name: Run doctor and prompt budget checks
         run: |
           bash scripts/commands/doctor.sh --summary
@@ -186,9 +189,13 @@ jobs:
       - name: Reject unsafe workflow settings
         run: |
           set -euo pipefail
-          ! grep -RInE 'runs-on:[[:space:]]*windows|pull_request_target|permissions:[[:space:]]*write-all|actions/checkout@v|actions/setup-python@v|curl[[:space:]].*\|[[:space:]]*(bash|sh)|wget[[:space:]].*\|[[:space:]]*(bash|sh)' .github/workflows
-          test "$(grep -Roh 'runs-on: ubuntu-latest' .github/workflows | wc -l)" -ge 1
-          test "$(grep -Roh 'uses: actions/[^@]*@[0-9a-f]\{40\}' .github/workflows | wc -l)" -ge 1
+          unsafe_patterns='runs-on:[[:space:]]*windows|pull_request_'
+          unsafe_patterns+='target|permissions:[[:space:]]*write-all|actions/checkout@'
+          unsafe_patterns+='v|actions/setup-python@'
+          unsafe_patterns+='v|curl[[:space:]].*\|[[:space:]]*(bash|sh)|wget[[:space:]].*\|[[:space:]]*(bash|sh)'
+          ! grep -RInE "$unsafe_patterns" .gitea/workflows
+          test "$(grep -Roh 'runs-on: ubuntu-latest' .gitea/workflows | wc -l)" -ge 1
+          test "$(grep -Roh 'uses: actions/[^@]*@[0-9a-f]\{40\}' .gitea/workflows | wc -l)" -ge 1
       - name: Check for tracked secrets
         run: |
           set -euo pipefail

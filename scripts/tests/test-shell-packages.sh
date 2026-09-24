@@ -8,20 +8,6 @@ while [ $# -gt 0 ]; do
   esac
 done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-grep -Eq '\$HoldMs[[:space:]]*=[[:space:]]*250' "$root/shared/hooks/flashbang.ps1"
-grep -Eq '\$FadeMs[[:space:]]*=[[:space:]]*250' "$root/shared/hooks/flashbang.ps1"
-[ "$(grep -c 'default=250' "$root/shared/hooks/flashbang.sh")" -ge 2 ]
-branch=$(git -C "$root" branch --show-current)
-build_summary_output=$(bash "$root/scripts/commands/build.sh" --summary)
-if ! printf '%s\n' "$build_summary_output" | grep -qx 'Build: PASS | 4 packages'; then
-  printf 'build.sh --summary must still print the PASS line: %s\n' "$build_summary_output" >&2
-  exit 1
-fi
-[ "$build_summary_output" = 'Build: PASS | 4 packages' ]
-status_output=$(printf '{"model":{"display_name":"Test Model"},"effort":{"level":"high"},"workspace":{"current_dir":"%s","repo":{"name":"TestRepo"}},"context_window":{"context_window_size":200000,"used_percentage":8.5,"total_input_tokens":15500,"total_output_tokens":1200}}' "$root" | bash "$root/shared/statusline/statusline.sh")
-plain_status_output=$(printf '%s' "$status_output" | sed -E $'s/\x1b\\[[0-9;]*m//g')
-expected_status_output=$'Test Model \xc2\xb7 Review auto \xc2\xb7 Effort high \xc2\xb7 TestRepo @ '"$branch"$'\nCtx 200k \xc2\xb7 Used 9% \xc2\xb7 Tokens 16.7k'
-[ "$plain_status_output" = "$expected_status_output" ]
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
 rule_skill_count=$(($(wc -l < "$root/adapters/rule-skills.tsv") - 1))
@@ -100,32 +86,4 @@ for shell in powershell bash; do
     done
   done
 done
-for shell_selection in 1 2; do
-  for client_selection in 1 2 3; do
-    output=$(printf '%s\n%s\n' "$shell_selection" "$client_selection" | bash "$root/scripts/commands/install.sh" --dry-run 2>&1) || { printf '%s\n' "$output" >&2; exit 1; }
-    printf '%s\n' "$output" | grep -E 'WARN|FAIL|WARNING|ERROR' || true
-    [[ "$output" == *'PASS install dry-run'* ]]
-    shell=powershell
-    [ "$shell_selection" != 2 ] || shell=bash
-    [[ "$output" == *"-$shell"* ]]
-  done
-done
-doctor_summary_output=$(bash "$root/scripts/commands/doctor.sh" --summary)
-if printf '%s\n' "$doctor_summary_output" | grep -q '^PASS '; then
-  printf 'Doctor summary mode must not print individual PASS lines.\n' >&2
-  exit 1
-fi
-if ! printf '%s\n' "$doctor_summary_output" | grep -Eq '^Doctor: PASS \| [0-9]+ checks$'; then
-  printf "Doctor summary mode must print one 'Doctor: PASS | N checks' line: %s\n" "$doctor_summary_output" >&2
-  exit 1
-fi
-for entry_point in install update; do
-  preview=$(bash "$root/scripts/commands/$entry_point.sh" --summary --dry-run --client both --shell bash)
-  if printf '%s\n' "$preview" | grep -Eq '^(SOURCE|CREATE|UPDATE|UNCHANGED|BACKUP|DRYRUN|PASS) '; then
-    printf '%s summary leaked per-item output.\n' "$entry_point" >&2
-    exit 1
-  fi
-  printf '%s\n' "$preview" | grep -Eiq "^$entry_point: PASS"
-done
-printf '%s\n' "$doctor_summary_output" | grep '^WARN ' || true
-if [ "$summary" = true ]; then printf 'Tests: PASS | shell packages\n'; else printf 'PASS four shell packages and six Bash selections\n'; fi
+if [ "$summary" = true ]; then printf 'Tests: PASS | generated packages\n'; else printf 'PASS four generated client and shell packages\n'; fi

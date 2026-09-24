@@ -58,14 +58,12 @@ class RetrievalServerTests(unittest.TestCase):
         self.assertFalse(huggingface_network_unavailable(OSError('model is missing')))
 
     def test_ci_disables_xet_for_model_downloads(self):
-        for workflow in ('.github/workflows/ci.yml', '.gitea/workflows/ci.yml'):
-            content = (ROOT / workflow).read_text(encoding='utf-8')
-            self.assertIn("HF_HUB_DISABLE_XET: '1'", content)
+        content = (ROOT / '.gitea/workflows/ci.yml').read_text(encoding='utf-8')
+        self.assertIn("HF_HUB_DISABLE_XET: '1'", content)
 
     def test_client_smoke_builds_packages(self):
-        for workflow in ('.github/workflows/ci.yml', '.gitea/workflows/ci.yml'):
-            content = (ROOT / workflow).read_text(encoding='utf-8')
-            self.assertIn('name: Build packages\n        run: bash scripts/commands/build.sh --summary', content)
+        content = (ROOT / '.gitea/workflows/ci.yml').read_text(encoding='utf-8')
+        self.assertIn('name: Build packages\n        run: bash scripts/commands/build.sh --summary', content)
 
     def test_runtime_python_uses_adjacent_virtualenv(self):
         with TemporaryDirectory() as temporary:
