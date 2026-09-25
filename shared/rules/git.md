@@ -15,6 +15,7 @@
 * Permission to push does not imply permission to create or merge a pull request.
 * Only perform Git write operations that the user explicitly requested.
 * Read-only Git commands may be used when needed to inspect repository state.
+* Create commits only with `git commit` and push commits only with `git push`. Never create commits or publish repository code through REST APIs, hosting-provider APIs, or other non-Git interfaces.
 
 ## Repository Safety
 
