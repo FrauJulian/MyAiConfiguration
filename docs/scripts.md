@@ -21,12 +21,14 @@ Run scripts from the repository root. PowerShell and Bash commands have equivale
 | `commands/update.ps1`, `commands/update.sh` | Update an existing installation; Quick reuses saved choices. |
 | `commands/uninstall.ps1`, `commands/uninstall.sh` | Remove setup-owned configuration and extensions. |
 | `commands/doctor.ps1`, `commands/doctor.sh` | Check generated output and installed configuration. |
-| `commands/prompt-budget.ps1`, `commands/prompt-budget.sh` | Warn above 115% of the 4,000-byte soft target; fail above the 6,000-byte hard limit for generated permanent instructions. |
+| `commands/prompt-budget.ps1`, `commands/prompt-budget.sh` | Track permanent context, skill metadata, the rule catalog, and agent metadata; warn above 4,000 permanent-context tokens, fail when any token estimate exceeds its baseline by 10%, or permanent context exceeds 6,000 tokens. |
 | `commands/repository-context.ps1`, `commands/repository-context.sh` | Refresh the local repository-context cache. |
 | `commands/session-state.ps1`, `commands/session-state.sh` | Read or update the local agent session state. |
 | `commands/telemetry.ps1`, `commands/telemetry.sh` | Append a local telemetry event. |
 | `commands/add-instruction.ps1`, `commands/add-instruction.sh` | Append a client-specific user instruction outside managed configuration. |
 | `commands/add-credentials.ps1`, `commands/add-credentials.sh` | Store a client-scoped tool credential in the operating-system credential store. |
+
+Prompt KPIs estimate tokens as UTF-8 bytes divided by four, using the larger shell package per client. Skill metadata counts `SKILL.md` frontmatter outside rule skills; the rule catalog counts all generated rule entry files but excludes references, so it measures the available catalog size rather than rules loaded in a typical session; agent metadata counts frontmatter for Claude and `name`/`description` for Codex. All four metrics fail CI above baseline +10%; permanent context also warns above 4,000 tokens and fails above 6,000 tokens.
 
 Custom instructions are read before generated rules, skills, and plugins. They remain under `~/.my-ai-configuration/instructions/`, so installation and update scripts never manage or reset them.
 
@@ -47,6 +49,7 @@ Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
 | `tests/test-managed-extensions.py` | Validate plugin, skill, and CLI ownership handling. |
 | `tests/test-managed-install.ps1`, `tests/test-managed-install.sh` | Validate managed-file synchronization and backups. |
 | `tests/test-plugin-selection.ps1`, `tests/test-plugin-selection.sh` | Validate plugin selection. |
+| `tests/test-prompt-budget.py` | Validate prompt budget threshold evaluation. |
 | `tests/test-prompt-inventory.py` | Validate prompt inventory collection. |
 | `tests/test-quick-update.py` | Validate saved Quickupdate choices. |
 | `tests/test-quick-update.ps1`, `tests/test-quick-update.sh` | Run the Quickupdate test through the relevant shell. |
