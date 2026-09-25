@@ -11,8 +11,11 @@ done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 shared="$root/shared"
 output="$root/generated"
+plugin_manifest="$root/adapters/plugins.tsv"
 capability_manifest="$root/adapters/claude/capabilities.tsv"
 
+[ -f "$plugin_manifest" ] || { printf 'Missing plugin manifest: %s\n' "$plugin_manifest" >&2; exit 1; }
+awk -F '\t' 'NR == 1 { next } NF == 0 { next } $1 == "" || $3 == "" || $6 == "" { print "Invalid plugin manifest row." > "/dev/stderr"; exit 1 } seen[$1]++ { print "Duplicate plugin name in manifest: " $1 > "/dev/stderr"; exit 1 }' "$plugin_manifest"
 [ -f "$capability_manifest" ] || { printf 'Missing capability manifest: %s\n' "$capability_manifest" >&2; exit 1; }
 declare -A agent_tools
 while IFS=$'\t' read -r role tools; do

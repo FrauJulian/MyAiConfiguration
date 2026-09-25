@@ -14,14 +14,11 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 home_path=${HOME:?HOME is required}
 failed=false
 check_count=0
-pass_buffer=()
 
 result() {
   check_count=$((check_count + 1))
   [ "$1" != FAIL ] || failed=true
-  if [ "$summary" = true ] && [ "$1" = PASS ]; then
-    pass_buffer+=("$1 $2")
-  else
+  if [ "$summary" != true ] || [ "$1" != PASS ]; then
     printf '%s %s\n' "$1" "$2"
   fi
 }
@@ -111,7 +108,6 @@ done
 
 if [ "$summary" = true ]; then
   if [ "$failed" = true ]; then
-    for line in "${pass_buffer[@]}"; do printf '%s\n' "$line"; done
     printf 'Doctor: FAIL | %s checks\n' "$check_count"
     exit 1
   fi

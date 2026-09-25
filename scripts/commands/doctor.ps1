@@ -6,13 +6,10 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $homePath = [Environment]::GetFolderPath('UserProfile')
 $script:fail = $false
 $script:checkCount = 0
-$script:passBuffer = @()
 function Result($state, $message) {
     $script:checkCount++
     if ($state -eq 'FAIL') { $script:fail = $true }
-    if ($Summary -and $state -eq 'PASS') {
-        $script:passBuffer += "$state $message"
-    } else {
+    if (-not ($Summary -and $state -eq 'PASS')) {
         Write-Output ("$state $message")
     }
 }
@@ -90,7 +87,6 @@ foreach ($client in @('codex','claude')) {
 
 if ($Summary) {
     if ($script:fail) {
-        $script:passBuffer | ForEach-Object { Write-Output $_ }
         Write-Output "Doctor: FAIL | $script:checkCount checks"
         exit 1
     }
