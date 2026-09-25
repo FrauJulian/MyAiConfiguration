@@ -17,7 +17,8 @@ manifest_path() {
 }
 
 managed_target() {
-  local destination=$1 relative=$2 component target=$destination probe
+  local destination=$1 relative=$2 component target probe
+  target=$destination
   [[ -n "$relative" && "$relative" != /* && "$relative" != */ && "$relative" != *//* && "$relative" != *\\* && "$relative" != *:* && "$relative" != *$'\t'* && "$relative" != *$'\r'* && "$relative" != *$'\n'* ]] || { printf 'Invalid managed path: %s\n' "$relative" >&2; return 1; }
   local -a parts
   IFS=/ read -r -a parts <<< "$relative"
@@ -80,7 +81,6 @@ sync_managed_destination() {
   declare -A old_manifest
   read_managed_manifest "$manifest" old_manifest || return 1
   declare -A new_manifest
-  local backup_root="$destination/backups/$stamp"
   local created=0 updated=0 unchanged=0 removed=0 warned=0
 
   while IFS= read -r -d '' source_file; do

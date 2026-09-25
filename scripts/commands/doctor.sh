@@ -33,8 +33,7 @@ command -v jq >/dev/null && result PASS 'jq available for Claude Bash status lin
 
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md 2>/dev/null | wc -l)
-rule_skill_count=$(find "$root/shared/rules" -mindepth 1 -maxdepth 1 -type f -name '*.md' ! -name general.md | wc -l)
-rule_skill_count=$((rule_skill_count + $(find "$root/shared/rules" -mindepth 2 -maxdepth 2 -type f -name index.md | wc -l)))
+rule_skill_count=$(find "$root/shared/rules" -type f -name '*.md' ! -path "$root/shared/rules/general.md" | wc -l)
 
 for shell in powershell bash; do
   [ -f "$root/generated/codex-$shell/AGENTS.md" ] && result PASS "generated output present ($shell)" || result FAIL "generated output missing ($shell); run build"

@@ -127,7 +127,7 @@ class ManagedExtensionTests(unittest.TestCase):
         self.assertFalse((directory / 'references/old.md').exists())
 
     def test_skill_records_resolved_revision(self):
-        with patch.object(extensions, 'resolve_revision', return_value='a' * 40):
+        with patch.object(extensions, 'fetch_skill', return_value=('humanizer', {'SKILL.md': (b'original', False)}, 'a' * 40)):
             self.manager().sync([skill()], ['codex'], {'Humanizer'})
         record = self.manager().state['resources'][0]
         self.assertEqual(record['source'], 'blader/humanizer')
@@ -278,7 +278,8 @@ class ManagedExtensionTests(unittest.TestCase):
         self.manager().sync([mcporter()], ['codex'], {'MCPorter'})
         self.commands.clear()
         with patch.object(extensions.shutil, 'which', return_value='mcporter'):
-            self.manager(update=True).sync([mcporter()], ['codex'], {'MCPorter'})
+            with patch.object(extensions.Manager, 'global_packages', return_value={'mcporter'}):
+                self.manager(update=True).sync([mcporter()], ['codex'], {'MCPorter'})
         self.assertEqual([['npm', 'update', '--global', 'mcporter']], self.commands)
 
     def test_managed_mcporter_reinstalls_when_command_is_missing(self):

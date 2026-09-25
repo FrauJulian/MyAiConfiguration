@@ -11,7 +11,6 @@ done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 shared="$root/shared"
 output="$root/generated"
-plugin_manifest="$root/adapters/plugins.tsv"
 capability_manifest="$root/adapters/claude/capabilities.tsv"
 
 [ -f "$capability_manifest" ] || { printf 'Missing capability manifest: %s\n' "$capability_manifest" >&2; exit 1; }
