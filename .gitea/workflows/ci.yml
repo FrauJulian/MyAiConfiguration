@@ -82,6 +82,7 @@ jobs:
         run: |
           if [ "${POWERSHELL_AVAILABLE:-false}" != true ]; then exit 0; fi
           pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/commands/check-capabilities.ps1
+          pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/commands/build.ps1 -Summary
           for file in scripts/tests/test-*.ps1; do
             echo "==> $file"
             pwsh -NoLogo -NoProfile -NonInteractive -File "$file" -Summary
