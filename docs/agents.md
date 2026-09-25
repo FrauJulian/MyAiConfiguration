@@ -5,8 +5,8 @@ The five shared agents are logical roles, not mandatory steps.
 - `implementer` executes the smallest complete engineering change and performs self-review.
 - `researcher` investigates code, patterns, evidence, alternatives, and unknowns without modifying implementation code by default.
 - `architect` evaluates technical boundaries, dependencies, interfaces, constraints, and design options.
-- `verifier` supplies execution evidence from relevant tests, builds, checks, generated output, and behavior reproduction. It does not repeat a general architecture review.
-- `reviewer` starts with the actual diff and changed symbols, then examines necessary callers, dependencies, tests, and contracts for analytical correctness. It does not automatically rerun the test suite.
+- `verifier` supplies execution evidence from relevant tests, builds, checks, generated output, and behavior reproduction. It inspects implementation only to choose checks and does not review the diff for general correctness.
+- `reviewer` starts with the actual diff and changed symbols, then examines necessary callers, dependencies, tests, and contracts for analytical correctness. It does not run tests, builds, or runtime checks; it reports missing execution evidence.
 
 Use only the roles that are likely to improve the outcome. Choose `researcher`, `reviewer`, and `verifier` based on the task's uncertainty, complexity, risk, blast radius, and verification value; none runs automatically. The agent may make evidence-based, reversible technical decisions. Ask the user when technical choices remain materially uncertain or when business behavior, user-visible behavior, UI, UX, APIs, database models, configuration formats, compatibility behavior, or other high-impact decisions are ambiguous or open to interpretation.
 
