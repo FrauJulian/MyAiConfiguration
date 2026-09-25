@@ -1,1 +1,23 @@
-{"Claude permanent context":4000,"Codex permanent context":4000,"Claude permanent context absolute limit":6000,"Codex permanent context absolute limit":6000}
+{
+  "regression_percent": 10,
+  "permanent_context_soft_target_tokens": 4000,
+  "permanent_context_hard_limit_tokens": 6000,
+  "metrics": {
+    "permanent_context_tokens": {
+      "claude": 1481,
+      "codex": 1481
+    },
+    "skill_metadata_tokens": {
+      "claude": 1124,
+      "codex": 1124
+    },
+    "rule_catalog_tokens": {
+      "claude": 28036,
+      "codex": 8058
+    },
+    "agent_metadata_tokens": {
+      "claude": 126,
+      "codex": 52
+    }
+  }
+}

@@ -1,2 +1,9 @@
-Claude	4000	6000
-Codex	4000	6000
+metric	client	baseline_tokens
+permanent_context_tokens	claude	1481
+permanent_context_tokens	codex	1481
+skill_metadata_tokens	claude	1124
+skill_metadata_tokens	codex	1124
+rule_catalog_tokens	claude	28036
+rule_catalog_tokens	codex	8058
+agent_metadata_tokens	claude	126
+agent_metadata_tokens	codex	52
