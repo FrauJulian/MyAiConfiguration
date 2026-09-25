@@ -37,7 +37,9 @@ Verifier: execution evidence against acceptance criteria. Choose relevant tests,
 
 ## Canonical task state
 
-For long-running work, the main agent maintains one compact state with `goal`, `decisions`, `changed`, `verified`, `open`, and `risks`. Store conclusions and file/symbol references, never transcripts, copied source, secrets, or narration. Update after material decisions, changes, and verification, before compaction when possible. Mark stale evidence after relevant edits.
+Use task state only for work expected to span multiple hours, compaction, or an interrupted session. For short, bounded work, rely on the conversation and current Git diff/working tree; do not create state just to record routine progress. Task state is a handoff for the active goal, not persistent project memory.
+
+When needed, the main agent maintains one compact state with `goal`, `decisions`, `changed`, `verified`, `open`, and `risks`. Store conclusions and file/symbol references, never transcripts, copied source, secrets, unrelated project knowledge, or narration. Update after material decisions, changes, and verification, before compaction when possible. Mark stale evidence after relevant edits and reset state when starting a different goal.
 
 Use an existing task-state facility when available; otherwise use the workspace's `.ai-session/state.json`. Keep one active owner per workspace; use separate checkouts for concurrent unrelated tasks. Runtime state is local, not committed. Explicitly share its location when needed; subagents may read it but return updates to the parent instead of maintaining copies. Do not paste the full state into every assignment.
 

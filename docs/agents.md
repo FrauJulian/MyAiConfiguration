@@ -20,7 +20,7 @@ The shared [orchestration rule](../shared/rules/orchestration.md) defines the `R
 
 ## Task state
 
-For long-running work, the main agent maintains one compact state containing `goal`, `decisions`, `changed`, `verified`, `open`, and `risks`. An existing task-state facility is preferred; the file fallback is `.ai-session/state.json` in the current workspace. Subagents may read it when needed, but send updates to the parent. Keep unrelated concurrent tasks in separate checkouts, and keep runtime state out of commits.
+See the [canonical task-state policy](../shared/rules/orchestration.md#canonical-task-state) for when to use state and what it may contain. The optional `.ai-session/state.json` file is local handoff state for a long-running active goal, not persistent project memory.
 
 The optional `scripts/commands/session-state.ps1` and `scripts/commands/session-state.sh` helpers update this workspace file. Omitted fields are preserved. Their `-Workspace`/`--workspace` option selects the workspace explicitly; the default is the current working directory. Both accept goal, decisions, changed files, completed verification, open items, and risks. `-Pointer`/`--pointer` only prints the existing file's location.
 
