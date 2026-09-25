@@ -20,6 +20,6 @@ Cross-cutting: unclear requirements or significant choices => `rules/decision-ru
 
 ## Tools and delegation
 
-Use the `mcporter` CLI for MCP services by default. Use a native MCP connection when MCPorter is not active, or when the user explicitly requests it or selects a native MCP plugin in this configuration. If the requested route is unavailable, report the limitation instead of silently switching routes.
+Use the `mcporter` CLI for MCP servers this configuration registers there, especially when the same server must work across Claude and Codex. Use a selected native plugin's MCP tools directly even when MCPorter is active; do not route them through an extra CLI hop or register the same server through both paths. Prefer native Codex plugin packaging when it provides the needed MCP server and skills together. Keep MCPorter where it provides a concrete shared benefit such as credential handling, discovery, or cross-client portability. If the selected route is unavailable, report the limitation instead of silently switching routes.
 
 The main agent owns state and decisions. Delegate only independent work when it saves effort; use one implementer for contained work. Subagents do not spawn agents; pass minimal context and verify handoffs.
