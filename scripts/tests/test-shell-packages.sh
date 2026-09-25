@@ -79,8 +79,9 @@ for shell in powershell bash; do
         test -f "$package/skills/rules/$skill_name/SKILL.md"
       done
     fi
-    printf '%s' "$doc_content" | grep -Fq 'Use the `mcporter` CLI for MCP services by default.'
-    printf '%s' "$doc_content" | grep -Fq 'Use a native MCP connection when MCPorter is not active, or when the user explicitly requests it or selects a native MCP plugin in this configuration.'
+    printf '%s' "$doc_content" | grep -Fq 'Use the `mcporter` CLI for MCP servers this configuration registers there'
+    printf '%s' "$doc_content" | grep -Fq "Use a selected native plugin's MCP tools directly even when MCPorter is active"
+    printf '%s' "$doc_content" | grep -Fq 'Keep MCPorter where it provides a concrete shared benefit'
     occurrences=$(printf '%s' "$doc_content" | grep -o 'Apply instructions in this order' | wc -l)
     [ "$occurrences" -eq 1 ] || { printf '%s-%s must embed the priority rule exactly once\n' "$client" "$shell" >&2; exit 1; }
     if [ "$client" = codex ] && printf '%s' "$doc_content" | grep -q 'Always load and apply `rules/general\.md`'; then

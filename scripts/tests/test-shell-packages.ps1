@@ -72,8 +72,9 @@ foreach ($shell in @('powershell','bash')) {
                 if (-not (Test-Path -LiteralPath $skillPath)) { throw "$package is missing generated skill $($ruleSource.Skill)." }
             }
         }
-        if ($docContent -notmatch [regex]::Escape('Use the `mcporter` CLI for MCP services by default.')) { throw "$package must set the MCPorter default" }
-        if ($docContent -notmatch [regex]::Escape('Use a native MCP connection when MCPorter is not active, or when the user explicitly requests it or selects a native MCP plugin in this configuration.')) { throw "$package must allow the selected native MCP route" }
+        if ($docContent -notmatch [regex]::Escape('Use the `mcporter` CLI for MCP servers this configuration registers there')) { throw "$package must route managed MCP servers through MCPorter" }
+        if ($docContent -notmatch [regex]::Escape("Use a selected native plugin's MCP tools directly even when MCPorter is active")) { throw "$package must allow the selected native MCP route" }
+        if ($docContent -notmatch [regex]::Escape('Keep MCPorter where it provides a concrete shared benefit')) { throw "$package must scope MCPorter to concrete shared benefits" }
         if (([regex]::Matches($docContent, [regex]::Escape('Apply instructions in this order'))).Count -ne 1) { throw "$client-$shell must embed the priority rule exactly once" }
         if ($client -eq 'codex' -and $docContent -match 'Always load and apply `rules/general\.md`') { throw "$package must not still instruct loading general.md by path" }
         if ($client -eq 'claude' -and (Test-Path (Join-Path $package 'rules/general.md'))) { throw 'Claude must not automatically load a second copy of general rules.' }
