@@ -4,6 +4,7 @@ set -euo pipefail
 plugin_installed() {
   local client=$1 plugin=$2
   local inventory
+  command -v "$client" >/dev/null 2>&1 || return 1
   inventory=$("$client" plugin list --json) || return 2
   printf '%s' "$inventory" | python3 -c '
 import json, sys

@@ -39,7 +39,8 @@ function Get-InstalledPlugins {
         [ValidateSet('Claude','Codex')][string]$Client,
         [string]$HomePath = [Environment]::GetFolderPath('UserProfile')
     )
-    $command = Get-Command $Client.ToLowerInvariant() -ErrorAction Stop
+    $command = Get-Command $Client.ToLowerInvariant() -ErrorAction SilentlyContinue
+    if (-not $command) { return @() }
     $environment = @{
         HOME = $HomePath
         USERPROFILE = $HomePath
