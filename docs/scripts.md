@@ -21,7 +21,7 @@ Run scripts from the repository root. PowerShell and Bash commands have equivale
 | `commands/update.ps1`, `commands/update.sh` | Update an existing installation; Quick reuses saved choices. |
 | `commands/uninstall.ps1`, `commands/uninstall.sh` | Remove setup-owned configuration and extensions. |
 | `commands/doctor.ps1`, `commands/doctor.sh` | Check generated output and installed configuration. |
-| `commands/prompt-budget.ps1`, `commands/prompt-budget.sh` | Check generated instruction sizes against their budget. |
+| `commands/prompt-budget.ps1`, `commands/prompt-budget.sh` | Warn above 115% of the 4,000-byte soft target; fail above the 6,000-byte hard limit for generated permanent instructions. |
 | `commands/repository-context.ps1`, `commands/repository-context.sh` | Refresh the local repository-context cache. |
 | `commands/session-state.ps1`, `commands/session-state.sh` | Read or update the local agent session state. |
 | `commands/telemetry.ps1`, `commands/telemetry.sh` | Append a local telemetry event. |
