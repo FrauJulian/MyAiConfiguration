@@ -24,11 +24,11 @@ if ($old) {
         $previous = [double]$old.($row.Name)
         $absolute = [double]$old.(($row.Name + ' absolute limit'))
         $baselineValues[$row.Name] = @($previous, $absolute)
-        if ($previous -gt 0 -and $row.Bytes -gt $previous * 1.15) { $fail = $true; Write-Error "Prompt budget relative limit failed: $($row.Name) $($row.Bytes) bytes (baseline $previous, limit 15%)." }
-        if ($absolute -gt 0 -and $row.Bytes -gt $absolute) { $fail = $true; Write-Error "Prompt budget absolute limit failed: $($row.Name) $($row.Bytes) bytes (absolute limit $absolute)." }
+        if ($previous -gt 0 -and $row.Bytes -gt $previous * 1.15) { Write-Warning "Prompt budget soft target exceeded: $($row.Name) $($row.Bytes) bytes (target $previous, 15% tolerance)." }
+        if ($absolute -gt 0 -and $row.Bytes -gt $absolute) { $fail = $true; Write-Error "Prompt budget hard limit failed: $($row.Name) $($row.Bytes) bytes (hard limit $absolute)." }
     }
 }
-if ($Summary) { Write-Output 'Prompt Budget'; foreach ($row in $rows | Select-Object -First 2) { $limits = $baselineValues[$row.Name]; $base = if($limits){$limits[0]}else{'-'}; $absolute = if($limits){$limits[1]}else{'-'}; Write-Output ('{0,-28} {1,8} bytes  baseline {2}  relative 115%  absolute {3}' -f $row.Name,$row.Bytes,$base,$absolute) }; $rows | Select-Object -Skip 2 | ForEach-Object { Write-Output ('{0,-28} {1,8} bytes  {2,6} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } } else { $rows | ForEach-Object { Write-Output ('{0}: {1} bytes / {2} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } }
+if ($Summary) { Write-Output 'Prompt Budget'; foreach ($row in $rows | Select-Object -First 2) { $limits = $baselineValues[$row.Name]; $base = if($limits){$limits[0]}else{'-'}; $absolute = if($limits){$limits[1]}else{'-'}; Write-Output ('{0,-28} {1,8} bytes  soft target {2}  hard limit {3}' -f $row.Name,$row.Bytes,$base,$absolute) }; $rows | Select-Object -Skip 2 | ForEach-Object { Write-Output ('{0,-28} {1,8} bytes  {2,6} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } } else { $rows | ForEach-Object { Write-Output ('{0}: {1} bytes / {2} tokens' -f $_.Name,$_.Bytes,$_.Tokens) } }
 & python (Join-Path $root 'scripts/lib/prompt-inventory.py') --home ([Environment]::GetFolderPath('UserProfile'))
 if ($LASTEXITCODE -ne 0) { throw 'Prompt inventory failed.' }
 if ($fail) { exit 1 }

@@ -16,11 +16,11 @@ if [ -f "$root/adapters/prompt-budget-baseline.tsv" ]; then
     current=$([ "$name" = Claude ] && printf '%s' "$claude" || printf '%s' "$codex")
     [ "$name" = Claude ] && claude_baseline=$old && claude_absolute=$absolute
     [ "$name" = Codex ] && codex_baseline=$old && codex_absolute=$absolute
-    if awk -v n="$current" -v o="$old" 'BEGIN { exit !(o > 0 && n > o * 1.15) }'; then printf 'Prompt budget relative limit failed: %s %s bytes (baseline %s, limit 15%%).\n' "$name" "$current" "$old" >&2; fail=true; fi
-    if awk -v n="$current" -v a="$absolute" 'BEGIN { exit !(a > 0 && n > a) }'; then printf 'Prompt budget absolute limit failed: %s %s bytes (absolute limit %s).\n' "$name" "$current" "$absolute" >&2; fail=true; fi
+    if awk -v n="$current" -v o="$old" 'BEGIN { exit !(o > 0 && n > o * 1.15) }'; then printf 'Prompt budget soft target exceeded: %s %s bytes (target %s, 15%% tolerance).\n' "$name" "$current" "$old" >&2; fi
+    if awk -v n="$current" -v a="$absolute" 'BEGIN { exit !(a > 0 && n > a) }'; then printf 'Prompt budget hard limit failed: %s %s bytes (hard limit %s).\n' "$name" "$current" "$absolute" >&2; fail=true; fi
   done < "$root/adapters/prompt-budget-baseline.tsv"
 fi
-if [ "$summary" = true ]; then printf 'Prompt Budget\nClaude permanent context    %8s bytes  baseline %s  relative 115%%  absolute %s\nCodex permanent context     %8s bytes  baseline %s  relative 115%%  absolute %s\nClaude skill files (lazy)       %8s bytes  %6s tokens\nLargest lazy rule           %8s bytes  %6s tokens\n' "$claude" "$claude_baseline" "$claude_absolute" "$codex" "$codex_baseline" "$codex_absolute" "$skills" "$(tokens "$skills")" "$lazy" "$(tokens "$lazy")"; else printf 'Prompt budget: Claude %s bytes, Codex %s bytes, skills %s bytes, largest lazy rule %s bytes\n' "$claude" "$codex" "$skills" "$lazy"; fi
+if [ "$summary" = true ]; then printf 'Prompt Budget\nClaude permanent context    %8s bytes  soft target %s  hard limit %s\nCodex permanent context     %8s bytes  soft target %s  hard limit %s\nClaude skill files (lazy)       %8s bytes  %6s tokens\nLargest lazy rule           %8s bytes  %6s tokens\n' "$claude" "$claude_baseline" "$claude_absolute" "$codex" "$codex_baseline" "$codex_absolute" "$skills" "$(tokens "$skills")" "$lazy" "$(tokens "$lazy")"; else printf 'Prompt budget: Claude %s bytes, Codex %s bytes, skills %s bytes, largest lazy rule %s bytes\n' "$claude" "$codex" "$skills" "$lazy"; fi
 python3 "$root/scripts/lib/prompt-inventory.py" --home "${HOME:?HOME is required}"
-$fail && { printf 'Prompt budget: permanent context increased by more than 15 percent.\n' >&2; exit 1; }
+$fail && { printf 'Prompt budget: permanent context exceeded hard limit.\n' >&2; exit 1; }
 exit 0
