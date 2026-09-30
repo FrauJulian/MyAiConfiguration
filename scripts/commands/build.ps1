@@ -4,6 +4,12 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $shared = Join-Path $root 'shared'
 $output = Join-Path $root 'generated'
+$sandboxSupported = [Environment]::OSVersion.Platform -eq [PlatformID]::Unix
+if ($sandboxSupported) {
+    $kernel = (& uname -r 2>$null | Out-String).Trim()
+    if ($kernel -match '(?i)microsoft') { $sandboxSupported = $kernel -match '(?i)microsoft-standard-WSL2' }
+}
+$claudeSandbox = if ($sandboxSupported) { '{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}' } else { '{"enabled": false}' }
 $pluginManifest = Join-Path $root 'adapters/plugins.tsv'
 $capabilityManifest = Join-Path $root 'adapters/claude/capabilities.tsv'
 
@@ -173,10 +179,15 @@ foreach ($shell in @('powershell','bash')) {
         $script = if ($shell -eq 'powershell') { 'flashbang.ps1' } else { 'flashbang.sh' }
         $statusLineScript = if ($shell -eq 'powershell') { 'statusline.ps1' } else { 'statusline.sh' }
         $content = Get-Content -LiteralPath $path -Raw
-        $sandbox = if ($shell -eq 'powershell') { '{"enabled": false}' } else { '{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}' }
+        $denyRules = if ($shell -eq 'powershell') {
+            @('PowerShell(git reset --hard*)','PowerShell(git clean*)','PowerShell(Remove-Item *-Recurse*)')
+        } else {
+            @('Bash(git reset --hard*)','Bash(git clean*)','Bash(rm -rf*)')
+        }
+        $denyRulesJson = ConvertTo-Json -InputObject $denyRules -Compress
         $compactScript = if ($shell -eq 'powershell') { 'Record-Compact.ps1' } else { 'record-compact.sh' }
         $pointerScript = if ($shell -eq 'powershell') { 'Show-SessionStatePointer.ps1' } else { 'show-session-state-pointer.sh' }
-        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__POWERSHELL_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__POWERSHELL_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript).Replace('__CLAUDE_SANDBOX__', $sandbox)
+        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__POWERSHELL_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__POWERSHELL_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript).Replace('__CLAUDE_SANDBOX__', $claudeSandbox).Replace('__CLAUDE_DENY_RULES__', $denyRulesJson)
         Set-Content -LiteralPath $path -Value $content -Encoding UTF8
     }
 
@@ -192,7 +203,7 @@ $leftoverPlaceholders = @(Get-ChildItem $output -File -Recurse | ForEach-Object 
     # expected to remain in generated output. -cmatch keeps this case-sensitive so Python
     # dunder names (__main__, __name__) in flashbang.sh are not mistaken for placeholders.
     $content = (Get-Content -LiteralPath $_.FullName -Raw) -replace '__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__|__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__', ''
-    if ($content -cmatch '__[A-Z0-9_]+__') { $_.FullName }
+    if ($content -cmatch '__[A-Z0-9_]*[A-Z0-9][A-Z0-9_]*__') { $_.FullName }
 })
 if ($leftoverPlaceholders.Count) { throw "Unresolved template placeholders in: $($leftoverPlaceholders -join ', ')" }
 

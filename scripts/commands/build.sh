@@ -11,6 +11,20 @@ done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 shared="$root/shared"
 output="$root/generated"
+sandbox_supported=false
+platform=$(uname -s 2>/dev/null || true)
+case "$platform" in
+  Darwin) sandbox_supported=true ;;
+  Linux)
+    kernel=$(uname -r 2>/dev/null || true)
+    case "$kernel" in
+      *microsoft*) [[ "$kernel" == *microsoft-standard-WSL2* ]] && sandbox_supported=true ;;
+      *) sandbox_supported=true ;;
+    esac
+    ;;
+esac
+sandbox='{"enabled": false}'
+[ "$sandbox_supported" != true ] || sandbox='{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}'
 plugin_manifest="$root/adapters/plugins.tsv"
 capability_manifest="$root/adapters/claude/capabilities.tsv"
 
@@ -158,8 +172,11 @@ for client in codex claude; do
   fi
   path="$output/$client-$shell/$file"
   content=$(<"$path")
-  sandbox='{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}'
-  [ "$shell" != powershell ] || sandbox='{"enabled": false}'
+  if [ "$shell" = powershell ]; then
+    deny_rules='["PowerShell(git reset --hard*)","PowerShell(git clean*)","PowerShell(Remove-Item *-Recurse*)"]'
+  else
+    deny_rules='["Bash(git reset --hard*)","Bash(git clean*)","Bash(rm -rf*)"]'
+  fi
   content=${content//__HOOK_COMMAND__/$command}
   content=${content//__POWERSHELL_HOOK_COMMAND__/$command}
   content=${content//__HOOK_SCRIPT__/$script}
@@ -169,6 +186,7 @@ for client in codex claude; do
   content=${content//__STATUSLINE_COMMAND__/$command}
   content=${content//__STATUSLINE_SCRIPT__/$statusline_script}
   content=${content//__CLAUDE_SANDBOX__/$sandbox}
+  content=${content//__CLAUDE_DENY_RULES__/$deny_rules}
   printf '%s\n' "$content" > "$path"
 done
 
@@ -191,9 +209,9 @@ done
 # __AI_CONFIG_ROOT__ is resolved at install time, once the destination is known; it is
 # expected to remain in generated output, so it is excluded from the leftover check. A
 # single tree-wide grep (rather than one process per file) keeps this fast.
-leftover_tokens=$(grep -RohE '__[A-Z0-9_]+__' "$output" 2>/dev/null | sort -u | grep -Ev '^(__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__|__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__)$' || true)
+leftover_tokens=$(grep -RohE '__[A-Z0-9_]*[A-Z0-9][A-Z0-9_]*__' "$output" 2>/dev/null | sort -u | grep -Ev '^(__AI_CONFIG_ROOT__|__POWERSHELL_COMMAND__|__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__)$' || true)
 if [ -n "$leftover_tokens" ]; then
-  offending_files=$(grep -RlE '__[A-Z0-9_]+__' "$output" 2>/dev/null | tr '\n' ' ')
+  offending_files=$(grep -RlE '__[A-Z0-9_]*[A-Z0-9][A-Z0-9_]*__' "$output" 2>/dev/null | tr '\n' ' ')
   printf 'Unresolved template placeholders (%s) in: %s\n' "$(printf '%s' "$leftover_tokens" | tr '\n' ' ')" "$offending_files" >&2
   exit 1
 fi

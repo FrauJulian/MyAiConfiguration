@@ -4,12 +4,7 @@
     "allow": [
       "Agent"
     ],
-    "deny": [
-      "Bash(git reset --hard*)",
-      "Bash(git clean*)",
-      "Bash(rm -rf*)",
-      "Bash(Remove-Item -Recurse*)"
-    ]
+    "deny": __CLAUDE_DENY_RULES__
   },
   "sandbox": __CLAUDE_SANDBOX__,
   "env": {
