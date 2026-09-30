@@ -8,4 +8,4 @@
 * Encrypt sensitive data in transit and at rest where appropriate; keep key access separate from database access.
 * Use transactions and suitable constraints where integrity requires atomicity. Check concurrency and isolation around security-sensitive state changes.
 * Avoid raw database errors and sensitive query parameters in responses, logs, traces, and metrics.
-* Test injection, cross-tenant access, unauthorized mutation, stale updates, and cache isolation within the approved scope.
+* Test injection, cross-tenant access, unauthorized mutation, stale updates, and cache isolation within the user's requested scope.

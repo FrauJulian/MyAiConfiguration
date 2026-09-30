@@ -9,4 +9,4 @@
 * Return only authorized fields. Do not expose stack traces, internal models, secrets, or implementation details in API responses or errors.
 * Prefer explicit DTOs and schemas; reject unknown or ambiguous fields when accepting them could alter privileged state.
 * Keep authorization, validation, serialization, and error responses consistent with the published schema and supported clients.
-* Test malformed, oversized, unauthenticated, unauthorized, cross-user, cross-tenant, and duplicate requests within the approved scope.
+* Test malformed, oversized, unauthenticated, unauthorized, cross-user, cross-tenant, and duplicate requests within the user's requested scope.
