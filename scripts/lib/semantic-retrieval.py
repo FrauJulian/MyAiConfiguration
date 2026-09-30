@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -89,10 +90,15 @@ def check_runtime(target, state):
         path = target / name
         if path.is_symlink() or not path.is_file() or digest(path) != expected:
             raise ValueError(f'Owned semantic retrieval file changed: {name}')
-    allowed = set(state['files']) | {'.venv', 'model-cache'}
+    allowed = set(state['files']) | {'.venv', 'model-cache', '__pycache__'}
     for path in target.iterdir():
         if path.is_symlink() or path.name not in allowed:
             raise ValueError(f'Foreign or linked semantic retrieval path: {path.name}')
+        if path.name == '__pycache__' and (not path.is_dir() or any(
+                child.is_symlink() or not child.is_file() or not re.fullmatch(
+                    r'(?:server|benchmark)\.[A-Za-z0-9_-]+(?:\.opt-\d+)?\.pyc', child.name)
+                for child in path.iterdir())):
+            raise ValueError('Foreign or linked semantic retrieval path: __pycache__')
 
 
 def sync(root, home, clients, enabled, dry_run, update, summary=False):

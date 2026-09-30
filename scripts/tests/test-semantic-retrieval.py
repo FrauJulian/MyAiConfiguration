@@ -4,6 +4,7 @@ import io
 import json
 from contextlib import redirect_stdout
 from pathlib import Path
+import py_compile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -84,6 +85,25 @@ class SemanticRetrievalTests(unittest.TestCase):
             MODULE.sync(ROOT, home, ['codex'], False, False, False)
             self.assertFalse(target.exists())
             self.assertFalse(state_path.exists())
+
+    def test_update_accepts_python_cache_but_rejects_foreign_cache_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / 'home'
+            target = home / '.my-ai-configuration/semantic-retrieval'
+            target.mkdir(parents=True)
+            files = {}
+            for name in MODULE.FILES:
+                content = (ROOT / 'shared/retrieval' / name).read_bytes()
+                (target / name).write_bytes(content)
+                files[name] = hashlib.sha256(content).hexdigest()
+            MODULE.save_state(target.parent / 'semantic-retrieval.json', {'version': 1, 'clients': ['codex'], 'files': files}, False)
+            py_compile.compile(str(target / 'server.py'), doraise=True)
+            cache = target / '__pycache__'
+            with patch.object(MODULE, 'ensure_runtime', return_value=Path('python')), patch.object(MODULE, 'ensure_models'):
+                MODULE.sync(ROOT, home, ['codex'], True, False, True)
+            (cache / 'foreign.txt').write_text('keep')
+            with self.assertRaisesRegex(ValueError, '__pycache__'):
+                MODULE.sync(ROOT, home, ['codex'], True, False, True)
 
     def test_negative_benchmark_keeps_active_runtime(self):
         with tempfile.TemporaryDirectory() as directory:
