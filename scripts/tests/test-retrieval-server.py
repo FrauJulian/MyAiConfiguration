@@ -28,6 +28,44 @@ def embedding():
     return array('f', [1.0] + [0.0] * (MODULE.EMBEDDING_DIMENSIONS - 1))
 
 
+class VectorBatch:
+    def __init__(self, blob):
+        self.values = array('f', blob)
+
+    def reshape(self, *shape):
+        return self
+
+    def __matmul__(self, vector):
+        width = MODULE.EMBEDDING_DIMENSIONS
+        return [sum(a * b for a, b in zip(self.values[offset:offset + width], vector))
+                for offset in range(0, len(self.values), width)]
+
+
+class ApproximateIndex:
+    def __init__(self, **kwargs):
+        self.vectors = {}
+
+    def add(self, keys, vectors):
+        width = MODULE.EMBEDDING_DIMENSIONS
+        for position, key in enumerate(keys):
+            start = position * width
+            self.vectors[key] = self.vectors.get(key, []) + list(vectors.values[start:start + width])
+
+    def search(self, vector, count):
+        matches = sorted(((key, sum(a * b for a, b in zip(values, vector)))
+                          for key, values in self.vectors.items()), key=lambda item: (-item[1], item[0]))[:count]
+        return [SimpleNamespace(key=key, distance=1.0 - score) for key, score in matches]
+
+
+def fake_numpy():
+    return SimpleNamespace(frombuffer=lambda blob, **kwargs: VectorBatch(blob), float32=None)
+
+
+def fake_usearch():
+    module = SimpleNamespace(Index=ApproximateIndex)
+    return SimpleNamespace(index=module), module
+
+
 def huggingface_available():
     try:
         request = urllib.request.Request('https://huggingface.co', method='HEAD')
@@ -151,19 +189,19 @@ class RetrievalServerTests(unittest.TestCase):
             for index in indexes:
                 index.encoder = lambda: SimpleNamespace(encode=encode, tokenizer=tokenize)
                 index.rerank = lambda query, rows, limit: rows[:limit]
-            numpy = SimpleNamespace(dot=lambda a, b: sum(x * y for x, y in zip(a, b)),
-                                    frombuffer=lambda blob, **kwargs: array('f', blob), float32=None)
+            numpy = fake_numpy()
+            usearch, usearch_index = fake_usearch()
             try:
-                with patch.dict('sys.modules', numpy=numpy):
+                with patch.dict('sys.modules', numpy=numpy, usearch=usearch, **{'usearch.index': usearch_index}):
                     self.assertEqual(indexes[0].search('query', 5)[0]['text'], 'alpha')
                     self.assertEqual(indexes[1].search('query', 5)[0]['text'], 'other')
                     encoded.clear()
+                    with patch.object(Path, 'read_bytes', side_effect=AssertionError('unchanged files must not be read')):
+                        self.assertEqual(indexes[0].search('query', 5)[0]['text'], 'alpha')
                     with ThreadPoolExecutor(max_workers=1) as executor:
                         self.assertEqual(executor.submit(indexes[0].search, 'query', 5).result()[0]['text'], 'alpha')
                     self.assertEqual(encoded, [])
-                    timestamp = file.stat()
                     file.write_text('bravo', encoding='utf-8')
-                    os.utime(file, ns=(timestamp.st_atime_ns, timestamp.st_mtime_ns))
                     self.assertEqual(indexes[0].search('query', 5)[0]['text'], 'bravo')
                     file.rename(first / 'renamed.md')
                     self.assertEqual(indexes[0].search('query', 5)[0]['path'], 'renamed.md')
@@ -227,6 +265,11 @@ class RetrievalServerTests(unittest.TestCase):
             root = Path(temporary)
             index = MODULE.Index(root, root / 'data')
             (root / 'visible.md').write_text('visible', encoding='utf-8')
+            (root / '.gitignore').write_text('secrets.json\n**/private/\n', encoding='utf-8')
+            (root / 'secrets.json').write_text('{"token":"hidden"}', encoding='utf-8')
+            private = root / 'nested' / 'private'
+            private.mkdir(parents=True)
+            (private / 'hidden.md').write_text('hidden', encoding='utf-8')
             for name in ('node_modules', '.git', 'generated', 'data'):
                 directory = root / name
                 directory.mkdir(exist_ok=True)
@@ -234,7 +277,7 @@ class RetrievalServerTests(unittest.TestCase):
             try:
                 self.assertEqual(index.files(), [(root / 'visible.md').resolve()])
                 filenames = ['visible.md'] * 2001
-                with patch.object(MODULE.os, 'walk', return_value=iter([(str(root), [], filenames)])), \
+                with patch.object(MODULE.subprocess, 'run', return_value=SimpleNamespace(stdout=b'visible.md\0' * 2001)), \
                      patch.object(MODULE.sys, 'stderr') as stderr:
                     self.assertEqual(len(index.files()), 2000)
                 self.assertIn('stopped scanning after 2000', stderr.write.call_args_list[0].args[0])
@@ -255,9 +298,9 @@ class RetrievalServerTests(unittest.TestCase):
                     self.assertEqual(MODULE.read_max_files(), MODULE.DEFAULT_MAX_FILES)
                 (root / 'visible.md').write_text('visible', encoding='utf-8')
                 index.max_files = 3
-                filenames = ['visible.md'] * 5
-                with patch.object(MODULE.os, 'walk', return_value=iter([(str(root), [], filenames)])), \
-                     patch.object(MODULE.sys, 'stderr'):
+                for number in range(5):
+                    (root / f'{number}.md').write_text('visible', encoding='utf-8')
+                with patch.object(MODULE.sys, 'stderr'):
                     self.assertEqual(len(index.files()), 3)
             finally:
                 index.db.close()
@@ -365,8 +408,7 @@ class RetrievalServerTests(unittest.TestCase):
             index.encoder = lambda: SimpleNamespace(encode=encode, tokenizer=tokenize)
             index.reranker = lambda: SimpleNamespace(predict=lambda values, **kwargs:
                 pairs.extend(values) or [float('109.md' in document) for _, document in values])
-            numpy = SimpleNamespace(dot=lambda a, b: 1.0,
-                                    frombuffer=lambda blob, **kwargs: array('f', blob), float32=None)
+            numpy = fake_numpy()
             original_fusion = MODULE.reciprocal_rank_fusion
             rankings = []
 
@@ -375,7 +417,9 @@ class RetrievalServerTests(unittest.TestCase):
                 return original_fusion(*values)
 
             try:
-                with patch.dict('sys.modules', numpy=numpy), patch.object(MODULE, 'reciprocal_rank_fusion', fuse):
+                usearch, usearch_index = fake_usearch()
+                with patch.dict('sys.modules', numpy=numpy, usearch=usearch, **{'usearch.index': usearch_index}), \
+                     patch.object(MODULE, 'reciprocal_rank_fusion', fuse):
                     results = index.search('109.md Symbol109 content', 20)
                 self.assertEqual([len(ranking) for ranking in rankings], [50, 50])
                 self.assertEqual(len(pairs), 50)
@@ -384,7 +428,7 @@ class RetrievalServerTests(unittest.TestCase):
                 self.assertEqual(results[0]['symbol'], 'Symbol109')
                 self.assertIn('Path: 109.md\nSymbol: Symbol109\n\n# Symbol109\ncontent 109', documents)
                 self.assertTrue(all(document in documents for _, document in pairs))
-                with patch.dict('sys.modules', numpy=numpy):
+                with patch.dict('sys.modules', numpy=numpy, usearch=usearch, **{'usearch.index': usearch_index}):
                     self.assertEqual(len(index.search('" OR * () : -')), 5)
                     self.assertEqual(len(index.search('***')), 5)
                     (root / '109.md').unlink()

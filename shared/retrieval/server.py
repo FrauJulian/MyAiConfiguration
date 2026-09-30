@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
-import heapq
 import json
 import multiprocessing
 from multiprocessing import AuthenticationError
@@ -379,30 +378,39 @@ class Index:
         self.db.execute("create table if not exists chunks (path text, symbol text, text text, vector blob)")
         self.db.execute("create index if not exists chunks_path on chunks (path)")
         self.db.execute("create virtual table if not exists lexical using fts5(document)")
-        self.db.execute("create table if not exists files (path text primary key, digest text)")
+        self.db.execute("create table if not exists files (path text primary key, digest text, size integer, mtime integer, ctime integer)")
+        columns = {row[1] for row in self.db.execute("pragma table_info(files)")}
+        for name in ("size", "mtime", "ctime"):
+            if name not in columns:
+                self.db.execute(f"alter table files add column {name} integer")
         self.db.execute("create table if not exists query_cache (cache_key text primary key, result text not null)")
         self.db.commit()
         self.lock = threading.RLock()
         self.max_files = read_max_files()
+        self.vector_index = None
 
     def files(self):
-        ignored = {".git", ".venv", "generated", "node_modules", ".my-ai-configuration"}
+        ignored = {".git", ".venv", "generated", "node_modules", ".my-ai-configuration", "bin", "obj"}
+        output = subprocess.run(["git", "-C", str(self.root), "ls-files", "--cached", "--others",
+                                 "--exclude-standard", "-z", "--", "."],
+                                check=True, capture_output=True, timeout=30).stdout
+        candidates = [self.root / name for name in
+                      output.decode("utf-8", errors="surrogateescape").split("\0") if name
+                      and not any(part in ignored for part in Path(name).parts)]
         result = []
-        for directory, directories, filenames in os.walk(self.root):
-            directories[:] = sorted(name for name in directories if name not in ignored
-                                    and not (Path(directory) / name).is_symlink()
-                                    and (Path(directory) / name).resolve().is_relative_to(self.root)
-                                    and (Path(directory) / name).resolve() != self.data)
-            for name in sorted(filenames):
-                path = Path(directory) / name
-                if path.is_symlink() or path.suffix.lower() not in TEXT_EXTENSIONS or not path.is_file() or path.stat().st_size > 524288:
-                    continue
-                result.append(path)
-                if len(result) == self.max_files:
-                    print(f"Semantic retrieval: stopped scanning after {self.max_files} indexable files; "
-                          f"some files under {self.root} were not indexed. Set {MAX_FILES_ENV} to raise this limit.",
-                          file=sys.stderr)
-                    return result
+        for candidate in sorted(candidates):
+            if candidate.is_symlink():
+                continue
+            path = candidate.resolve()
+            if (not path.is_relative_to(self.root) or path.is_relative_to(self.data)
+                    or path.suffix.lower() not in TEXT_EXTENSIONS or not path.is_file() or path.stat().st_size > 524288):
+                continue
+            result.append(path)
+            if len(result) == self.max_files:
+                print(f"Semantic retrieval: stopped scanning after {self.max_files} indexable files; "
+                      f"some files under {self.root} were not indexed. Set {MAX_FILES_ENV} to raise this limit.",
+                      file=sys.stderr)
+                return result
         return result
 
     def encoder(self):
@@ -429,17 +437,25 @@ class Index:
             return self.db.execute("select count(*) from chunks").fetchone()[0]
 
     def refresh(self, force=False):
-        previous = dict(self.db.execute("select path, digest from files"))
+        previous = {path: (digest, size, mtime, ctime)
+                    for path, digest, size, mtime, ctime in self.db.execute("select path, digest, size, mtime, ctime from files")}
         encoder = None
         changed = []
         documents = []
         document_offsets = []
         for path in self.files():
             relative = path.relative_to(self.root).as_posix()
+            metadata = path.stat()
+            size, mtime, ctime = metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns
+            old_digest, old_size, old_mtime, old_ctime = previous.pop(relative, (None, None, None, None))
+            if not force and old_digest and (size, mtime, ctime) == (old_size, old_mtime, old_ctime):
+                continue
             content = path.read_bytes()
             digest = hashlib.sha256(content).hexdigest()
-            old_digest = previous.pop(relative, None)
             if not force and digest == old_digest:
+                with self.db:
+                    self.db.execute("update files set size = ?, mtime = ?, ctime = ? where path = ?",
+                                    (size, mtime, ctime, relative))
                 continue
             if encoder is None:
                 encoder = self.encoder()
@@ -447,10 +463,10 @@ class Index:
             file_documents = [document_text(relative, symbol, value) for symbol, value in values]
             document_offsets.append(len(documents))
             documents.extend(file_documents)
-            changed.append((relative, digest, values, file_documents))
+            changed.append((relative, digest, size, mtime, ctime, values, file_documents))
         vectors = encoder.encode(documents, normalize_embeddings=True) if documents else []
         with self.db:
-            for number, (relative, digest, values, file_documents) in enumerate(changed):
+            for number, (relative, digest, size, mtime, ctime, values, file_documents) in enumerate(changed):
                 start = document_offsets[number]
                 file_vectors = vectors[start:start + len(file_documents)]
                 self.delete_path(relative)
@@ -460,17 +476,32 @@ class Index:
                     cursor = self.db.execute("insert into chunks values (?, ?, ?, ?)",
                                              (relative, symbol, value, vector.tobytes()))
                     self.db.execute("insert into lexical(rowid, document) values (?, ?)", (cursor.lastrowid, document))
-                self.db.execute("insert or replace into files values (?, ?)", (relative, digest))
+                self.db.execute("insert or replace into files values (?, ?, ?, ?, ?)",
+                                (relative, digest, size, mtime, ctime))
             for relative in previous:
                 self.delete_path(relative)
                 self.db.execute("delete from files where path = ?", (relative,))
             if changed or previous:
                 self.db.execute("delete from query_cache")
+                self.vector_index = None
+
+    def dense_candidates(self, vector):
+        import numpy as np
+        from usearch.index import Index as VectorIndex
+
+        if self.vector_index is None:
+            index = VectorIndex(ndim=EMBEDDING_DIMENSIONS, metric="cos", dtype="f32",
+                                connectivity=16, expansion_add=128, expansion_search=64)
+            cursor = self.db.execute("select rowid, vector from chunks")
+            while rows := cursor.fetchmany(4096):
+                vectors = np.frombuffer(b"".join(row[1] for row in rows), dtype=np.float32).reshape(-1, EMBEDDING_DIMENSIONS)
+                index.add([row[0] for row in rows], vectors)
+            self.vector_index = index
+        return [match.key for match in self.vector_index.search(vector, DENSE_CANDIDATES)]
 
     def cache_key(self, query: str, top_k: int):
-        files = self.db.execute("select path, digest from files order by path").fetchall()
         identity = json.dumps([
-            query, top_k, files,
+            query, top_k,
             RERANKER_MODEL, RERANKER_MODEL_REVISION, RETRIEVAL_INSTRUCTION,
             DENSE_CANDIDATES, LEXICAL_CANDIDATES, RERANK_CANDIDATES, FINAL_RESULTS, RRF_K,
         ], ensure_ascii=False, separators=(",", ":"))
@@ -491,13 +522,10 @@ class Index:
                 except (TypeError, json.JSONDecodeError):
                     with self.db:
                         self.db.execute("delete from query_cache where cache_key = ?", (key,))
-            import numpy as np
             vector = self.encoder().encode([query], prompt_name="query", normalize_embeddings=True)[0]
             if len(vector) != EMBEDDING_DIMENSIONS:
                 raise ValueError("Embedding must have 1024 dimensions")
-            scores = ((identifier, float(np.dot(vector, np.frombuffer(blob, dtype=np.float32))))
-                      for identifier, blob in self.db.execute("select rowid, vector from chunks"))
-            dense = [identifier for identifier, _ in heapq.nlargest(DENSE_CANDIDATES, scores, key=lambda item: item[1])]
+            dense = self.dense_candidates(vector)
             terms = list(dict.fromkeys(re.findall(r"[^\W_]+", query)))[:128]
             expression = " OR ".join(f'"{term}"' for term in terms)
             lexical = [row[0] for row in self.db.execute(
