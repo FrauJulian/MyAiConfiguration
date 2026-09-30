@@ -2,6 +2,11 @@
 param([switch]$Summary)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$sandboxSupported = [Environment]::OSVersion.Platform -eq [PlatformID]::Unix
+if ($sandboxSupported) {
+    $kernel = (& uname -r 2>$null | Out-String).Trim()
+    if ($kernel -match '(?i)microsoft') { $sandboxSupported = $kernel -match '(?i)microsoft-standard-WSL2' }
+}
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory).Count
 $sourceSkillCount = @(Get-ChildItem (Join-Path $root 'shared/skills') -Filter 'SKILL.md' -Recurse).Count
 $rulesRoot = Join-Path $root 'shared/rules'
@@ -56,10 +61,10 @@ foreach ($shell in @('powershell','bash')) {
             throw "Claude finish hook is incorrect in $package"
         } elseif ($content -notmatch '"defaultMode"\s*:\s*"auto"') {
             throw "Claude auto permission mode is missing in $package"
-        } elseif ($shell -eq 'powershell' -and ($settings.sandbox.enabled -ne $false -or $settings.sandbox.PSObject.Properties.Count -ne 1)) {
-            throw "Claude sandbox must be disabled in $package"
-        } elseif ($shell -eq 'bash' -and (-not $settings.sandbox.enabled -or $settings.sandbox.allowUnsandboxedCommands -ne $false -or $settings.sandbox.failIfUnavailable -ne $true)) {
+        } elseif ($sandboxSupported -and ($settings.sandbox.enabled -ne $true -or $settings.sandbox.allowUnsandboxedCommands -ne $false -or $settings.sandbox.failIfUnavailable -ne $true -or $settings.sandbox.PSObject.Properties.Count -ne 3)) {
             throw "Claude strict sandbox is missing in $package"
+        } elseif (-not $sandboxSupported -and ($settings.sandbox.enabled -ne $false -or $settings.sandbox.PSObject.Properties.Count -ne 1)) {
+            throw "Claude sandbox must be disabled in $package"
         } elseif (-not (Test-Path -LiteralPath (Join-Path $package "statusline/statusline.$(if ($shell -eq 'powershell') { 'ps1' } else { 'sh' })")) -or $settings.statusLine.command -notmatch "statusline\.$(if ($shell -eq 'powershell') { 'ps1' } else { 'sh' })") {
             throw "Claude status line is incorrect in $package"
         }

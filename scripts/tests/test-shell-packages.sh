@@ -8,6 +8,17 @@ while [ $# -gt 0 ]; do
   esac
 done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+sandbox_supported=false
+case "$(uname -s 2>/dev/null || true)" in
+  Darwin) sandbox_supported=true ;;
+  Linux)
+    kernel=$(uname -r 2>/dev/null || true)
+    case "$kernel" in
+      *microsoft*) [[ "$kernel" == *microsoft-standard-WSL2* ]] && sandbox_supported=true ;;
+      *) sandbox_supported=true ;;
+    esac
+    ;;
+esac
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d | wc -l)
 source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
 mapfile -t rule_paths < <(find "$root/shared/rules" -mindepth 1 -type f -name '*.md' ! -name general.md -printf '%P\n' | sort)
@@ -62,7 +73,7 @@ for shell in powershell bash; do
       ! grep -q 'flashbang-if-input' "$package/$file"
       ! grep -q '"async"[[:space:]]*:[[:space:]]*true' "$package/$file"
       grep -q '"defaultMode"[[:space:]]*:[[:space:]]*"auto"' "$package/$file"
-      python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); expected={"enabled": False} if sys.argv[2] == "powershell" else {"enabled": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True}; assert settings["sandbox"] == expected' "$package/$file" "$shell"
+      python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); expected={"enabled": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True} if sys.argv[2] == "true" else {"enabled": False}; assert settings["sandbox"] == expected' "$package/$file" "$sandbox_supported"
       statusline_extension='sh'
       [ "$shell" != powershell ] || statusline_extension=ps1
       test -f "$package/statusline/statusline.$statusline_extension"
