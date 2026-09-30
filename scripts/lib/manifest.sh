@@ -111,42 +111,14 @@ sync_managed_destination() {
       new_hash=$(sha256_of_file "$source_file")
     fi
     if [ "$relative" = config.toml ] && [ -f "$target" ]; then
-      local plugin_tables local_settings setting_name
-      local_settings=$(awk '
-        NR == 1 { sub(/^\357\273\277/, "") }
-        /^[ \t]*\[/ { exit }
-        /^[ \t]*(model|model_reasoning_effort)[ \t]*=/ { print }
-      ' "$target")
-      if [ -n "$local_settings" ]; then
-        while IFS= read -r setting; do
-          setting_name=${setting%%=*}
-          setting_name=${setting_name//[[:space:]]/}
-          content=$(printf '%s\n' "$content" | sed "/^[[:space:]]*${setting_name}[[:space:]]*=/d")
-        done <<< "$local_settings"
-        if printf '%s\n' "$content" | grep -qE '^[[:blank:]]*\['; then
-          content=$(printf '%s\n' "$content" | awk -v settings="$local_settings" '
-            !inserted && /^[ \t]*\[/ { print settings; inserted = 1 }
-            { print }
-          ')
-        else
-          content="$content"$'\n'"$local_settings"
-        fi
-        needs_sub=true
-        new_hash=$(sha256_of_string "$content")
-      fi
-      plugin_tables=$(awk '
-        /^[ \t]*\[/ { preserve = ($0 ~ /^[ \t]*\[(plugins|marketplaces)(\.|\])/) }
-        preserve { print }
-      ' "$target")
-      if [ -n "$plugin_tables" ]; then
-        if printf '%s\n' "$content" | grep -Eq '^[[:blank:]]*\[(plugins|marketplaces)(\.|\])'; then
-          printf 'Cannot overwrite local plugin configuration with generated plugin tables.\n' >&2
-          return 1
-        fi
-        content="$content"$'\n\n'"$plugin_tables"$'\n'
-        needs_sub=true
-        new_hash=$(sha256_of_string "$content")
-      fi
+      content=$(printf '%s' "$content" | python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" merge-toml --current "$target") || return
+      needs_sub=true
+      new_hash=$(sha256_of_string "$content")
+    fi
+    if [ "$relative" = settings.json ] && [ -f "$target" ]; then
+      content=$(printf '%s' "$content" | python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" merge-json --current "$target") || return
+      needs_sub=true
+      new_hash=$(sha256_of_string "$content")
     fi
     new_manifest[$relative]=$new_hash
 

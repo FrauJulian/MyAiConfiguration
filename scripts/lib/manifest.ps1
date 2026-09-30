@@ -112,30 +112,14 @@ function Sync-ManagedDestination {
             $newBytes = [System.IO.File]::ReadAllBytes($_.FullName)
         }
         if ($relative -eq 'config.toml' -and (Test-Path -LiteralPath $target)) {
-            $localConfig = [System.IO.File]::ReadAllText($target)
-            $pluginTables = [regex]::Matches($localConfig, '(?m)^[ \t]*\[(?:plugins|marketplaces)(?:\.|\])[\s\S]*?(?=^[ \t]*\[|\z)')
-            $rootConfig = ([regex]::Split($localConfig, '(?m)^[ \t]*\[', 2)[0]).TrimStart([char]0xFEFF)
-            $localSettings = [regex]::Matches($rootConfig, '(?m)^[ \t]*(?:model|model_reasoning_effort)[ \t]*=.*$')
-            if ($localSettings.Count -gt 0) {
-                $content = [System.Text.Encoding]::UTF8.GetString($newBytes).TrimEnd([char[]]"`r`n")
-                foreach ($setting in $localSettings) {
-                    $name = ([regex]::Match($setting.Value, '^[ \t]*([^ \t=]+)')).Groups[1].Value
-                    $content = [regex]::Replace($content, "(?m)^[ \t]*$([regex]::Escape($name))[ \t]*=.*(?:\r?\n|$)", '')
-                }
-                $preservedSettings = ($localSettings | ForEach-Object { $_.Value.TrimEnd([char[]]"`r`n") }) -join "`n"
-                $firstTable = [regex]::Match($content, '(?m)^[ \t]*\[')
-                if ($firstTable.Success) { $content = $content.Insert($firstTable.Index, "$preservedSettings`n") }
-                else { $content = "$content`n$preservedSettings" }
-                $newBytes = [System.Text.Encoding]::UTF8.GetBytes("$content`n")
-            }
-            if ($pluginTables.Count -gt 0) {
-                $content = [System.Text.Encoding]::UTF8.GetString($newBytes).TrimEnd([char[]]"`r`n")
-                if ($content -match '(?m)^[ \t]*\[(?:plugins|marketplaces)(?:\.|\])') {
-                    throw 'Cannot overwrite local plugin configuration with generated plugin tables.'
-                }
-                $preserved = ($pluginTables | ForEach-Object { $_.Value.TrimEnd([char[]]"`r`n") }) -join "`n"
-                $newBytes = [System.Text.Encoding]::UTF8.GetBytes("$content`n`n$preserved`n")
-            }
+            $content = [System.Text.Encoding]::UTF8.GetString($newBytes) | & python (Join-Path $PSScriptRoot 'install-options.py') merge-toml --current $target | Out-String
+            if ($LASTEXITCODE -ne 0) { throw 'Could not merge managed config.toml keys.' }
+            $newBytes = [System.Text.Encoding]::UTF8.GetBytes($content)
+        }
+        if ($relative -eq 'settings.json' -and (Test-Path -LiteralPath $target)) {
+            $finalContent = [System.Text.Encoding]::UTF8.GetString($newBytes) | & python (Join-Path $PSScriptRoot 'install-options.py') merge-json --current $target | Out-String
+            if ($LASTEXITCODE -ne 0) { throw 'Could not merge managed settings.json keys.' }
+            $newBytes = [System.Text.Encoding]::UTF8.GetBytes($finalContent)
         }
         $newHash = Get-Sha256HashOfBytes $newBytes
         $newManifest[$relative] = $newHash
