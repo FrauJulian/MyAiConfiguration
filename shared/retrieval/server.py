@@ -497,7 +497,7 @@ class Index:
                 vectors = np.frombuffer(b"".join(row[1] for row in rows), dtype=np.float32).reshape(-1, EMBEDDING_DIMENSIONS)
                 index.add([row[0] for row in rows], vectors)
             self.vector_index = index
-        return [match.key for match in self.vector_index.search(vector, DENSE_CANDIDATES)]
+        return [int(match.key) for match in self.vector_index.search(vector, DENSE_CANDIDATES)]
 
     def cache_key(self, query: str, top_k: int):
         identity = json.dumps([

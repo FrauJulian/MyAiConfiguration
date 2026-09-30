@@ -403,6 +403,25 @@ class RetrievalServerTests(unittest.TestCase):
         self.assertEqual(MODULE.reciprocal_rank_fusion([1, 2, 3], [4, 2, 3]), [2, 3, 1, 4])
         self.assertEqual(MODULE.reciprocal_rank_fusion([], [4, 2]), [4, 2])
 
+    def test_dense_candidates_converts_vector_keys_for_sqlite(self):
+        class VectorKey:
+            def __int__(self):
+                return 9
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            index = MODULE.Index(root, root / 'data')
+            index.vector_index = SimpleNamespace(search=lambda vector, count: [SimpleNamespace(key=VectorKey())])
+            usearch, usearch_index = fake_usearch()
+            try:
+                with patch.dict('sys.modules', numpy=fake_numpy(), usearch=usearch,
+                                **{'usearch.index': usearch_index}):
+                    candidates = index.dense_candidates(embedding())
+                self.assertEqual(candidates, [9])
+                self.assertIs(type(candidates[0]), int)
+            finally:
+                index.db.close()
+
     def test_hybrid_candidates_and_document_metadata(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
