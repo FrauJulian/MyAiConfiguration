@@ -88,33 +88,42 @@ def merge_json(current, managed):
             result[key] = hooks
         elif isinstance(value, dict) and isinstance(result.get(key), dict):
             result[key] = merge_json(result[key], value)
+        elif isinstance(value, list) and isinstance(result.get(key), list):
+            result[key] = value + [item for item in result[key] if item not in value]
         else:
             result[key] = value
     return result
 
 
-def merge_toml(current_text, managed_text):
+def split_toml_sections(content):
+    root = []
+    sections = []
+    active = root
+    for line in content.splitlines(keepends=True):
+        match = re.match(r'^\s*(\[\[?.+?\]\]?)\s*(?:#.*)?$', line.rstrip('\r\n'))
+        if match:
+            active = []
+            sections.append((match.group(1), active))
+        active.append(line)
+    return root, sections
+
+
+def merge_toml(current_text, managed_text, statusline_enabled=True):
     tomllib.loads(current_text)
     tomllib.loads(managed_text)
     managed_root_keys = set(tomllib.loads(managed_text))
-    lines = current_text.splitlines(keepends=True)
-    root = []
-    blocks = []
-    active = root
-    for line in lines:
-        header = re.match(r'^\s*(\[\[?.+?\]\]?)\s*(?:#.*)?$', line.rstrip('\r\n'))
-        if header:
-            active = []
-            blocks.append((header.group(1), active))
-        if active is root:
-            assignment = re.match(r'^\s*([A-Za-z0-9_-]+)\s*=', line)
-            if assignment and assignment.group(1) in managed_root_keys:
-                continue
-        active.append(line)
+    current_root, current_sections = split_toml_sections(current_text)
+    managed_root, managed_sections = split_toml_sections(managed_text)
+    root_extras = []
+    for line in current_root:
+        assignment = re.match(r'^\s*([A-Za-z0-9_-]+)\s*=', line)
+        if not assignment or assignment.group(1) not in managed_root_keys:
+            root_extras.append(line)
 
-    managed_headers = set(re.findall(r'(?m)^\s*(\[\[?.+?\]\]?)\s*(?:#.*)?$', managed_text))
+    managed_headers = {header for header, _ in managed_sections}
     extras = []
-    for header, block in blocks:
+    fields_by_header = {}
+    for header, block in current_sections:
         plugin_table = re.match(r'^\[(?:plugins|marketplaces)(?:\.|\])', header)
         array_table = header.startswith('[[')
         owned_hook = any(re.search(r'(?:flashbang|statusline|record-compact|session-state-pointer)\.(?:ps1|sh)', line, re.I) for line in block)
@@ -122,12 +131,35 @@ def merge_toml(current_text, managed_text):
             raise ValueError('Cannot merge conflicting managed plugin tables.')
         if header not in managed_headers or (array_table and not owned_hook):
             extras.extend(block)
+            continue
+        if array_table:
+            continue
+        generated_block = next(lines for name, lines in managed_sections if name == header)
+        generated_keys = {match.group(1) for line in generated_block
+                          if (match := re.match(r'^\s*([A-Za-z0-9_-]+)\s*=', line))}
+        retained = []
+        active_statement = False
+        for line in block[1:]:
+            assignment = re.match(r'^\s*([A-Za-z0-9_-]+)\s*=', line)
+            if assignment:
+                active_statement = assignment.group(1) not in generated_keys
+                if header == '[tui]' and assignment.group(1) == 'status_line' and not statusline_enabled:
+                    active_statement = False
+            if active_statement:
+                retained.append(line)
+        if retained:
+            fields_by_header.setdefault(header, []).extend(retained)
 
-    result = managed_text
-    if root and ''.join(root).strip():
-        managed_lines = managed_text.splitlines(keepends=True)
-        split = next((i for i, line in enumerate(managed_lines) if re.match(r'^\s*\[', line)), len(managed_lines))
-        result = ''.join(managed_lines[:split]).rstrip() + '\n' + ''.join(root).strip() + '\n' + ''.join(managed_lines[split:])
+    result = ''.join(managed_root).rstrip()
+    if root_extras:
+        result += '\n' + ''.join(root_extras).strip()
+    result += '\n'
+    for header, block in managed_sections:
+        result += ''.join(block)
+        if header in fields_by_header:
+            result += ''.join(fields_by_header.pop(header))
+        if not result.endswith('\n\n'):
+            result += '\n'
     if extras:
         result = result.rstrip() + '\n\n' + ''.join(extras).lstrip()
     tomllib.loads(result)
@@ -152,7 +184,7 @@ if __name__ == '__main__':
                 managed = json.load(sys.stdin)
                 print(json.dumps(merge_json(current, managed), indent=2, ensure_ascii=False) + '\n', end='')
             else:
-                print(merge_toml(args.current.read_text(encoding='utf-8-sig'), sys.stdin.read()), end='')
+                print(merge_toml(args.current.read_text(encoding='utf-8-sig'), sys.stdin.read(), args.statusline == 'true'), end='')
     except (OSError, ValueError, KeyError) as error:
         print(f'Install options: {error}', file=sys.stderr)
         sys.exit(1)

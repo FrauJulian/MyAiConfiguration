@@ -111,7 +111,7 @@ sync_managed_destination() {
       new_hash=$(sha256_of_file "$source_file")
     fi
     if [ "$relative" = config.toml ] && [ -f "$target" ]; then
-      content=$(printf '%s' "$content" | python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" merge-toml --current "$target") || return
+      content=$(printf '%s' "$content" | python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" merge-toml --current "$target" --statusline "$statusline_enabled") || return
       needs_sub=true
       new_hash=$(sha256_of_string "$content")
     fi

@@ -112,7 +112,8 @@ function Sync-ManagedDestination {
             $newBytes = [System.IO.File]::ReadAllBytes($_.FullName)
         }
         if ($relative -eq 'config.toml' -and (Test-Path -LiteralPath $target)) {
-            $content = [System.Text.Encoding]::UTF8.GetString($newBytes) | & python (Join-Path $PSScriptRoot 'install-options.py') merge-toml --current $target | Out-String
+            $statusLineFlag = if ($StatusLineEnabled) { 'true' } else { 'false' }
+            $content = [System.Text.Encoding]::UTF8.GetString($newBytes) | & python (Join-Path $PSScriptRoot 'install-options.py') merge-toml --current $target --statusline $statusLineFlag | Out-String
             if ($LASTEXITCODE -ne 0) { throw 'Could not merge managed config.toml keys.' }
             $newBytes = [System.Text.Encoding]::UTF8.GetBytes($content)
         }
