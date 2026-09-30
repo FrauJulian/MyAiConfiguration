@@ -3,6 +3,14 @@ function Get-ManagedManifestPath {
     return (Join-Path $Destination '.ai-config-manifest.tsv')
 }
 
+function Get-ManagedBackupRoot {
+    param([Parameter(Mandatory=$true)][string]$Destination)
+    if ((Split-Path $Destination -Leaf) -eq 'skills' -and (Split-Path (Split-Path $Destination -Parent) -Leaf) -eq '.agents') {
+        return (Resolve-ManagedPath -Destination (Split-Path $Destination -Parent) -Relative '.ai-config-skill-backups')
+    }
+    return (Resolve-ManagedPath -Destination $Destination -Relative 'backups')
+}
+
 function Resolve-ManagedPath {
     param([Parameter(Mandatory=$true)][string]$Destination, [Parameter(Mandatory=$true)][string]$Relative)
     $parts = $Relative -split '/', 0, 'SimpleMatch'
@@ -33,6 +41,23 @@ function Get-Sha256HashOfBytes {
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try { return ([System.BitConverter]::ToString($sha256.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant() }
     finally { $sha256.Dispose() }
+}
+
+function Write-ManagedSkillFile {
+    param([Parameter(Mandatory=$true)][string]$Path,[Parameter(Mandatory=$true)][byte[]]$Bytes)
+    $temporary = Join-Path (Split-Path $Path -Parent) ('.ai-config-skill-' + [Guid]::NewGuid().ToString('N') + '.tmp')
+    $backup = "$temporary.bak"
+    try {
+        [System.IO.File]::WriteAllBytes($temporary, $Bytes)
+        if ([System.IO.File]::Exists($Path)) {
+            [System.IO.File]::Replace($temporary, $Path, $backup)
+        } else {
+            [System.IO.File]::Move($temporary, $Path)
+        }
+    } finally {
+        if ([System.IO.File]::Exists($temporary)) { [System.IO.File]::Delete($temporary) }
+        if ([System.IO.File]::Exists($backup)) { [System.IO.File]::Delete($backup) }
+    }
 }
 
 function Read-ManagedManifest {
@@ -88,7 +113,16 @@ function Sync-ManagedDestination {
     $null = Resolve-ManagedPath -Destination $Destination -Relative '.ai-config-manifest.tsv'
     $oldManifest = Read-ManagedManifest $manifestPath
     $newManifest = @{}
-    $backupRoot = Join-Path $Destination "backups/$Stamp"
+    $backupRoot = Get-ManagedBackupRoot $Destination
+    $oldBackupRoot = Resolve-ManagedPath -Destination $Destination -Relative 'backups'
+    if ($backupRoot -ne $oldBackupRoot -and (Test-Path -LiteralPath $oldBackupRoot)) {
+        if ($DryRun) {
+            if (-not $Summary) { Write-Output "DRYRUN MOVE $oldBackupRoot -> $backupRoot" }
+        } else {
+            New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+            Move-Item -LiteralPath $oldBackupRoot -Destination (Join-Path $backupRoot ('legacy-' + [Guid]::NewGuid().ToString('N')))
+        }
+    }
     $tally = @{ Created = 0; Updated = 0; Unchanged = 0; Removed = 0; Warned = 0 }
 
     Get-ChildItem $Source -File -Recurse | ForEach-Object {
@@ -132,14 +166,18 @@ function Sync-ManagedDestination {
         if ($DryRun) { if (-not $Summary) { Write-Output "DRYRUN $action $target" }; if ($action -eq 'CREATE') { $tally.Created++ } else { $tally.Updated++ }; return }
         if ($exists) {
             $wasManaged = $oldManifest.ContainsKey($relative)
-            $backup = Resolve-ManagedPath -Destination $Destination -Relative "backups/$Stamp/$relative"
+            $backup = Resolve-ManagedPath -Destination $backupRoot -Relative "$Stamp/$relative"
             New-Item (Split-Path $backup -Parent) -ItemType Directory -Force | Out-Null
             Copy-Item -LiteralPath $target $backup -Force
             if (-not $Summary) { Write-Output "BACKUP $target -> $backup" }
             if (-not $wasManaged) { Write-Output "WARN $target existed before this installation but was not tracked by a previous run; it was backed up before being overwritten."; $tally.Warned++ }
         }
         New-Item (Split-Path $target -Parent) -ItemType Directory -Force | Out-Null
-        [System.IO.File]::WriteAllBytes($target, $newBytes)
+        if ($relative -eq 'SKILL.md' -or $relative.EndsWith('/SKILL.md', [StringComparison]::Ordinal)) {
+            Write-ManagedSkillFile -Path $target -Bytes $newBytes
+        } else {
+            [System.IO.File]::WriteAllBytes($target, $newBytes)
+        }
         if (-not $Summary) { Write-Output "$action $target" }
         if ($action -eq 'CREATE') { $tally.Created++ } else { $tally.Updated++ }
     }
@@ -148,7 +186,7 @@ function Sync-ManagedDestination {
         $target = Resolve-ManagedPath -Destination $Destination -Relative $relative
         if (-not (Test-Path -LiteralPath $target)) { continue }
         if ($DryRun) { if (-not $Summary) { Write-Output "DRYRUN REMOVE $target" }; $tally.Removed++; continue }
-        $backup = Resolve-ManagedPath -Destination $Destination -Relative "backups/$Stamp/$relative"
+        $backup = Resolve-ManagedPath -Destination $backupRoot -Relative "$Stamp/$relative"
         New-Item (Split-Path $backup -Parent) -ItemType Directory -Force | Out-Null
         Copy-Item -LiteralPath $target $backup -Force
         if (-not $Summary) { Write-Output "BACKUP $target -> $backup" }

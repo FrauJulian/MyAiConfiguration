@@ -16,6 +16,15 @@ manifest_path() {
   printf '%s/.ai-config-manifest.tsv' "$1"
 }
 
+managed_backup_root() {
+  local destination=$1
+  if [ "${destination##*/}" = skills ] && [ "$(basename -- "$(dirname -- "$destination")")" = .agents ]; then
+    managed_target "$(dirname -- "$destination")" '.ai-config-skill-backups'
+  else
+    managed_target "$destination" backups
+  fi
+}
+
 managed_target() {
   local destination=$1 relative=$2 component target probe
   target=$destination
@@ -82,6 +91,20 @@ sync_managed_destination() {
   read_managed_manifest "$manifest" old_manifest || return 1
   declare -A new_manifest
   local created=0 updated=0 unchanged=0 removed=0 warned=0
+  local backup_root old_backup_root
+  backup_root=$(managed_backup_root "$destination") || return 1
+  old_backup_root=$(managed_target "$destination" backups) || return 1
+  if [ "$backup_root" != "$old_backup_root" ] && [ -e "$old_backup_root" ]; then
+    if [ "$dry_run" = true ]; then
+      [ "$summary" = true ] || printf 'DRYRUN MOVE %s -> %s\n' "$old_backup_root" "$backup_root"
+    else
+      mkdir -p -- "$backup_root"
+      local legacy_target
+      legacy_target="$backup_root/legacy-$RANDOM-$RANDOM"
+      while [ -e "$legacy_target" ]; do legacy_target="$backup_root/legacy-$RANDOM-$RANDOM"; done
+      mv -- "$old_backup_root" "$legacy_target" || return 1
+    fi
+  fi
 
   while IFS= read -r -d '' source_file; do
     local relative target content needs_sub new_hash exists current_hash action backup
@@ -143,7 +166,7 @@ sync_managed_destination() {
     fi
 
     if [ "$exists" = true ]; then
-      backup=$(managed_target "$destination" "backups/$stamp/$relative") || return 1
+      backup=$(managed_target "$backup_root" "$stamp/$relative") || return 1
       mkdir -p "$(dirname -- "$backup")"
       cp -- "$target" "$backup"
       [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"
@@ -153,7 +176,16 @@ sync_managed_destination() {
       fi
     fi
     mkdir -p "$(dirname -- "$target")"
-    if [ "$needs_sub" = true ]; then
+    if [[ "$relative" = SKILL.md || "$relative" = */SKILL.md ]]; then
+      local temporary
+      temporary=$(mktemp "$(dirname -- "$target")/.ai-config-skill.XXXXXX") || return 1
+      if [ "$needs_sub" = true ]; then
+        printf '%s' "$content" > "$temporary" || { rm -f -- "$temporary"; return 1; }
+      else
+        cp -- "$source_file" "$temporary" || { rm -f -- "$temporary"; return 1; }
+      fi
+      mv -f -- "$temporary" "$target" || { rm -f -- "$temporary"; return 1; }
+    elif [ "$needs_sub" = true ]; then
       printf '%s' "$content" > "$target"
     else
       cp -- "$source_file" "$target"
@@ -172,7 +204,7 @@ sync_managed_destination() {
       removed=$((removed + 1))
       continue
     fi
-    backup=$(managed_target "$destination" "backups/$stamp/$relative") || return 1
+    backup=$(managed_target "$backup_root" "$stamp/$relative") || return 1
     mkdir -p "$(dirname -- "$backup")"
     cp -- "$target" "$backup"
     [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"

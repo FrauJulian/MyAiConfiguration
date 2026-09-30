@@ -108,15 +108,30 @@ legacy_manifest[skills/example/custom.md]=$(printf '0%.0s' {1..64})
 write_managed_manifest "$(manifest_path "$legacy")" legacy_manifest
 mapfile -t targets < <(get_install_targets "$generated" "$test_home" bash codex)
 [[ "${targets[0]}" = *"|$test_home/.agents/skills" ]] || { printf 'Canonical skills must be installed first.\n' >&2; exit 1; }
+mkdir -p "$test_home/.agents/skills/backups/old/example"
+printf 'old backup' > "$test_home/.agents/skills/backups/old/example/SKILL.md"
+sync_managed_destination "${targets[0]%%|*}" "${targets[0]#*|}" migrate-dry "" "" "" true > /dev/null
+[ -f "$test_home/.agents/skills/backups/old/example/SKILL.md" ] || { printf 'Dry run moved an old skill backup.\n' >&2; exit 1; }
 for target_pair in "${targets[@]}"; do
   sync_managed_destination "${target_pair%%|*}" "${target_pair#*|}" migrate "" "" "" false > /dev/null
 done
 [ -f "$test_home/.agents/skills/example/SKILL.md" ] && [ ! -f "$legacy/skills/example/SKILL.md" ] && [ -f "$legacy/backups/migrate/skills/example/SKILL.md" ] || { printf 'Skill migration must remove and back up the managed duplicate.\n' >&2; exit 1; }
+[ ! -e "$test_home/.agents/skills/backups" ] && [ "$(find "$test_home/.agents/.ai-config-skill-backups" -name SKILL.md -type f -exec grep -l '^old backup$' {} + | wc -l)" -eq 1 ] || { printf 'Old skill backup must be preserved outside the skill tree.\n' >&2; exit 1; }
 [ -f "$legacy/skills/example/custom.md" ] && [ -f "$legacy/skills/example/foreign.md" ] || { printf 'Skill migration must preserve modified and foreign files.\n' >&2; exit 1; }
 for target_pair in "${targets[@]}"; do
   sync_managed_destination "${target_pair%%|*}" "${target_pair#*|}" migrate-repeat "" "" "" false > /dev/null
 done
 [ ! -d "$legacy/backups/migrate-repeat" ] || { printf 'Skill migration must be idempotent.\n' >&2; exit 1; }
+printf 'updated managed skill' > "$package/skills/example/SKILL.md"
+for target_pair in "${targets[@]}"; do
+  sync_managed_destination "${target_pair%%|*}" "${target_pair#*|}" skill-update "" "" "" false > /dev/null
+done
+[ "$(cat "$test_home/.agents/skills/example/SKILL.md")" = 'updated managed skill' ] || { printf 'Managed skill update did not replace the file.\n' >&2; exit 1; }
+[ "$(cat "$test_home/.agents/.ai-config-skill-backups/skill-update/example/SKILL.md")" = 'managed skill' ] || { printf 'New skill backup must be outside the skill tree.\n' >&2; exit 1; }
+[ -z "$(find "$test_home/.agents/skills/example" -maxdepth 1 -name '.ai-config-skill.*' -print -quit)" ] || { printf 'Managed skill update left a temporary file.\n' >&2; exit 1; }
+rm -f -- "$package/skills/example/SKILL.md"
+sync_managed_destination "${targets[0]%%|*}" "${targets[0]#*|}" skill-remove "" "" "" false > /dev/null
+[ ! -f "$test_home/.agents/skills/example/SKILL.md" ] && [ "$(cat "$test_home/.agents/.ai-config-skill-backups/skill-remove/example/SKILL.md")" = 'updated managed skill' ] || { printf 'Deselected skill must be removed and backed up outside the skill tree.\n' >&2; exit 1; }
 printf '__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__' > "$source_dir/concurrency.txt"
 sync_managed_destination "$source_dir" "$destination" concurrency "" "" "" false false true 7 > /dev/null
 [ "$(cat "$destination/concurrency.txt")" = 7 ] || { printf 'Standalone concurrency placeholder must be resolved.\n' >&2; exit 1; }

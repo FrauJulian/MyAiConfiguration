@@ -89,8 +89,16 @@ try {
     }
     $targets = @(Get-InstallTargets -Generated $generated -HomePath $testHome -Shell PowerShell -Client Codex)
     if ($targets[0].Destination -ne (Join-Path $testHome '.agents/skills')) { throw 'Canonical skills must be installed before legacy copies are removed.' }
+    $oldSkillBackup = Join-Path $testHome '.agents/skills/backups/old/example'
+    New-Item $oldSkillBackup -ItemType Directory -Force | Out-Null
+    Set-Content (Join-Path $oldSkillBackup 'SKILL.md') 'old backup' -NoNewline
+    $null = Sync-ManagedDestination -Source $targets[0].Source -Destination $targets[0].Destination -Stamp 'migrate-dry' -DryRun
+    if (-not (Test-Path (Join-Path $oldSkillBackup 'SKILL.md'))) { throw 'Dry run moved an old skill backup.' }
     foreach ($item in $targets) { $null = Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp 'migrate' }
     if (-not (Test-Path (Join-Path $testHome '.agents/skills/example/SKILL.md'))) { throw 'Canonical skill is missing.' }
+    if (Test-Path (Join-Path $testHome '.agents/skills/backups')) { throw 'Old skill backups must leave the discoverable skill tree.' }
+    $skillBackupRoot = Join-Path $testHome '.agents/.ai-config-skill-backups'
+    if (@(Get-ChildItem -LiteralPath $skillBackupRoot -Filter SKILL.md -Recurse -File | Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -eq 'old backup' }).Count -ne 1) { throw 'Old skill backup was not preserved outside the skill tree.' }
     if (Test-Path (Join-Path $legacy 'skills/example/SKILL.md')) { throw 'Unmodified managed skill must not remain duplicated.' }
     if (-not (Test-Path (Join-Path $legacy 'backups/migrate/skills/example/SKILL.md'))) { throw 'Removed legacy skill must have a backup.' }
     foreach ($name in @('custom.md', 'foreign.md')) {
@@ -98,6 +106,16 @@ try {
     }
     foreach ($item in $targets) { $null = Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp 'migrate-repeat' }
     if (Test-Path (Join-Path $legacy 'backups/migrate-repeat')) { throw 'Skill migration must be idempotent.' }
+    Set-Content (Join-Path $package 'skills/example/SKILL.md') 'updated managed skill' -NoNewline
+    foreach ($item in $targets) { $null = Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp 'skill-update' }
+    $installedSkill = Join-Path $testHome '.agents/skills/example/SKILL.md'
+    if ((Get-Content -LiteralPath $installedSkill -Raw) -ne 'updated managed skill') { throw 'Managed skill update did not replace the file.' }
+    if ((Get-Content -LiteralPath (Join-Path $skillBackupRoot 'skill-update/example/SKILL.md') -Raw) -ne 'managed skill') { throw 'New skill backup must be outside the skill tree.' }
+    if (@(Get-ChildItem -LiteralPath (Split-Path $installedSkill -Parent) -Filter '.ai-config-skill-*' -File).Count) { throw 'Managed skill update left a temporary file.' }
+    Remove-Item -LiteralPath (Join-Path $package 'skills/example/SKILL.md') -Force
+    $null = Sync-ManagedDestination -Source $targets[0].Source -Destination $targets[0].Destination -Stamp 'skill-remove'
+    if (Test-Path -LiteralPath $installedSkill) { throw 'Deselected managed skill must be removed.' }
+    if ((Get-Content -LiteralPath (Join-Path $skillBackupRoot 'skill-remove/example/SKILL.md') -Raw) -ne 'updated managed skill') { throw 'Removed skill backup must be outside the skill tree.' }
     Set-Content (Join-Path $source 'concurrency.txt') '__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__' -NoNewline
     $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'concurrency' -ClaudeConcurrency '7'
     if ((Get-Content (Join-Path $destination 'concurrency.txt') -Raw) -ne '7') { throw 'Standalone concurrency placeholder must be resolved.' }
