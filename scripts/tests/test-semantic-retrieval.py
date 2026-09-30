@@ -5,6 +5,7 @@ import json
 from contextlib import redirect_stdout
 from pathlib import Path
 import py_compile
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -104,6 +105,39 @@ class SemanticRetrievalTests(unittest.TestCase):
             (cache / 'foreign.txt').write_text('keep')
             with self.assertRaisesRegex(ValueError, '__pycache__'):
                 MODULE.sync(ROOT, home, ['codex'], True, False, True)
+
+    def test_install_search_update_and_remove_owned_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / 'home'
+            repository = Path(directory) / 'repository'
+            repository.mkdir()
+            subprocess.run(['git', '-C', str(repository), 'init', '--quiet'], check=True)
+            target = home / '.my-ai-configuration/semantic-retrieval'
+            state_path = target.parent / 'semantic-retrieval.json'
+            with patch.object(MODULE, 'ensure_runtime', return_value=Path('python')), \
+                 patch.object(MODULE, 'ensure_models'):
+                MODULE.sync(ROOT, home, ['codex'], True, False, False)
+                installed = importlib.util.spec_from_file_location('installed_retrieval', target / 'server.py')
+                server = importlib.util.module_from_spec(installed)
+                installed.loader.exec_module(server)
+                index = server.Index(repository, target / 'data')
+                try:
+                    self.assertEqual(index.search('query'), [])
+                finally:
+                    index.db.close()
+                self.assertEqual(len(list((target / 'data').glob('*.sqlite3'))), 1)
+                server.daemon_authkey(target / 'data')
+                MODULE.sync(ROOT, home, ['codex'], True, False, True)
+                self.assertTrue((target / 'data').is_dir())
+                foreign = target / 'data' / 'foreign.txt'
+                foreign.write_text('keep')
+                with self.assertRaisesRegex(ValueError, 'data'):
+                    MODULE.sync(ROOT, home, ['codex'], False, False, False)
+                self.assertTrue(foreign.exists())
+                foreign.unlink()
+                MODULE.sync(ROOT, home, ['codex'], False, False, False)
+            self.assertFalse(target.exists())
+            self.assertFalse(state_path.exists())
 
     def test_negative_benchmark_keeps_active_runtime(self):
         with tempfile.TemporaryDirectory() as directory:

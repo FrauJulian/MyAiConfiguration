@@ -90,10 +90,17 @@ def check_runtime(target, state):
         path = target / name
         if path.is_symlink() or not path.is_file() or digest(path) != expected:
             raise ValueError(f'Owned semantic retrieval file changed: {name}')
-    allowed = set(state['files']) | {'.venv', 'model-cache', '__pycache__'}
+    allowed = set(state['files']) | {'.venv', 'model-cache', '__pycache__', 'data'}
     for path in target.iterdir():
         if path.is_symlink() or path.name not in allowed:
             raise ValueError(f'Foreign or linked semantic retrieval path: {path.name}')
+        if path.name == 'data' and (not path.is_dir() or any(
+                child.is_symlink() or not (
+                    child.is_file() and (child.name in ('daemon.key', 'daemon.starting') or re.fullmatch(
+                        r'[0-9a-f]{64}\.sqlite3(?:-(?:wal|shm|journal))?', child.name))
+                    or child.is_socket() and re.fullmatch(r'daemon-[0-9a-f]{16}\.sock', child.name))
+                for child in path.iterdir())):
+            raise ValueError('Foreign or linked semantic retrieval path: data')
         if path.name == '__pycache__' and (not path.is_dir() or any(
                 child.is_symlink() or not child.is_file() or not re.fullmatch(
                     r'(?:server|benchmark)\.[A-Za-z0-9_-]+(?:\.opt-\d+)?\.pyc', child.name)
@@ -188,7 +195,7 @@ def benchmark(root, home, dry_run, summary=False):
         shutil.rmtree(target)
         state_path.unlink(missing_ok=True)
     if not summary:
-        print('Semantic retrieval benchmark: ' + ('recommended' if outcome['recommended'] else 'not recommended') + f" (embedding {outcome['embeddingSeconds']}s, reranking {outcome['rerankingSeconds']}s)")
+        print('Semantic retrieval warm-model check: ' + ('passed' if outcome['recommended'] else 'failed') + f" (embedding {outcome['embeddingSeconds']}s, reranking {outcome['rerankingSeconds']}s; excludes model startup and indexing)")
     return outcome['recommended']
 
 
