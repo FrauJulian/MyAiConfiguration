@@ -274,6 +274,14 @@ class ManagedExtensionTests(unittest.TestCase):
         self.assertIn(['claude', 'plugin', 'install', 'qmd@qmd', '--scope', 'user'], self.commands)
         self.assertNotIn(['codex', 'mcp', 'add', 'qmd', '--', 'qmd', 'mcp'], self.commands)
 
+    def test_owned_qmd_uses_npm_update_instead_of_reinstalling(self):
+        entry = dict(name='QMD', codex_method='qmd', codex_source='@tobilu/qmd', codex_skill='qmd', codex_plugin='-', codex_marketplace='-', claude_plugin='qmd@qmd', claude_marketplace='tobi/qmd')
+        self.manager().sync([entry], ['codex'], {'QMD'})
+        self.commands.clear()
+        with patch.object(extensions.Manager, 'global_packages', return_value={'@tobilu/qmd'}):
+            self.manager(update=True).sync([entry], ['codex'], {'QMD'})
+        self.assertEqual([['npm', 'update', '--global', '@tobilu/qmd']], self.commands)
+
     def test_managed_mcporter_updates_when_requested(self):
         self.manager().sync([mcporter()], ['codex'], {'MCPorter'})
         self.commands.clear()

@@ -429,7 +429,7 @@ class Manager:
         if record is None and installed and not self.summary:
             print(f'PASS Preserving pre-existing global package: {package}')
         if (record is not None or not installed) and (not installed or (self.update and package not in self.updated_packages)):
-            self.command(['npm', 'install', '--global', package])
+            self.command(['npm', 'update' if installed else 'install', '--global', package])
             self.global_packages().add(package)
             self.updated_packages.add(package)
             if record is None:
