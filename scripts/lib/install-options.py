@@ -152,7 +152,7 @@ def merge_toml(current_text, managed_text, statusline_enabled=True):
 
     result = ''.join(managed_root).rstrip()
     if root_extras:
-        result += '\n' + ''.join(root_extras).strip()
+        result += '\n' + ''.join(root_extras).strip('\r\n')
     result += '\n'
     for header, block in managed_sections:
         result += ''.join(block)
@@ -161,7 +161,7 @@ def merge_toml(current_text, managed_text, statusline_enabled=True):
         if not result.endswith('\n\n'):
             result += '\n'
     if extras:
-        result = result.rstrip() + '\n\n' + ''.join(extras).lstrip()
+        result = result.rstrip() + '\n\n' + ''.join(extras).lstrip('\r\n')
     tomllib.loads(result)
     return result
 

@@ -16,6 +16,21 @@ SPEC.loader.exec_module(OPTIONS)
 
 
 class InstallOptionsTests(unittest.TestCase):
+    def test_merge_toml_preserves_local_plugin_table_indentation(self):
+        plugin_state = ('  [marketplaces.ponytail]\n'
+                        '    source_type = "git"\n'
+                        '    source = "https://github.com/DietrichGebert/ponytail.git"\n'
+                        '  [plugins."ponytail@ponytail"]\n'
+                        '    enabled = true\n'
+                        '  [plugins."disabled@market"]\n'
+                        '    enabled = false')
+        current = "model = 'old'\napprovals_reviewer = 'user'\n" + plugin_state + '\n'
+        managed = "approvals_reviewer = 'auto_review'\n\n[tui]\n"
+
+        result = OPTIONS.merge_toml(current, managed)
+
+        self.assertIn(plugin_state, result)
+
     def test_filter_preserves_other_claude_hooks_and_status(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'settings.json'
