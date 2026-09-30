@@ -11,6 +11,7 @@ METRICS = (
     'permanent_context_tokens',
     'instruction_tokens',
     'skill_metadata_tokens',
+    'auto_loaded_rule_tokens',
     'rule_catalog_tokens',
     'agent_metadata_tokens',
 )
@@ -40,12 +41,17 @@ def measure_package(package, client):
 
     if client == 'claude':
         rule_files = (package / 'skills' / 'rules').glob('rules-*/SKILL.md')
+        security_rule = package / 'skills' / 'rules' / 'rules-security' / 'SKILL.md'
+        security_content = security_rule.read_text(encoding='utf-8-sig')
+        security_header = re.match(r'\A---\r?\n.*?^---[ \t]*\r?$', security_content, re.MULTILINE | re.DOTALL)
+        auto_loaded_rule_bytes = len(security_content[security_header.end():].encode('utf-8')) if security_header else len(security_content.encode('utf-8'))
     else:
         rule_root = package / 'rules'
         rule_files = (
             path for path in rule_root.rglob('*.md')
             if 'references' not in path.relative_to(rule_root).parts
         )
+        auto_loaded_rule_bytes = (rule_root / 'security' / 'index.md').stat().st_size
     rule_catalog_bytes = sum(path.stat().st_size for path in rule_files)
 
     agent_root = package / 'agents'
@@ -58,9 +64,10 @@ def measure_package(package, client):
             agent_metadata_bytes += sum(len(agent.get(key, '').encode('utf-8')) for key in ('name', 'description'))
 
     return {
-        'permanent_context_tokens': tokens(instruction_bytes + skill_metadata_bytes),
+        'permanent_context_tokens': tokens(instruction_bytes + skill_metadata_bytes + agent_metadata_bytes + auto_loaded_rule_bytes),
         'instruction_tokens': tokens(instruction_bytes),
         'skill_metadata_tokens': tokens(skill_metadata_bytes),
+        'auto_loaded_rule_tokens': tokens(auto_loaded_rule_bytes),
         'rule_catalog_tokens': tokens(rule_catalog_bytes),
         'agent_metadata_tokens': tokens(agent_metadata_bytes),
     }
@@ -135,7 +142,8 @@ def main():
     failures, warnings = evaluate(current, baseline)
 
     print('Prompt Budget (UTF-8 bytes / 4 estimates; not runtime token measurements)')
-    print('Permanent context includes global instructions and all skill frontmatter; agent metadata, plugins, and tool schemas are separate or excluded.')
+    print('Bundled estimate includes global instructions, skill and agent metadata, and the always-loaded security baseline.')
+    print('Project-specific instructions, external plugin prompt bodies, and live MCP/tool schemas are runtime-dependent and not measured here.')
     if args.summary:
         for metric in METRICS:
             for client in CLIENTS:

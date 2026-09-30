@@ -40,7 +40,7 @@ def main():
             directories.append(args.home / '.agents' / 'skills')
         report(f'Installed {client} user catalog', directories)
         report(f'Cached {client} plugins (all versions)', [args.home / f'.{client}' / 'plugins' / 'cache'], warn_duplicates=False)
-    print('Coverage: prompt KPIs cover generated permanent instructions, skill metadata, the full rule catalog, and agent metadata. Rule catalog size does not represent rules loaded in a typical session. Counts are bytes/4 estimates, not runtime token telemetry. Installed prompts, tool schemas, dynamic hook output, and inactive plugin versions are excluded.')
+    print('Coverage: the bundled estimate includes generated global instructions, all skill and agent metadata, and the always-loaded security baseline. The full rule catalog is inventory size, not automatic load. Project-specific instructions, external plugin prompt bodies, and live MCP/tool schemas are runtime-dependent and excluded. Counts are UTF-8 bytes/4 estimates, not runtime token telemetry.')
 
 
 if __name__ == '__main__':
