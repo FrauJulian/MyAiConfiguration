@@ -1,12 +1,12 @@
-# Modern Java
+# Java Coding Style
 
-Apply these rules when writing or reviewing Java code.
+Apply these rules when editing Java syntax, class structure, and everyday code organization.
 
-* Match the project's configured Java release, compiler flags, libraries, and style. Use newer language or library features only when that release supports them and they improve clarity.
-* Prefer clear, immutable value types. Use records for transparent data carriers and sealed types when a closed set of variants is part of the domain; do not force these forms onto mutable entities or framework-bound types.
-* Use pattern matching, switch expressions, and text blocks where supported and clearer than older forms. Keep control flow explicit; streams are not automatically clearer or faster than loops.
-* Prefer local `var` only when the initializer makes the type obvious. Keep public APIs explicitly typed and avoid raw types and unchecked casts.
-* Keep classes and methods focused, use descriptive names, and make state and side effects easy to see. Prefer composition and small interfaces at real boundaries over speculative abstractions.
-* Use try-with-resources for `AutoCloseable` resources. Preserve interruption, exception causes, and precise failure context; do not swallow exceptions or use exceptions for ordinary control flow.
-* Define nullability and mutability expectations at API boundaries. Prefer standard collection and `Optional` conventions without using `Optional` for fields or parameters by default.
-* Avoid deprecated APIs and obsolete date/time or concurrency utilities when supported standard replacements fit the target release. Remove dead code and unused dependencies.
+* Match the project's Java release, style, and framework conventions. Use newer syntax only when supported and clearer.
+* Prefer direct control flow and descriptive domain names. Use streams when they clarify a transformation; loops are often clearer for stateful work or error handling.
+* Use local `var` only when the initializer makes the type obvious. Keep public contracts explicitly typed.
+* Use records for transparent immutable carriers and sealed types for genuinely closed variants when the target release supports them. Do not force them onto mutable entities or framework-managed types.
+* Prefer composition and focused classes over inheritance, reflection, global mutable state, or speculative interfaces.
+* Make ownership, mutation, and side effects visible. Use `final` where it clarifies invariants; do not add it mechanically to every local variable.
+* Prefer supported `java.time` APIs and standard library facilities over obsolete APIs or custom helpers when they fit the contract.
+* Remove dead code. Add comments only for non-obvious decisions or public contracts that code cannot express clearly.
