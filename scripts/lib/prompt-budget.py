@@ -9,6 +9,7 @@ from pathlib import Path
 
 METRICS = (
     'permanent_context_tokens',
+    'instruction_tokens',
     'skill_metadata_tokens',
     'rule_catalog_tokens',
     'agent_metadata_tokens',
@@ -35,7 +36,6 @@ def measure_package(package, client):
     skill_metadata_bytes = sum(
         len(read_frontmatter(path))
         for path in skill_root.rglob('SKILL.md')
-        if path.relative_to(skill_root).parts[0] != 'rules'
     )
 
     if client == 'claude':
@@ -58,7 +58,8 @@ def measure_package(package, client):
             agent_metadata_bytes += sum(len(agent.get(key, '').encode('utf-8')) for key in ('name', 'description'))
 
     return {
-        'permanent_context_tokens': tokens(instruction_bytes),
+        'permanent_context_tokens': tokens(instruction_bytes + skill_metadata_bytes),
+        'instruction_tokens': tokens(instruction_bytes),
         'skill_metadata_tokens': tokens(skill_metadata_bytes),
         'rule_catalog_tokens': tokens(rule_catalog_bytes),
         'agent_metadata_tokens': tokens(agent_metadata_bytes),
@@ -133,7 +134,8 @@ def main():
     current = measure(root)
     failures, warnings = evaluate(current, baseline)
 
-    print('Prompt Budget')
+    print('Prompt Budget (UTF-8 bytes / 4 estimates; not runtime token measurements)')
+    print('Permanent context includes global instructions and all skill frontmatter; agent metadata, plugins, and tool schemas are separate or excluded.')
     if args.summary:
         for metric in METRICS:
             for client in CLIENTS:
