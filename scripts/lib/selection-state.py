@@ -22,6 +22,7 @@ def validate(state, allow_legacy=False):
         state['semantic_retrieval'] = False
     if 'statusline' not in state:
         state['statusline'] = True
+    state.pop('skill_profile', None)
     state.pop('update_agents', None)
     if any(type(state.get(key)) is not bool for key in ('flashbang', 'statusline', 'semantic_retrieval')):
         raise ValueError('Invalid saved install options. Run update once without Quick.')

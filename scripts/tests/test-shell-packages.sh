@@ -55,6 +55,12 @@ for shell in powershell bash; do
     expected_skill_count=$source_skill_count
     [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
     test "$(find "$package/skills" -name SKILL.md | wc -l)" -eq "$expected_skill_count"
+    test -f "$package/skills/debugging/SKILL.md"
+    test -f "$package/skills/copywriting/SKILL.md"
+    test -f "$package/skills/marketing-psychology/SKILL.md"
+    test -f "$package/skills/image/SKILL.md"
+    test ! -e "$package/skills/marketing-plan/SKILL.md"
+    test ! -e "$package/skills/social/SKILL.md"
     if [ "$shell" = powershell ]; then
       grep -q '__POWERSHELL_COMMAND__ .*flashbang.ps1' "$package/$file"
       ! grep -Eq 'WindowStyle[[:space:]]+Hidden' "$package/$file"

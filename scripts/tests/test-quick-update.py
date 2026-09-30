@@ -80,6 +80,14 @@ class SelectionTests(unittest.TestCase):
         self.assertTrue(state['statusline'])
         self.assertIn('semantic_retrieval\ttrue', self.run_state('read', '--format', 'tsv').stdout)
 
+    def test_legacy_skill_profile_is_ignored(self):
+        self.save()
+        state = json.loads(self.run_state('read').stdout)
+        state['skill_profile'] = 'core'
+        self.path.write_text(json.dumps(state))
+        self.assertNotIn('skill_profile', json.loads(self.run_state('read').stdout))
+        self.assertNotIn('skill_profile', self.run_state('read', '--format', 'tsv').stdout)
+
     def test_invalid_write_preserves_last_selection(self):
         self.save('--selected', 'Superpowers')
         original = self.path.read_bytes()
