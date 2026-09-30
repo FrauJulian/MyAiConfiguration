@@ -29,7 +29,7 @@ done
 command -v jq >/dev/null && result PASS 'jq available for Claude Bash status line' || result WARN 'jq unavailable; Claude Bash status line is disabled'
 
 source_agent_count=$(find "$root/shared/agents" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
-source_skill_count=$(find "$root/shared/skills" -name SKILL.md 2>/dev/null | wc -l)
+source_skill_count=$(find "$root/shared/skills" -name SKILL.md | wc -l)
 rule_skill_count=$(find "$root/shared/rules" -type f -name '*.md' ! -path "$root/shared/rules/general.md" | wc -l)
 
 for shell in powershell bash; do
