@@ -269,4 +269,4 @@ These phrases are overused in AI-generated content:
 - "This begs the question..."
 - "Let's delve into..."
 
-See the seo-audit skill's `references/ai-writing-detection.md` for a complete list of AI writing tells.
+Review the text for generic phrasing and unnatural transitions before publishing.

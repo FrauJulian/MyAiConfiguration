@@ -1,6 +1,6 @@
 ---
 name: copywriting
-description: When the user wants to write, rewrite, or improve marketing copy for any page — including homepage, landing pages, pricing pages, feature pages, about pages, or product pages. Also use when the user says "write copy for," "improve this copy," "rewrite this page," "marketing copy," "headline help," "CTA copy," "value proposition," "tagline," "subheadline," "hero section copy," "above the fold," "this copy is weak," "make this more compelling," or "help me describe my product." Use this whenever someone is working on website text that needs to persuade or convert. For email copy, see emails. For popup copy, see popups. For editing existing copy, see copy-editing. For the offer underneath the copy (bonuses, guarantees, value framing), see offers.
+description: Use when writing or rewriting product and website copy, headlines, calls to action, and explanations that keep readers engaged. For editing existing copy, see copy-editing; for value framing, see offers.
 metadata:
   version: 2.0.2
 ---
@@ -251,6 +251,3 @@ For headlines and CTAs, provide 2-3 options:
 
 - **copy-editing**: For polishing existing copy (use after your draft)
 - **cro**: If page structure/strategy needs work, not just copy
-- **emails**: For email copywriting
-- **popups**: For popup and modal copy
-- **ab-testing**: To test copy variations

@@ -1,6 +1,6 @@
 ---
 name: content-strategy
-description: When the user wants to plan a content strategy, decide what content to create, or figure out what topics to cover. Also use when the user mentions "content strategy," "what should I write about," "content ideas," "blog strategy," "topic clusters," "content planning," "editorial calendar," "content marketing," "content roadmap," "what content should I create," "blog topics," "content pillars," or "I don't know what to write." Use this whenever someone needs help deciding what content to produce, not just writing it. For writing individual pieces, see copywriting. For SEO-specific audits, see seo-audit. For social media content specifically, see social.
+description: Use when planning content for software products, documentation, or websites, including topics, information hierarchy, and engaging formats. For individual copy, see copywriting.
 metadata:
   version: 2.1.1
 ---
@@ -132,16 +132,15 @@ When the goal of a piece is backlinks specifically, format choice matters more t
 |---|---|
 | Statistics / data roundups | **4.25x** |
 | Glossary / definition pages | 1.47x |
-| Interactive tools / calculators (see **free-tools**) | 1.38x |
+| Interactive tools / calculators | 1.38x |
 | How-to / tutorials | 1.36x |
 | Original research / reports | 0.80x |
 | Ultimate guides | 0.77x |
 | Thought leadership | 0.74x |
 | Templates / frameworks | 0.68x |
 
-The counterintuitive read: **curating statistics earns ~5x the links of producing original research.** Writers link to whatever makes citation easiest — a maintained stat-roundup page is citation infrastructure, while original research often gets cited *via* the roundups that aggregate it. Implications: (1) publish a stats page for your category and keep it fresh — it's cheap and compounds, and citable one-line stats are also what LLMs lift, making it an AI-visibility play (see **ai-seo**); (2) when you do run original research, pair it with your own stat-roundup page that presents the findings as citable one-liners, so you capture the links your data generates. The formats at the bottom aren't dead — guides, templates, and thought leadership earn their keep on rankings, conversions, and brand. Judge each piece by the job it's for, and don't expect links from formats that don't earn them.
+The counterintuitive read: **curating statistics earns ~5x the links of producing original research.** Writers link to whatever makes citation easiest — a maintained stat-roundup page is citation infrastructure, while original research often gets cited *via* the roundups that aggregate it. Implications: (1) publish a stats page for your category and keep it fresh — it's cheap and compounds, and citable one-line stats are also what LLMs lift, making it an AI-visibility play; (2) when you do run original research, pair it with your own stat-roundup page that presents the findings as citable one-liners, so you capture the links your data generates. The formats at the bottom aren't dead — guides, templates, and thought leadership earn their keep on rankings, conversions, and brand. Judge each piece by the job it's for, and don't expect links from formats that don't earn them.
 
-For programmatic content at scale, see **programmatic-seo** skill.
 
 ---
 
@@ -359,9 +358,9 @@ Treating content like a product means each format has a production standard, not
 
 - **Blog post** — write **10 title options** before drafting (the title does most of the work; pick the strongest). Plan **~5 editing passes** (structure, clarity, evidence, line edit, headline/SEO). For the writing itself, see **copywriting**.
 - **Long-form guide** — the flagship of a pillar. Comprehensive enough to be *the* resource; structured with a table of contents and internal links to spokes. Build the hub before the spokes.
-- **Video** — script the hook first; front-load the payoff. Repurpose into short-form clips at creation time (see **social**).
+- **Video** — script the hook first; front-load the payoff.
 - **Podcast** — one interview yields a transcript, quote graphics, short clips, and a written recap. Design the episode knowing it will be atomized.
-- **Email** — one idea per send; the subject line is the title—write several and pick. For sequences and lifecycle, see **emails**.
+- **Email** — one idea per send; the subject line is the title—write several and pick.
 
 ---
 
@@ -377,7 +376,7 @@ Build **distribution hooks into the piece at creation time**, not after: write s
 - **Rented** (social platforms, ad networks) — engagement, but you don't own the audience or the algorithm.
 - **Owned** (email list, blog, community) — conversion and the only durable asset. Everything upstream should funnel here.
 
-ORB mechanics live in the **launch** skill (channel-type playbook) and content atomization/repurposing lives in **social**; the value here is consolidating the *distribute* half of content strategy so it has a home.
+This skill covers the distribution side of content strategy.
 
 **Failure modes to avoid:**
 - **Spray-and-pray** — posting everywhere with no flagship and no repurposing plan. Effort scatters, nothing compounds.
@@ -430,10 +429,4 @@ Visual or structured representation of how content interconnects.
 ## Related Skills
 
 - **copywriting**: For writing individual content pieces
-- **seo-audit**: For technical SEO and on-page optimization
-- **ai-seo**: For optimizing content for AI search engines and getting cited by LLMs
-- **programmatic-seo**: For scaled content generation
 - **site-architecture**: For page hierarchy, navigation design, and URL structure
-- **emails**: For email-based content
-- **social**: For social media content, content atomization, and repurposing execution
-- **launch**: For the ORB channel-type playbook and launch-day distribution

@@ -67,7 +67,7 @@ Each turn of the loop lowers the cost of the next piece (you learn what lands) a
 
 ## Atomization Checklist (per flagship)
 
-For each major piece, produce (see **social** for the platform-native execution):
+For each major piece, produce:
 - [ ] 3–5 standalone social posts from the subheads/key points
 - [ ] 1 thread (Twitter/X) or carousel (LinkedIn/Instagram) of the core argument
 - [ ] 2–4 short-form video clips (if source is video/podcast)
