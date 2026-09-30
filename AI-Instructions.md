@@ -51,12 +51,10 @@ Write all repository content, generated instructions, scripts, prompts, document
 
 ## Installation and security
 
-- Do not install global configuration automatically.
-- Perform global installation only after explicit user instruction, using `scripts/commands/install.ps1` so replaced managed files are backed up.
+- Keep all task changes inside this repository. Never install, update, or remove configuration, skills, plugins, packages, or settings on the local machine, and never modify files outside the repository. You may change repository code that defines installation behavior, but do not execute it; if a task requires an out-of-repository write, stop and report it.
 - Do not add project-specific rules, secrets, credentials, authentication state, or generated runtime state.
 
 ## Version control
 
 - Never commit changes unless explicitly instructed.
 - Preserve unrelated user changes.
-
