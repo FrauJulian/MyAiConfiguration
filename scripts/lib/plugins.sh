@@ -56,14 +56,38 @@ get_plugin_names() {
 plugin_field() {
   local root=$1 target=$2 field=$3
   # shellcheck disable=SC2034
-  local name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill
+  local name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill mcporter_name mcporter_url
   # shellcheck disable=SC2034
-  while IFS=$'\t' read -r name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill; do
+  while IFS=$'\t' read -r name claude_marketplace claude_plugin codex_marketplace codex_plugin codex_method codex_source codex_skill mcporter_name mcporter_url; do
     [ "$name" = "$target" ] || continue
     printf '%s\n' "${!field}"
     return 0
   done < "$root/adapters/plugins.tsv"
   return 1
+}
+
+mcporter_server_installed() {
+  local path="$1/.mcporter/mcporter.json" server=$2 url=$3
+  if [ -L "$1/.mcporter" ] || [ -L "$path" ]; then printf 'MCPorter configuration path contains a link.\n' >&2; return 2; fi
+  [ -f "$path" ] || return 1
+  python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8-sig") as stream:
+        config = json.load(stream)
+    if not isinstance(config, dict):
+        raise ValueError("Invalid MCPorter server configuration")
+    servers = config.get("mcpServers", {})
+    if not isinstance(servers, dict):
+        raise ValueError("Invalid MCPorter server configuration")
+    entry = servers.get(sys.argv[2])
+    if entry is not None and not isinstance(entry, dict):
+        raise ValueError("Invalid MCPorter server entry")
+    sys.exit(0 if entry is not None and entry.get("baseUrl") == sys.argv[3] else 1)
+except (OSError, ValueError, AttributeError) as error:
+    print("Invalid MCPorter configuration: " + str(error), file=sys.stderr)
+    sys.exit(2)
+' "$path" "$server" "$url"
 }
 
 plugin_toggleable() {
@@ -128,6 +152,13 @@ select_configured_plugins() {
       continue
     fi
     found=false
+    local mcporter_name mcporter_url status
+    mcporter_name=$(plugin_field "$root" "$name" mcporter_name)
+    mcporter_url=$(plugin_field "$root" "$name" mcporter_url)
+    if [ -n "$mcporter_name" ] && [ "$mcporter_name" != - ] && [ -n "$mcporter_url" ] && [ "$mcporter_url" != - ]; then
+      if mcporter_server_installed "${home_path:-$HOME}" "$mcporter_name" "$mcporter_url"; then found=true
+      else status=$?; [ "$status" -eq 1 ] || return "$status"; fi
+    fi
     for reference_client in "${reference_clients[@]}"; do
       if [ "$reference_client" = claude ]; then selector=$(plugin_field "$root" "$name" claude_plugin); else selector=$(plugin_field "$root" "$name" codex_plugin); fi
       if [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" = qmd ]; then
@@ -138,7 +169,7 @@ select_configured_plugins() {
         { [ -d "$HOME/.agents/skills/$skill_name" ] || [ -d "$HOME/.codex/skills/$skill_name" ]; } && found=true
       elif plugin_installed "$reference_client" "$selector"; then found=true
       else
-        local status=$?
+        status=$?
         [ "$status" -eq 1 ] || return "$status"
       fi
     done

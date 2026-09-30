@@ -37,7 +37,8 @@ catch { $failed = $true }
 $env:AI_CONFIG_VERBOSE = $null
 if (-not $failed -or $diagnostics -notcontains 'download progress' -or $diagnostics -notcontains 'WARN test warning') { throw 'Plugin failure must retain full diagnostics and fail.' }
 $global:LASTEXITCODE = 0
-function codex { $script:observedCodexHome = $env:CODEX_HOME; $script:observedProfile = $env:USERPROFILE; '{"installed":[{"pluginId":"ponytail@ponytail"},{"pluginId":"i-have-adhd@i-have-adhd"},{"pluginId":"superpowers@openai-curated-remote"},{"pluginId":"context7@context7-marketplace"},{"pluginId":"caveman@thinkhome-caveman"}],"available":[]}' }
+$script:codexInventory = '{"installed":[{"pluginId":"ponytail@ponytail"},{"pluginId":"i-have-adhd@i-have-adhd"},{"pluginId":"superpowers@openai-curated-remote"},{"pluginId":"context7@context7-marketplace"},{"pluginId":"caveman@thinkhome-caveman"}],"available":[]}'
+function codex { $script:observedCodexHome = $env:CODEX_HOME; $script:observedProfile = $env:USERPROFILE; $script:codexInventory }
 $testHome = Join-Path ([System.IO.Path]::GetTempPath()) 'ai-config-plugin-test-home'
 $previousCodexHome = [Environment]::GetEnvironmentVariable('CODEX_HOME', 'Process')
 $previousProfile = [Environment]::GetEnvironmentVariable('USERPROFILE', 'Process')
@@ -51,6 +52,20 @@ $script:answers.Enqueue('4')
 $script:answers.Enqueue('done')
 $selection = Select-ConfiguredPlugins -RepositoryRoot (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) -Client Codex -Mode Update
 if (@($selection.Deselected | Where-Object { $_.name -eq 'Context7' }).Count -ne 1) { throw 'Only the explicitly unchecked installed plugin must be deselected.' }
+$mcporterHome = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) ('.context7-test-' + [Guid]::NewGuid())
+try {
+    $configPath = Join-Path $mcporterHome '.mcporter/mcporter.json'
+    New-Item (Split-Path $configPath) -ItemType Directory -Force | Out-Null
+    [System.IO.File]::WriteAllText($configPath, '{"mcpServers":{"context7":{"baseUrl":"https://mcp.context7.com/mcp"}}}')
+    $script:codexInventory = '{"installed":[],"available":[]}'
+    $script:answers.Enqueue('done')
+    $selection = Select-ConfiguredPlugins -RepositoryRoot $root -Client Codex -Mode Update -HomePath $mcporterHome
+    if (@($selection.Selected | Where-Object { $_.name -eq 'Context7' }).Count -ne 1) { throw 'MCPorter Context7 must start checked when updating.' }
+    [System.IO.File]::WriteAllText($configPath, '{"mcpServers":{"context7":{"baseUrl":"https://example.invalid/mcp"}}}')
+    $script:answers.Enqueue('done')
+    $selection = Select-ConfiguredPlugins -RepositoryRoot $root -Client Codex -Mode Update -HomePath $mcporterHome
+    if (@($selection.Deselected | Where-Object { $_.name -eq 'Context7' }).Count -ne 1) { throw 'A different MCPorter server must not select Context7.' }
+} finally { Remove-Item -LiteralPath $mcporterHome -Recurse -Force -ErrorAction SilentlyContinue }
 $script:managedArguments = @()
 function python { $script:managedArguments = @($args); $global:LASTEXITCODE = 0 }
 $entry = [pscustomobject]@{ name = 'Test'; codex_method = 'plugin'; codex_marketplace = '-'; codex_plugin = 'test@market' }

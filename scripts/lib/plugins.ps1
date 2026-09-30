@@ -65,6 +65,24 @@ function Get-InstalledPlugins {
     }
 }
 
+function Test-InstalledMCPServer {
+    param([string]$HomePath, [string]$Name, [string]$Url)
+    $path = Join-Path $HomePath '.mcporter/mcporter.json'
+    foreach ($candidate in @((Split-Path $path), $path)) {
+        if ((Test-Path -LiteralPath $candidate) -and ((Get-Item -LiteralPath $candidate -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { throw 'MCPorter configuration path contains a link.' }
+    }
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
+    $config = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    if ($config -isnot [pscustomobject]) { throw 'Invalid MCPorter server configuration.' }
+    $servers = $config.PSObject.Properties['mcpServers']
+    if ($null -eq $servers) { return $false }
+    if ($servers.Value -isnot [pscustomobject]) { throw 'Invalid MCPorter server configuration.' }
+    $server = $servers.Value.PSObject.Properties[$Name]
+    if ($null -eq $server) { return $false }
+    if ($server.Value -isnot [pscustomobject]) { throw 'Invalid MCPorter server entry.' }
+    return $server.Value.baseUrl -eq $Url
+}
+
 function Read-PluginToggleSelection {
     param(
         [Parameter(Mandatory=$true)][string[]]$Names,
@@ -102,7 +120,9 @@ function Select-ConfiguredPlugins {
         if ($Mode -eq 'Install') { $true; return }
         if ($_.codex_method -eq 'cli') { return $null -ne (Get-Command $_.codex_source -ErrorAction SilentlyContinue) }
         $entry = $_
-        $found = $false
+        $found = if ($entry.mcporter_name -and $entry.mcporter_url) {
+            Test-InstalledMCPServer -HomePath $HomePath -Name $entry.mcporter_name -Url $entry.mcporter_url
+        } else { $false }
         foreach ($referenceClient in $referenceClients) {
             $selector = if ($referenceClient -eq 'Claude') { $entry.claude_plugin } else { $entry.codex_plugin }
             if ($referenceClient -eq 'Codex' -and $entry.codex_method -eq 'qmd') {

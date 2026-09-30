@@ -14,8 +14,9 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 # shellcheck disable=SC2034
 names=(A B C)
 checked=(true false true)
-toggle_log=$(mktemp)
-trap 'rm -f -- "$toggle_log"' EXIT
+toggle_log=$(mktemp "$root/.plugin-toggle.XXXXXX")
+test_home=$(mktemp -d "$root/.context7-test.XXXXXX")
+trap 'rm -f -- "$toggle_log" "$test_home/.mcporter/mcporter.json"; rmdir -- "$test_home/.mcporter" "$test_home" 2>/dev/null || true' EXIT
 read_plugin_toggle_selection names checked <<< $'1\n2\ndone' > "$toggle_log"
 [ "$summary" = true ] || cat "$toggle_log"
 
@@ -36,6 +37,17 @@ if diagnostics=$(summary=true run_plugin_command false test_plugin_output fail 2
   exit 1
 fi
 [[ "$diagnostics" == *'download progress'* ]] && [[ "$diagnostics" == *'WARN test warning'* ]]
+mkdir -p "$test_home/.mcporter"
+printf '%s\n' '{"mcpServers":{"context7":{"baseUrl":"https://mcp.context7.com/mcp"}}}' > "$test_home/.mcporter/mcporter.json"
+home_path=$test_home
+plugin_installed() { return 1; }
+selected=()
+deselected=()
+select_configured_plugins "$root" codex Update true selected deselected
+[[ " ${selected[*]} " == *' Context7 '* ]] || { printf 'MCPorter Context7 must start checked when updating.\n' >&2; exit 1; }
+printf '%s\n' '{"mcpServers":{"context7":{"baseUrl":"https://example.invalid/mcp"}}}' > "$test_home/.mcporter/mcporter.json"
+select_configured_plugins "$root" codex Update true selected deselected
+[[ " ${deselected[*]} " == *' Context7 '* ]] || { printf 'A different MCPorter server must not select Context7.\n' >&2; exit 1; }
 # shellcheck disable=SC2034
 selected=()
 plugin_installed() { printf 'Empty selection must not query installed plugins.\n' >&2; exit 1; }
