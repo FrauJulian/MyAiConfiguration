@@ -96,8 +96,8 @@ Install and update also rebuild internally; the explicit build above lets you ch
 - Separate install, update, and uninstall scripts: install refuses to run against an already-installed destination,
   update refuses to run against one that is not installed yet, and uninstall refuses to run against one that was
   never installed.
-- User-level plugin installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, QMD, Humanizer, Impeccable, and
-  Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
+- User-level extension installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, QMD, MCPorter,
+  Humanizer, Impeccable, and Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
   installed and recorded by this setup can be removed through deselection.
 - Optional local semantic retrieval for both clients using Qwen3-Embedding-0.6B embeddings and Qwen3-Reranker-0.6B
   reranking, disabled by default and removable through the install/update choice.
@@ -111,8 +111,9 @@ Install and update also rebuild internally; the explicit build above lets you ch
 - Python `venv` and `pip` when the optional semantic retrieval layer is enabled.
 - Node.js 22 or newer and `npm` when QMD or MCPorter is selected.
 
-The Bash scripts do not require PowerShell. The PowerShell scripts remain compatible with PowerShell 5.1;
-PowerShell 7 can also run them.
+Core Bash setup scripts do not require PowerShell. The credential commands use Windows Credential Manager and require
+PowerShell, including when invoked through their Bash wrappers. The PowerShell scripts remain compatible with
+PowerShell 5.1; PowerShell 7 can also run them.
 
 ## Architecture
 
@@ -214,12 +215,18 @@ and replaced, with a warning. Untracked files outside package target paths are l
 
 Previously managed files no longer shipped are backed up and removed if unchanged. If locally modified, they are
 backed up and retained with a warning. Backups are stored under `backups/<timestamp>/` in each destination.
-Local Codex `model`, `model_reasoning_effort`, `plugins`, and `marketplaces` settings are preserved when syncing `config.toml`;
-other local settings are not generally merged. Dry runs still rebuild `generated/`, but do not modify installation destinations.
+Codex skill backups use `.agents/.ai-config-skill-backups/` instead, so Codex does not discover backup copies as skills.
+Existing `.agents/skills/backups/` content is moved there on the next install, update, or uninstall.
+Codex `config.toml` synchronization merges setup-owned keys while retaining other root keys, extra fields in managed
+tables, plugin and marketplace tables, and unowned array tables. Other standalone tables may be dropped; the previous
+file is backed up when content changes. Claude `settings.json` synchronization retains unrelated settings and hooks.
+Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
 Codex skills; unchecked extensions are skipped on installation. Normal install and update ask whether to enable
 Flashbang, apply the custom status line, and enable Qwen3 semantic retrieval. Choices are saved for Quickupdate.
+The shared skill catalog includes development skills and focused writing, image, site structure, psychology, and
+conversion skills. All retained skills are included in both generated clients.
 The status line defaults to enabled to preserve existing behavior. Disabling it removes the custom client setting and,
 for Claude, the setup-owned status line script. Disabling retrieval on update removes its setup-owned runtime and index.
 Dry runs preview changes without updating extensions or retrieval. See [Plugins](docs/plugins.md) for client-specific behavior.
@@ -270,7 +277,8 @@ touching anything, unless `-Force`/`--force` is passed; running without a termin
 fails instead of hanging. Removal reuses the same manifest-sync logic as install and update: every managed file is
 backed up under `backups/<timestamp>/` before removal, and a file changed locally since the last install/update is
 backed up but left in place with a warning instead of being deleted. Files this setup never installed are never
-touched. A destination directory is only deleted once it is fully empty; backups already on disk are always kept.
+touched. Codex skill backups are kept under `.agents/.ai-config-skill-backups/`. A destination directory is only
+deleted once it is fully empty; backups already on disk are always kept.
 Extensions and skills recorded in the ledger are removed the same way `update` removes a deselected extension:
 pre-existing or manually installed ones outside the ledger are left alone, and a skill file modified since it was
 installed is kept with a warning. An enabled semantic retrieval setup is disabled and its setup-owned runtime and
@@ -285,7 +293,10 @@ keep outside this setup's ledger, or files this setup never installed.
 
 Codex and Claude Code receive the same shared rules, skills, agents, hooks, and status data. Codex loads applicable rules from generated files, while Claude Code exposes technology- and situation-specific rules as generated skills.
 
-The default configuration keeps writes workspace-scoped and enables automatic review for eligible escalation requests. Both clients include the same logical agent roles and compact status displays. See [Configuration](docs/configuration.md) for settings, permissions, and limitations.
+Codex defaults to workspace-write sandboxing and automatic review for eligible escalation requests. Claude uses
+automatic permissions and enables its sandbox where the platform supports it; explicit deny rules still apply where it
+does not. Both clients include the same logical agent roles and compact status displays. See
+[Configuration](docs/configuration.md) for settings, permissions, and limitations.
 
 ## Support
 

@@ -1,6 +1,6 @@
 # Skills
 
-Skills are reusable workflows. Rules are persistent constraints and agents are specialized roles. Each skill is a minimal `SKILL.md` with YAML frontmatter and a small initial workflow so both clients can consume it.
+Skills are reusable workflows. Rules are persistent constraints and agents are specialized roles. Each skill has a readable `SKILL.md` with YAML frontmatter; detailed guidance may live in that file or its `references/` directory.
 
 The current structure is organized by purpose:
 
@@ -11,8 +11,13 @@ The current structure is organized by purpose:
 - `implementation/`: SQL, unit-test, and integration-test writing
 - `verification/`: facts, work-item, and regression verification
 - `git/`: pull request reviews
+- `content-strategy/`, `copy-editing/`, `copywriting/`: planning, editing, and writing text
+- `image/`, `site-architecture/`: visuals and website structure
+- `marketing-psychology/`, `offers/`, `product-marketing/`, `cro/`: audience understanding, value framing, and conversion
 
 Each skill defines a focused workflow with the investigation, decision points, and output expected for that task. Keep guidance specific to the skill; shared repository constraints belong in the rules.
+
+The single catalog in `shared/skills/` includes development skills and focused skills for writing, images, content and site structure, positioning, psychology, and conversion. Builds include every retained skill for both clients. Updating a managed installation backs up and removes unchanged setup-owned skills deleted from the catalog; local changes are backed up and retained.
 
 Claude's generated package additionally has `skills/rules/`: one skill per focused rule file or directory in
 `shared/rules/`. The rule-to-skill loading conditions live in `shared/global-instructions.md`, so full rule text loads

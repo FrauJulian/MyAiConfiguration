@@ -4,16 +4,16 @@
   "permanent_context_hard_limit_tokens": 15000,
   "metrics": {
     "permanent_context_tokens": {
-      "claude": 14521,
-      "codex": 12997
+      "claude": 5451,
+      "codex": 3767
     },
     "instruction_tokens": {
       "claude": 1485,
       "codex": 1485
     },
     "skill_metadata_tokens": {
-      "claude": 12233,
-      "codex": 10784
+      "claude": 3163,
+      "codex": 1554
     },
     "auto_loaded_rule_tokens": {
       "claude": 678,

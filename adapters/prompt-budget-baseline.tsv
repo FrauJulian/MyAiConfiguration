@@ -1,10 +1,10 @@
 metric	client	baseline_tokens
-permanent_context_tokens	claude	14521
-permanent_context_tokens	codex	12997
+permanent_context_tokens	claude	5451
+permanent_context_tokens	codex	3767
 instruction_tokens	claude	1485
 instruction_tokens	codex	1485
-skill_metadata_tokens	claude	12233
-skill_metadata_tokens	codex	10784
+skill_metadata_tokens	claude	3163
+skill_metadata_tokens	codex	1554
 auto_loaded_rule_tokens	claude	678
 auto_loaded_rule_tokens	codex	678
 rule_catalog_tokens	claude	28818
