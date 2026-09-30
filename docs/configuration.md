@@ -1,6 +1,6 @@
 # Configuration
 
-Codex receives a generated global `AGENTS.md`, agent TOML files, skills, rule files, and a `config.toml` adapter. It keeps workspace sandboxing, automatic approval review, `agents.enabled = true`, `agents.max_concurrent_threads_per_session = 5`, and `agents.max_depth = 1`. Claude Code receives a generated global `CLAUDE.md`, agent Markdown files, skills, and `settings.json` with `auto` permissions, explicit `Agent` permission, and five-operation concurrency. Installation resolves user paths at runtime; the repository contains no machine-specific paths.
+Codex receives a generated global `AGENTS.md`, agent TOML files, skills, rule files, and a `config.toml` adapter. It sets workspace sandboxing, automatic approval review, `agents.enabled = true`, `agents.max_concurrent_threads_per_session = 5`, and `agents.max_depth = 1`. Claude Code receives a generated global `CLAUDE.md`, agent Markdown files, skills, and `settings.json` with `auto` permissions, explicit `Agent` permission, and a five-operation concurrency default. Installation resolves user paths at runtime; the repository contains no machine-specific paths.
 
 Both clients embed `shared/rules/general.md` and the rule-loading conditions from `shared/global-instructions.md`. Rules for languages and frameworks live in their own directories, with an `index.md` entry point and focused Markdown rules under `references/`. Security has its own directory with a baseline entry point and focused rules for authentication, web, APIs, data, files, network, cryptography, and supply chains. Git, Microsoft, and cross-cutting rules remain directly under `shared/rules/`. Codex receives the full directory tree; Claude generates a skill for each rule and copies supporting references alongside the index skill.
 
@@ -12,7 +12,7 @@ Client settings remain thin adapters. Shared semantics remain in `shared/`. User
 
 ## Permission defaults
 
-Codex sets `approval_policy = "on-request"`, `approvals_reviewer = "auto_review"`, and `sandbox_mode = "workspace-write"`. Eligible approval requests go through automatic review; sandboxing remains enabled. Claude sets `permissions.defaultMode = "auto"`. These are generated defaults, not a guarantee that a running session, account policy, or explicit launch override uses the same mode.
+Codex sets `approval_policy = "on-request"`, `approvals_reviewer = "auto_review"`, and `sandbox_mode = "workspace-write"`. Eligible approval requests go through automatic review. Claude sets `permissions.defaultMode = "auto"` and shell-specific deny rules. Its sandbox is enabled on supported macOS, Linux, and WSL2 environments and disabled where unavailable, including native Windows. These are generated defaults, not a guarantee that a running session, account policy, or explicit launch override uses the same mode.
 
 ## Status displays
 
@@ -37,4 +37,4 @@ The agent chooses the smallest sufficient checks based on behavior, affected cal
 
 Delegation and long-running state use the shared orchestration rule, loaded on demand as a Codex rule or Claude skill. The coordinator owns decisions and routes concise evidence-based handoffs. Review and execution verification have separate responsibilities; see [Agents](agents.md).
 
-Rebuild packages after changes to shared definitions or adapters. Generated defaults reach a user's configuration only through installation or update. Updates back up replaced files and preserve Codex's local `model`, `reasoning_effort`, `plugins`, and `marketplaces` settings; other local settings are not generally merged. See [the README](../README.md) for overwrite and backup behavior.
+Rebuild packages after changes to shared definitions or adapters. Generated defaults reach a user's configuration only through installation or update. Updates merge Codex's setup-owned root keys and table fields while retaining other root keys, extra fields in managed tables, plugin and marketplace tables, and unowned array tables. Other standalone tables may be dropped. Claude settings retain unrelated keys and hooks. See [the README](../README.md) for overwrite and backup behavior.

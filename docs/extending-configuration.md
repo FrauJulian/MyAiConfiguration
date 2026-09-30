@@ -8,7 +8,7 @@ Create cross-cutting rules such as Git or Microsoft guidance as focused Markdown
 
 ## Add a skill
 
-Create `shared/skills/<category>/<skill>/SKILL.md` with valid YAML frontmatter and a concise workflow. Reference shared rules instead of repeating persistent standards.
+Create `shared/skills/<skill>/SKILL.md` for a standalone skill, or `shared/skills/<category>/<skill>/SKILL.md` for a grouped workflow. Each leaf skill directory must contain a readable `SKILL.md` with valid YAML frontmatter. Keep the initial workflow focused; place longer supporting material under `references/`. Reference shared rules instead of repeating persistent standards.
 
 ## Add an agent
 
