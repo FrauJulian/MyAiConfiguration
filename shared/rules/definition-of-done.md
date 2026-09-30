@@ -46,5 +46,5 @@ Before declaring a task complete:
 
 * Do not mark, close, resolve, or otherwise change the state of a work item automatically.
 * A task may be technically complete without changing its remote work item state.
-* Any Azure DevOps WRITE operation still requires explicit user approval.
+* Perform an Azure DevOps write only when the user explicitly requests or approves that specific action. A direct request in the current task is sufficient; do not ask for the same approval again.
 * If completion is unclear, requirements conflict, or something is missing, ask the user instead of deciding autonomously.
