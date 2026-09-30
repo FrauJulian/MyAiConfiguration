@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import socket
+import subprocess
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import time
@@ -64,6 +65,10 @@ def fake_numpy():
 def fake_usearch():
     module = SimpleNamespace(Index=ApproximateIndex)
     return SimpleNamespace(index=module), module
+
+
+def initialize_repository(root):
+    subprocess.run(['git', '-C', str(root), 'init', '--quiet'], check=True)
 
 
 def huggingface_available():
@@ -144,6 +149,7 @@ class RetrievalServerTests(unittest.TestCase):
         os.environ['HF_HOME'] = os.environ['QWEN_TEST_MODEL_CACHE']
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
+            initialize_repository(root)
             (root / 'authentication.md').write_text('Password reset tokens are created by create_reset_token. The reset_password endpoint sends the user a password reset email.', encoding='utf-8')
             (root / 'weather.md').write_text('The weather service fetches temperature and rainfall forecasts for a city.', encoding='utf-8')
             index = MODULE.Index(root, root / 'data')
@@ -175,6 +181,8 @@ class RetrievalServerTests(unittest.TestCase):
             first, second = root / 'first', root / 'second'
             first.mkdir()
             second.mkdir()
+            initialize_repository(first)
+            initialize_repository(second)
             file = first / 'a.md'
             file.write_text('alpha', encoding='utf-8')
             (second / 'a.md').write_text('other', encoding='utf-8')
@@ -218,6 +226,7 @@ class RetrievalServerTests(unittest.TestCase):
     def test_failed_refresh_preserves_previous_index(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
+            initialize_repository(root)
             (root / 'a.md').write_text('before', encoding='utf-8')
             index = MODULE.Index(root, root / 'data')
             index.encoder = lambda: SimpleNamespace(encode=lambda values, **kwargs: [embedding() for _ in values], tokenizer=tokenize)
@@ -243,6 +252,7 @@ class RetrievalServerTests(unittest.TestCase):
     def test_refresh_batches_embeddings_for_changed_files(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
+            initialize_repository(root)
             (root / 'first.md').write_text('first', encoding='utf-8')
             (root / 'second.md').write_text('second', encoding='utf-8')
             index = MODULE.Index(root, root / 'data')
@@ -263,6 +273,7 @@ class RetrievalServerTests(unittest.TestCase):
     def test_scan_prunes_ignored_directories_and_warns_at_limit(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
+            initialize_repository(root)
             index = MODULE.Index(root, root / 'data')
             (root / 'visible.md').write_text('visible', encoding='utf-8')
             (root / '.gitignore').write_text('secrets.json\n**/private/\n', encoding='utf-8')
@@ -287,6 +298,7 @@ class RetrievalServerTests(unittest.TestCase):
     def test_max_files_is_configurable_via_environment(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
+            initialize_repository(root)
             index = MODULE.Index(root, root / 'data')
             try:
                 with patch.dict(os.environ, {MODULE.MAX_FILES_ENV: '3'}):
@@ -394,6 +406,7 @@ class RetrievalServerTests(unittest.TestCase):
     def test_hybrid_candidates_and_document_metadata(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
+            initialize_repository(root)
             for number in range(110):
                 (root / f'{number:03}.md').write_text(f'# Symbol{number}\ncontent {number}', encoding='utf-8', newline='\n')
             index = MODULE.Index(root, root / 'data')
