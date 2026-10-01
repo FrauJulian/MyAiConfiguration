@@ -201,7 +201,7 @@ sys.stdout.buffer.write(("\n".join(lines) + "\n").encode("utf-8"))
   # Plan every change before writing anything, so the journal can describe the whole run.
   local -a plan_relative=() plan_target=() plan_action=() plan_hash=() plan_source=() plan_sub=() plan_content=()
   while IFS= read -r -d '' source_file; do
-    local relative target content needs_sub new_hash exists current_hash action backup
+    local relative target content needs_sub new_hash current_hash action backup
     relative=${source_file#"$source/"}
     if [ "${destination##*/}" = .codex ] && [[ "$relative" = skills/* ]]; then continue; fi
     if [ "${destination##*/}" = .claude ] && [ "$statusline_enabled" = false ] && [[ "$relative" = statusline/* ]]; then continue; fi
