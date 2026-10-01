@@ -119,6 +119,9 @@ def sections(text: str, path: str):
                 if heading:
                     boundaries[number] = heading[1]
             elif suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".cs", ".java", ".kt", ".kts", ".go", ".rs", ".c", ".cpp", ".ps1", ".psm1", ".sh"}:
+                # A closing brace in column 0 ends a top-level declaration; code after it belongs to the module again.
+                if line.startswith("}"):
+                    boundaries.setdefault(number + 1, "<module>")
                 symbol = re.match(
                     r"^\s*(?:(?:export|default|public|private|protected|internal|static|abstract|async|sealed|partial|pub)\s+)*"
                     r"(?:(?:class|interface|struct|enum|record|function|fun|fn|def)\s+([\w$-]+)"

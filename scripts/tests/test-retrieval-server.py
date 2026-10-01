@@ -411,6 +411,7 @@ class RetrievalServerTests(unittest.TestCase):
             ('service.ts', 'export function load() {\n return 1;\n}\nexport const save = () => 2;\n', ['load', 'save']),
             ('service.cs', 'public class Service\n{\n public void Load()\n {\n }\n}\n', ['Service', 'Load']),
             ('setup.ps1', 'function Get-Result {\n return 1\n}\n', ['Get-Result']),
+            ('build.sh', 'quote() {\n  echo "$1"\n}\nfor shell in a b; do\n  quote "$shell"\ndone\n', ['quote', '<module>']),
             ('schema.sql', 'CREATE TABLE users (id int);\nCREATE OR ALTER PROCEDURE dbo.GetUser AS SELECT 1;\n', ['users', 'dbo.GetUser']),
             ('Main.kt', 'fun main() {\n println(1)\n}\n', ['main']),
             ('config.toml', '[server]\nport = 1\n[client]\nport = 2\n', ['server', 'client']),
