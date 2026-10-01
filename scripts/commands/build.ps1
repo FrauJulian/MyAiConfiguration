@@ -185,9 +185,11 @@ foreach ($shell in @('powershell','bash')) {
             @('Bash(git reset --hard*)','Bash(git clean*)','Bash(rm -rf*)')
         }
         $denyRulesJson = ConvertTo-Json -InputObject $denyRules -Compress
+        $shellTool = if ($shell -eq 'powershell') { 'PowerShell' } else { 'Bash' }
+        $allowRulesJson = ConvertTo-Json -InputObject @('Agent', "$shellTool(mcporter call context7.*)") -Compress
         $compactScript = if ($shell -eq 'powershell') { 'Record-Compact.ps1' } else { 'record-compact.sh' }
         $pointerScript = if ($shell -eq 'powershell') { 'Show-SessionStatePointer.ps1' } else { 'show-session-state-pointer.sh' }
-        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__POWERSHELL_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__POWERSHELL_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript).Replace('__CLAUDE_SANDBOX__', $claudeSandbox).Replace('__CLAUDE_DENY_RULES__', $denyRulesJson)
+        $content = $content.Replace('__HOOK_COMMAND__', $command).Replace('__POWERSHELL_HOOK_COMMAND__', $command).Replace('__HOOK_SCRIPT__', $script).Replace('__POWERSHELL_HOOK_SCRIPT__', $script).Replace('__COMPACT_SCRIPT__', $compactScript).Replace('__SESSION_POINTER_SCRIPT__', $pointerScript).Replace('__STATUSLINE_COMMAND__', $command).Replace('__STATUSLINE_SCRIPT__', $statusLineScript).Replace('__CLAUDE_SANDBOX__', $claudeSandbox).Replace('__CLAUDE_DENY_RULES__', $denyRulesJson).Replace('__CLAUDE_ALLOW_RULES__', $allowRulesJson)
         Set-Content -LiteralPath $path -Value $content -Encoding UTF8
     }
 

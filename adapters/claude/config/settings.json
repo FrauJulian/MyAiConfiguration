@@ -1,9 +1,7 @@
 {
   "permissions": {
     "defaultMode": "auto",
-    "allow": [
-      "Agent"
-    ],
+    "allow": __CLAUDE_ALLOW_RULES__,
     "deny": __CLAUDE_DENY_RULES__
   },
   "sandbox": __CLAUDE_SANDBOX__,

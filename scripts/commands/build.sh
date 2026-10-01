@@ -174,8 +174,10 @@ for client in codex claude; do
   content=$(<"$path")
   if [ "$shell" = powershell ]; then
     deny_rules='["PowerShell(git reset --hard*)","PowerShell(git clean*)","PowerShell(Remove-Item *-Recurse*)"]'
+    allow_rules='["Agent","PowerShell(mcporter call context7.*)"]'
   else
     deny_rules='["Bash(git reset --hard*)","Bash(git clean*)","Bash(rm -rf*)"]'
+    allow_rules='["Agent","Bash(mcporter call context7.*)"]'
   fi
   content=${content//__HOOK_COMMAND__/$command}
   content=${content//__POWERSHELL_HOOK_COMMAND__/$command}
@@ -187,6 +189,7 @@ for client in codex claude; do
   content=${content//__STATUSLINE_SCRIPT__/$statusline_script}
   content=${content//__CLAUDE_SANDBOX__/$sandbox}
   content=${content//__CLAUDE_DENY_RULES__/$deny_rules}
+  content=${content//__CLAUDE_ALLOW_RULES__/$allow_rules}
   printf '%s\n' "$content" > "$path"
 done
 
