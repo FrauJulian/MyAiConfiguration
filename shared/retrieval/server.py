@@ -34,9 +34,11 @@ RERANK_CANDIDATES = 50
 FINAL_RESULTS = 5
 CLI_TIMEOUT_SECONDS = 300
 RRF_K = 60
-INDEX_VERSION = 2
+INDEX_VERSION = 3
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
-TEXT_EXTENSIONS = {".c", ".cpp", ".cs", ".go", ".java", ".js", ".json", ".md", ".py", ".ps1", ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
+TEXT_EXTENSIONS = {".c", ".cjs", ".cpp", ".cs", ".csproj", ".css", ".go", ".gradle", ".html", ".java", ".js", ".json", ".jsx", ".kt", ".kts",
+                   ".md", ".mjs", ".props", ".ps1", ".psm1", ".py", ".razor", ".rs", ".scss", ".sh", ".sql", ".targets", ".toml", ".ts",
+                   ".tsx", ".txt", ".xaml", ".xml", ".yaml", ".yml"}
 DEFAULT_MAX_FILES = 2000
 MAX_FILES_ENV = "SEMANTIC_RETRIEVAL_MAX_FILES"
 
@@ -111,10 +113,15 @@ def sections(text: str, path: str):
                 heading = re.match(r"^\s*\[\[?([^\]]+)\]\]?\s*(?:#.*)?$", line)
                 if heading:
                     boundaries[number] = heading[1]
-            elif suffix in {".js", ".ts", ".tsx", ".cs", ".java", ".go", ".rs", ".c", ".cpp", ".ps1", ".sh"}:
+            elif suffix == ".sql":
+                heading = re.match(r"^\s*create\s+(?:or\s+(?:alter|replace)\s+)?(?:procedure|proc|function|view|table|trigger|index)\s+([\w.\[\]\"]+)",
+                                   line, re.IGNORECASE)
+                if heading:
+                    boundaries[number] = heading[1]
+            elif suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".cs", ".java", ".kt", ".kts", ".go", ".rs", ".c", ".cpp", ".ps1", ".psm1", ".sh"}:
                 symbol = re.match(
                     r"^\s*(?:(?:export|default|public|private|protected|internal|static|abstract|async|sealed|partial|pub)\s+)*"
-                    r"(?:(?:class|interface|struct|enum|record|function|fn|def)\s+([\w$-]+)"
+                    r"(?:(?:class|interface|struct|enum|record|function|fun|fn|def)\s+([\w$-]+)"
                     r"|func\s+(?:\([^)]*\)\s*)?([\w]+)"
                     r"|(?:const|let|var)\s+([\w$]+)\s*=.*=>"
                     r"|([\w$-]+)\s*\([^;]*\)\s*\{"
