@@ -179,6 +179,12 @@ def preferred_device():
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
+def model_kwargs():
+    """Use bfloat16 on GPUs that support it; CPUs keep float32, where bfloat16 is often slower."""
+    import torch
+    return {"dtype": torch.bfloat16} if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else {}
+
+
 def read_max_files():
     value = os.environ.get(MAX_FILES_ENV)
     if value is None:
@@ -203,7 +209,8 @@ def shared_encoder():
         if _shared_encoder is None:
             from sentence_transformers import SentenceTransformer
             _shared_encoder = SentenceTransformer(MODEL, revision=MODEL_REVISION, truncate_dim=EMBEDDING_DIMENSIONS,
-                                                   prompts={"query": QUERY_PROMPT}, device=preferred_device())
+                                                   prompts={"query": QUERY_PROMPT}, device=preferred_device(),
+                                                   model_kwargs=model_kwargs())
         return _shared_encoder
 
 
@@ -213,7 +220,8 @@ def shared_reranker():
         if _shared_reranker is None:
             from sentence_transformers import CrossEncoder
             _shared_reranker = CrossEncoder(RERANKER_MODEL, revision=RERANKER_MODEL_REVISION, prompts={"query": RETRIEVAL_INSTRUCTION},
-                                             default_prompt_name="query", device=preferred_device())
+                                             default_prompt_name="query", device=preferred_device(),
+                                             model_kwargs=model_kwargs())
         return _shared_reranker
 
 

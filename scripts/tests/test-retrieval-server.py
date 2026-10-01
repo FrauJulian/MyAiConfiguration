@@ -133,6 +133,13 @@ class RetrievalServerTests(unittest.TestCase):
                 self.assertNotEqual(MODULE.daemon_address(data_dir), old_address)
                 self.assertNotEqual(MODULE.daemon_lock_path(data_dir), old_lock)
 
+    def test_model_kwargs_use_bfloat16_only_on_supporting_gpus(self):
+        bfloat16 = object()
+        for available, supported, expected in [(True, True, {'dtype': bfloat16}), (True, False, {}), (False, True, {})]:
+            cuda = SimpleNamespace(is_available=lambda available=available: available, is_bf16_supported=lambda supported=supported: supported)
+            with patch.dict('sys.modules', torch=SimpleNamespace(cuda=cuda, bfloat16=bfloat16)):
+                self.assertEqual(MODULE.model_kwargs(), expected)
+
     def test_query_prompt_matches_qwen_format(self):
         self.assertTrue(MODULE.QUERY_PROMPT.startswith('Instruct: '))
         self.assertTrue(MODULE.QUERY_PROMPT.endswith('\nQuery:'))
@@ -350,7 +357,7 @@ class RetrievalServerTests(unittest.TestCase):
 
     def test_shared_encoder_and_reranker_are_cached_module_singletons(self):
         with patch.object(MODULE, '_shared_encoder', None), patch.object(MODULE, '_shared_reranker', None), \
-             patch.object(MODULE, 'preferred_device', lambda: 'cpu'):
+             patch.object(MODULE, 'preferred_device', lambda: 'cpu'), patch.object(MODULE, 'model_kwargs', dict):
             sentinel = SimpleNamespace()
             with patch.dict('sys.modules', sentence_transformers=SimpleNamespace(
                     SentenceTransformer=lambda *args, **kwargs: sentinel,
