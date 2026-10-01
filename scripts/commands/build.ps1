@@ -3,7 +3,11 @@ param([switch]$Summary)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $shared = Join-Path $root 'shared'
-$output = Join-Path $root 'generated'
+$final = Join-Path $root 'generated'
+# Keep the name short: it lengthens every generated path, and Windows PowerShell 5.1 fails beyond 260 characters.
+$output = Join-Path $root ("generated.build-ps$PID-" + [Guid]::NewGuid().ToString('N').Substring(0, 6))
+# A trap covers the whole script scope, so every terminating error discards this run's tree.
+trap { Remove-Item -LiteralPath $output -Recurse -Force -ErrorAction SilentlyContinue; break }
 $sandboxSupported = [Environment]::OSVersion.Platform -eq [PlatformID]::Unix
 if ($sandboxSupported) {
     $kernel = (& uname -r 2>$null | Out-String).Trim()
@@ -32,8 +36,16 @@ foreach ($entry in @(Import-Csv -LiteralPath $capabilityManifest -Delimiter ([ch
     $agentTools[$entry.role] = $entry.tools
 }
 
-Remove-Item $output -Recurse -Force -ErrorAction SilentlyContinue
-New-Item $output -ItemType Directory -Force | Out-Null
+# Build into a private sibling directory and swap it into place only after validation, so a failed
+# or parallel build never leaves generated/ partial. Leftovers of crashed runs are removed here:
+# old trees always, build trees only when their PowerShell owner process has exited.
+# ponytail: Bash-owned leftovers are left to the Bash build, since PIDs are not comparable across shells.
+foreach ($leftover in @(Get-ChildItem -LiteralPath $root -Directory -Filter 'generated.*')) {
+    if ($leftover.Name -like 'generated.old-*' -or ($leftover.Name -match '^generated\.build-ps(\d+)-' -and -not (Get-Process -Id ([int]$Matches[1]) -ErrorAction SilentlyContinue))) {
+        Remove-Item -LiteralPath $leftover.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+New-Item $output -ItemType Directory | Out-Null
 
 function Copy-Directory($source, $destination) {
     New-Item $destination -ItemType Directory -Force | Out-Null
@@ -219,6 +231,31 @@ $leftoverPlaceholders = @(Get-ChildItem $output -File -Recurse | ForEach-Object 
     if ($content -cmatch '__[A-Z0-9_]*[A-Z0-9][A-Z0-9_]*__') { $_.FullName }
 })
 if ($leftoverPlaceholders.Count) { throw "Unresolved template placeholders in: $($leftoverPlaceholders -join ', ')" }
+
+$lockPath = Join-Path $root 'generated.lock'
+$lockDeadline = (Get-Date).AddSeconds(30)
+while ($true) {
+    try { [System.IO.File]::Open($lockPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None).Dispose(); break }
+    catch [System.IO.IOException], [System.UnauthorizedAccessException] {
+        if ((Get-Date) -gt $lockDeadline) { throw "Another build holds $lockPath; wait for it to finish, or remove the file if no build is running." }
+        Start-Sleep -Milliseconds 200
+    }
+}
+$retired = $null
+try {
+    if (Test-Path -LiteralPath $final) {
+        $retired = Join-Path $root ("generated.old-ps$PID-" + [Guid]::NewGuid().ToString('N').Substring(0, 6))
+        [System.IO.Directory]::Move($final, $retired)
+    }
+    try { [System.IO.Directory]::Move($output, $final) }
+    catch {
+        if ($retired) { [System.IO.Directory]::Move($retired, $final); $retired = $null }
+        throw
+    }
+} finally {
+    [System.IO.File]::Delete($lockPath)
+}
+if ($retired) { Remove-Item -LiteralPath $retired -Recurse -Force -ErrorAction SilentlyContinue }
 
 if ($Summary) { Write-Output 'Build: PASS | 4 packages' } else { Write-Output 'PASS build: codex-powershell, claude-powershell, codex-bash, claude-bash' }
 exit 0

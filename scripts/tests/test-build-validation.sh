@@ -16,7 +16,7 @@ trap cleanup EXIT
 new_repo_copy() {
   local copy
   copy=$(mktemp -d "$work/case-XXXXXX")
-  (cd "$root" && tar -cf - --exclude='.git' --exclude='generated' .) | (cd "$copy" && tar -xf -)
+  (cd "$root" && tar -cf - --exclude='.git' --exclude='generated' --exclude='generated.*' .) | (cd "$copy" && tar -xf -)
   printf '%s' "$copy"
 }
 
@@ -28,11 +28,22 @@ test_build_fails() {
     printf 'Expected build to fail for case "%s" but it succeeded.\n' "$label" >&2
     exit 1
   fi
+  if [ -n "$(find "$copy" -maxdepth 1 -name 'generated*' -print -quit)" ]; then
+    printf 'Failed build for case "%s" left output behind.\n' "$label" >&2
+    exit 1
+  fi
   rm -rf -- "$copy"
 }
 
 baseline=$(new_repo_copy)
 bash "$baseline/scripts/commands/build.sh" --summary >/dev/null
+expected_files=$(cd "$baseline/generated" && find . -type f | sort)
+bash "$baseline/scripts/commands/build.sh" --summary > "$work/parallel-1.out" 2>&1 & first_build=$!
+bash "$baseline/scripts/commands/build.sh" --summary > "$work/parallel-2.out" 2>&1 & second_build=$!
+wait "$first_build" || { printf 'Parallel build 1 failed:\n%s\n' "$(cat "$work/parallel-1.out")" >&2; exit 1; }
+wait "$second_build" || { printf 'Parallel build 2 failed:\n%s\n' "$(cat "$work/parallel-2.out")" >&2; exit 1; }
+[ "$(cd "$baseline/generated" && find . -type f | sort)" = "$expected_files" ] || { printf 'generated/ is incomplete after two parallel builds.\n' >&2; exit 1; }
+[ -z "$(find "$baseline" -maxdepth 1 -name 'generated.*' -print -quit)" ] || { printf 'Parallel builds left a build directory, retired tree, or lock behind.\n' >&2; exit 1; }
 
 mutate_invalid_json() {
   printf '} this is not json {' >> "$1/adapters/claude/config/settings.json"
@@ -65,4 +76,4 @@ mutate_mixed_placeholders() {
 }
 test_build_fails 'unknown placeholder beside an allowed installer placeholder' mutate_mixed_placeholders
 
-if [ "$summary" = true ]; then printf 'Tests: PASS | build validation\n'; else printf 'PASS build validation: invalid JSON, duplicate agent, unknown Claude tool name, duplicate plugin, and leftover placeholders are all rejected\n'; fi
+if [ "$summary" = true ]; then printf 'Tests: PASS | build validation\n'; else printf 'PASS build validation: invalid JSON, duplicate agent, unknown Claude tool name, duplicate plugin, and leftover placeholders are all rejected without leaving output; parallel builds swap generated/ safely\n'; fi

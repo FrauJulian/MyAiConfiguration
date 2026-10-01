@@ -8,7 +8,7 @@ New-Item $work -ItemType Directory -Force | Out-Null
 function New-RepoCopy {
     $copy = Join-Path $work ("case-" + [Guid]::NewGuid())
     New-Item $copy -ItemType Directory -Force | Out-Null
-    Get-ChildItem $root -Force | Where-Object { $_.Name -notin @('.git','generated') } | ForEach-Object {
+    Get-ChildItem $root -Force | Where-Object { $_.Name -ne '.git' -and $_.Name -ne 'generated' -and $_.Name -notlike 'generated.*' } | ForEach-Object {
         Copy-Item $_.FullName (Join-Path $copy $_.Name) -Recurse -Force
     }
     return $copy
@@ -20,12 +20,28 @@ function Test-BuildFails([string]$Label, [scriptblock]$Mutate) {
     $failed = $false
     try { & (Join-Path $copy 'scripts/commands/build.ps1') 2>&1 | Out-Null }
     catch { $failed = $true }
+    $leftovers = @(Get-ChildItem $copy -Force -Filter 'generated*')
     Remove-Item $copy -Recurse -Force -ErrorAction SilentlyContinue
     if (-not $failed) { throw "Expected build to fail for case '$Label' but it succeeded." }
+    if ($leftovers.Count) { throw "Failed build for case '$Label' left output behind: $($leftovers.Name -join ', ')" }
 }
 
 $baseline = New-RepoCopy
 & (Join-Path $baseline 'scripts/commands/build.ps1') -Summary | Out-Null
+$baselineGenerated = Join-Path $baseline 'generated'
+$expectedFiles = @(Get-ChildItem $baselineGenerated -File -Recurse | ForEach-Object { $_.FullName.Substring($baselineGenerated.Length) } | Sort-Object)
+$builds = @(1, 2 | ForEach-Object {
+    $build = Start-Process (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + (Join-Path $baseline 'scripts/commands/build.ps1') + '"'), '-Summary') -NoNewWindow -PassThru -RedirectStandardOutput (Join-Path $work "parallel-$_.out") -RedirectStandardError (Join-Path $work "parallel-$_.err")
+    $null = $build.Handle # Windows PowerShell 5.1 reports ExitCode only when the handle was opened.
+    $build
+})
+foreach ($build in $builds) { $build.WaitForExit() }
+foreach ($index in 0, 1) {
+    if ($builds[$index].ExitCode -ne 0) { throw "Parallel build $($index + 1) failed: $(Get-Content (Join-Path $work "parallel-$($index + 1).err") -Raw)" }
+}
+$actualFiles = @(Get-ChildItem $baselineGenerated -File -Recurse | ForEach-Object { $_.FullName.Substring($baselineGenerated.Length) } | Sort-Object)
+if (Compare-Object $expectedFiles $actualFiles) { throw 'generated/ is incomplete after two parallel builds.' }
+if (@(Get-ChildItem $baseline -Force | Where-Object Name -like 'generated.*').Count) { throw 'Parallel builds left a build directory, retired tree, or lock behind.' }
 
 Test-BuildFails 'invalid Claude settings.json' {
     param($copy)
@@ -64,5 +80,5 @@ Test-BuildFails 'unknown placeholder beside an allowed installer placeholder' {
 }
 
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
-if ($Summary) { Write-Output 'Tests: PASS | build validation' } else { Write-Output 'PASS build validation: invalid JSON, duplicate agent, unknown Claude tool name, duplicate plugin, and leftover placeholders are all rejected' }
+if ($Summary) { Write-Output 'Tests: PASS | build validation' } else { Write-Output 'PASS build validation: invalid JSON, duplicate agent, unknown Claude tool name, duplicate plugin, and leftover placeholders are all rejected without leaving output; parallel builds swap generated/ safely' }
 exit 0

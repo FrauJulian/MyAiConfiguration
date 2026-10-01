@@ -10,7 +10,7 @@ done
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 shared="$root/shared"
-output="$root/generated"
+final="$root/generated"
 sandbox_supported=false
 platform=$(uname -s 2>/dev/null || true)
 case "$platform" in
@@ -66,7 +66,27 @@ if [ "$summary" = true ]; then
 else
   printf '%s\n' "$session_output"
 fi
-rm -rf -- "$output"
+# Build into a private sibling directory and swap it into place only after validation, so a failed
+# or parallel build never leaves generated/ partial. Leftovers of crashed runs are removed here:
+# old trees always, build trees only when their Bash owner process has exited.
+# ponytail: PowerShell-owned leftovers are left to the PowerShell build, since PIDs are not comparable across shells.
+for leftover in "$root"/generated.old-* "$root"/generated.build-sh*; do
+  [ -d "$leftover" ] || continue
+  if [[ "$leftover" == */generated.build-sh* ]]; then
+    leftover_pid=${leftover##*/generated.build-sh}
+    leftover_pid=${leftover_pid%%-*}
+    ! kill -0 "$leftover_pid" 2>/dev/null || continue
+  fi
+  rm -rf -- "$leftover"
+done
+lock="$root/generated.lock"
+locked=false
+retired=''
+output=''
+trap 'rm -rf -- ${output:+"$output"}; [ "$locked" != true ] || rm -f -- "$lock"' EXIT
+# Keep the name short: it lengthens every generated path, which matters on Windows.
+output=$(mktemp -d "$root/generated.build-sh$$-XXXXXX")
+chmod "$(printf '%o' $((0777 & ~$(umask))))" "$output"
 
 agent_dirs=("$shared"/agents/*/)
 declare -A agent_seen
@@ -230,5 +250,22 @@ if [ -n "$leftover_tokens" ]; then
   printf 'Unresolved template placeholders (%s) in: %s\n' "$(printf '%s' "$leftover_tokens" | tr '\n' ' ')" "$offending_files" >&2
   exit 1
 fi
+
+for ((attempt = 0; attempt < 150; attempt++)); do
+  if (set -o noclobber; : > "$lock") 2>/dev/null; then locked=true; break; fi
+  sleep 0.2
+done
+[ "$locked" = true ] || { printf 'Another build holds %s; wait for it to finish, or remove the file if no build is running.\n' "$lock" >&2; exit 1; }
+if [ -e "$final" ]; then
+  retired="$root/generated.old-sh$$-$RANDOM"
+  mv -- "$final" "$retired"
+fi
+if ! mv -- "$output" "$final"; then
+  [ -z "$retired" ] || mv -- "$retired" "$final"
+  exit 1
+fi
+rm -f -- "$lock"
+locked=false
+[ -z "$retired" ] || rm -rf -- "$retired"
 
 if [ "$summary" = true ]; then printf 'Build: PASS | 4 packages\n'; else printf 'PASS build: codex-powershell, claude-powershell, codex-bash, claude-bash\n'; fi

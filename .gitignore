@@ -1,4 +1,7 @@
 generated/
+generated.build-*/
+generated.old-*/
+generated.lock
 .superpowers/
 *.log
 *.tmp
