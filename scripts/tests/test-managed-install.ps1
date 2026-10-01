@@ -111,7 +111,7 @@ try {
     $installedSkill = Join-Path $testHome '.agents/skills/example/SKILL.md'
     if ((Get-Content -LiteralPath $installedSkill -Raw) -ne 'updated managed skill') { throw 'Managed skill update did not replace the file.' }
     if ((Get-Content -LiteralPath (Join-Path $skillBackupRoot 'skill-update/example/SKILL.md') -Raw) -ne 'managed skill') { throw 'New skill backup must be outside the skill tree.' }
-    if (@(Get-ChildItem -LiteralPath (Split-Path $installedSkill -Parent) -Filter '.ai-config-skill-*' -File).Count) { throw 'Managed skill update left a temporary file.' }
+    if (@(Get-ChildItem -LiteralPath (Split-Path $installedSkill -Parent) -Filter '.ai-config-write-*' -File).Count) { throw 'Managed skill update left a temporary file.' }
     Remove-Item -LiteralPath (Join-Path $package 'skills/example/SKILL.md') -Force
     $null = Sync-ManagedDestination -Source $targets[0].Source -Destination $targets[0].Destination -Stamp 'skill-remove'
     if (Test-Path -LiteralPath $installedSkill) { throw 'Deselected managed skill must be removed.' }

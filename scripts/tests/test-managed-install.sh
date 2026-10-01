@@ -128,7 +128,7 @@ for target_pair in "${targets[@]}"; do
 done
 [ "$(cat "$test_home/.agents/skills/example/SKILL.md")" = 'updated managed skill' ] || { printf 'Managed skill update did not replace the file.\n' >&2; exit 1; }
 [ "$(cat "$test_home/.agents/.ai-config-skill-backups/skill-update/example/SKILL.md")" = 'managed skill' ] || { printf 'New skill backup must be outside the skill tree.\n' >&2; exit 1; }
-[ -z "$(find "$test_home/.agents/skills/example" -maxdepth 1 -name '.ai-config-skill.*' -print -quit)" ] || { printf 'Managed skill update left a temporary file.\n' >&2; exit 1; }
+[ -z "$(find "$test_home/.agents/skills/example" -maxdepth 1 -name '.ai-config-write.*' -print -quit)" ] || { printf 'Managed skill update left a temporary file.\n' >&2; exit 1; }
 rm -f -- "$package/skills/example/SKILL.md"
 sync_managed_destination "${targets[0]%%|*}" "${targets[0]#*|}" skill-remove "" "" "" false > /dev/null
 [ ! -f "$test_home/.agents/skills/example/SKILL.md" ] && [ "$(cat "$test_home/.agents/.ai-config-skill-backups/skill-remove/example/SKILL.md")" = 'updated managed skill' ] || { printf 'Deselected skill must be removed and backed up outside the skill tree.\n' >&2; exit 1; }

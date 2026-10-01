@@ -43,9 +43,9 @@ function Get-Sha256HashOfBytes {
     finally { $sha256.Dispose() }
 }
 
-function Write-ManagedSkillFile {
-    param([Parameter(Mandatory=$true)][string]$Path,[Parameter(Mandatory=$true)][byte[]]$Bytes)
-    $temporary = Join-Path (Split-Path $Path -Parent) ('.ai-config-skill-' + [Guid]::NewGuid().ToString('N') + '.tmp')
+function Write-ManagedFileAtomically {
+    param([Parameter(Mandatory=$true)][string]$Path,[Parameter(Mandatory=$true)][AllowEmptyCollection()][byte[]]$Bytes)
+    $temporary = Join-Path (Split-Path $Path -Parent) ('.ai-config-write-' + [Guid]::NewGuid().ToString('N') + '.tmp')
     $backup = "$temporary.bak"
     try {
         [System.IO.File]::WriteAllBytes($temporary, $Bytes)
@@ -83,7 +83,7 @@ function Write-ManagedManifest {
     # without BOM and with LF line endings so either implementation can read the file
     # regardless of which one wrote it.
     $content = ($lines -join "`n") + "`n"
-    [System.IO.File]::WriteAllText($ManifestPath, $content, (New-Object System.Text.UTF8Encoding($false)))
+    Write-ManagedFileAtomically -Path $ManifestPath -Bytes ((New-Object System.Text.UTF8Encoding($false)).GetBytes($content))
 }
 
 function Invoke-InstallOptions {
@@ -190,11 +190,7 @@ function Sync-ManagedDestination {
             if (-not $wasManaged) { Write-Output "WARN $target existed before this installation but was not tracked by a previous run; it was backed up before being overwritten."; $tally.Warned++ }
         }
         New-Item (Split-Path $target -Parent) -ItemType Directory -Force | Out-Null
-        if ($relative -eq 'SKILL.md' -or $relative.EndsWith('/SKILL.md', [StringComparison]::Ordinal)) {
-            Write-ManagedSkillFile -Path $target -Bytes $newBytes
-        } else {
-            [System.IO.File]::WriteAllBytes($target, $newBytes)
-        }
+        Write-ManagedFileAtomically -Path $target -Bytes $newBytes
         if (-not $Summary) { Write-Output "$action $target" }
         if ($action -eq 'CREATE') { $tally.Created++ } else { $tally.Updated++ }
     }

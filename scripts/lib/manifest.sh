@@ -66,18 +66,32 @@ read_managed_manifest() {
   done < "$path"
 }
 
+# write_managed_file <target> <content-file> [source-file]
+# Replace target atomically: write a sibling temporary file, then rename it over the target.
+write_managed_file() {
+  local target=$1 content_file=$2 source_file=${3:-} temporary mode
+  temporary=$(mktemp "$(dirname -- "$target")/.ai-config-write.XXXXXX") || return 1
+  mode=$(printf '%o' $((0666 & ~$(umask))))
+  [ -z "$source_file" ] || [ ! -x "$source_file" ] || mode=$(printf '%o' $((0777 & ~$(umask))))
+  { cat -- "$content_file" > "$temporary" && chmod "$mode" "$temporary" && mv -f -- "$temporary" "$target"; } || { rm -f -- "$temporary"; return 1; }
+}
+
 # write_managed_manifest <manifest-file> <assoc-array-name>
 write_managed_manifest() {
-  local path=$1
+  local path=$1 content
   local -n in_ref=$2
   mkdir -p "$(dirname -- "$path")"
+  content=$(mktemp) || return 1
   {
     printf 'path\tsha256\n'
     while IFS= read -r rel; do
       [ -n "$rel" ] || continue
       printf '%s\t%s\n' "$rel" "${in_ref[$rel]}"
     done < <(printf '%s\n' "${!in_ref[@]}" | sort)
-  } > "$path"
+  } > "$content" && write_managed_file "$path" "$content"
+  local status=$?
+  rm -f -- "$content"
+  return "$status"
 }
 
 # sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <powershell-command> <dry-run: true|false> [summary: true|false] [flashbang] [claude-concurrency] [statusline]
@@ -176,19 +190,13 @@ sync_managed_destination() {
       fi
     fi
     mkdir -p "$(dirname -- "$target")"
-    if [[ "$relative" = SKILL.md || "$relative" = */SKILL.md ]]; then
-      local temporary
-      temporary=$(mktemp "$(dirname -- "$target")/.ai-config-skill.XXXXXX") || return 1
-      if [ "$needs_sub" = true ]; then
-        printf '%s' "$content" > "$temporary" || { rm -f -- "$temporary"; return 1; }
-      else
-        cp -- "$source_file" "$temporary" || { rm -f -- "$temporary"; return 1; }
-      fi
-      mv -f -- "$temporary" "$target" || { rm -f -- "$temporary"; return 1; }
-    elif [ "$needs_sub" = true ]; then
-      printf '%s' "$content" > "$target"
+    if [ "$needs_sub" = true ]; then
+      local rendered
+      rendered=$(mktemp) || return 1
+      printf '%s' "$content" > "$rendered" && write_managed_file "$target" "$rendered" "$source_file" || { rm -f -- "$rendered"; return 1; }
+      rm -f -- "$rendered"
     else
-      cp -- "$source_file" "$target"
+      write_managed_file "$target" "$source_file" "$source_file" || return 1
     fi
     [ "$summary" = true ] || printf '%s %s\n' "$action" "$target"
     [ "$action" = CREATE ] && created=$((created + 1)) || updated=$((updated + 1))
@@ -219,7 +227,7 @@ sync_managed_destination() {
     fi
   done
 
-  if [ "$dry_run" != true ]; then write_managed_manifest "$manifest" new_manifest; fi
+  if [ "$dry_run" != true ]; then write_managed_manifest "$manifest" new_manifest || return 1; fi
   if [ "$summary" = true ]; then
     printf 'SYNC %s: %s created, %s updated, %s unchanged, %s removed, %s warnings\n' "$destination" "$created" "$updated" "$unchanged" "$removed" "$warned"
   fi
