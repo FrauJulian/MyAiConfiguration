@@ -15,7 +15,7 @@ A task is only considered done when all applicable requirements below are fulfil
 * No temporary code, debug output, commented-out code, placeholders, or TODOs remain unless explicitly intended.
 * Error handling and edge cases are handled appropriately.
 * The implementation is readable, maintainable, and production-ready.
-* Documentation and comments follow `general.md`'s Documentation and Comments rules (not changed automatically, none created without explicit instruction).
+* Directly affected documentation and comments are updated; other documentation or comments are added only for a concrete need.
 * Any delegated research, review, or verification is complete and its relevant findings are resolved or reported.
 
 ## Work Items
