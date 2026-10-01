@@ -56,10 +56,14 @@ def runtime_python(script=__file__, executable=sys.executable, system=os.name):
     return None
 
 
-def use_runtime_python():
+def use_runtime_python(system=os.name):
     runtime = runtime_python()
     if runtime is not None:
-        os.execv(str(runtime), [str(runtime), str(Path(__file__).resolve()), *sys.argv[1:]])
+        command = [str(runtime), str(Path(__file__).resolve()), *sys.argv[1:]]
+        if system == 'nt':
+            # os.execv does not quote arguments on Windows, so a multi-word --query would be split.
+            sys.exit(subprocess.run(command).returncode)
+        os.execv(command[0], command)
 
 
 def sections(text: str, path: str):

@@ -117,6 +117,13 @@ class RetrievalServerTests(unittest.TestCase):
 
             self.assertEqual(MODULE.runtime_python(script, 'C:/Python/python.exe', 'nt'), runtime.resolve())
 
+    def test_windows_runtime_handoff_keeps_multi_word_arguments(self):
+        calls = []
+        with patch.object(MODULE, 'runtime_python', return_value=Path('C:/runtime/python.exe')),                 patch.object(MODULE.sys, 'argv', ['server.py', 'search', '--query', 'two words']),                 patch.object(MODULE.subprocess, 'run', side_effect=lambda command: calls.append(command) or SimpleNamespace(returncode=3)),                 self.assertRaises(SystemExit) as stopped:
+            MODULE.use_runtime_python('nt')
+        self.assertEqual(stopped.exception.code, 3)
+        self.assertEqual(calls[0][2:], ['search', '--query', 'two words'])
+
     def test_preferred_device_uses_cuda_with_cpu_fallback(self):
         with patch.dict('sys.modules', torch=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))):
             self.assertEqual(MODULE.preferred_device(), 'cuda')
