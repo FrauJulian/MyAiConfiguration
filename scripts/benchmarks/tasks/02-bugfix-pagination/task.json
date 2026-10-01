@@ -1,0 +1,14 @@
+{
+  "prompt": "Users report that the last item is missing on the final page returned by paginate(). Fix the bug.",
+  "workflow": {
+    "kind": "bugfix with targeted verification",
+    "forbid_skills": [
+      "superpowers:brainstorming",
+      "superpowers:writing-plans",
+      "superpowers:subagent-driven-development",
+      "superpowers:executing-plans"
+    ],
+    "max_agents": 0,
+    "require_command": "test_pagination|pagination"
+  }
+}

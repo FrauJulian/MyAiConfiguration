@@ -1,0 +1,6 @@
+{
+  "prompt": "Add unittest-based unit tests for app/slug.py under tests/ that cover its edge cases.",
+  "workflow": {
+    "kind": "test writing"
+  }
+}

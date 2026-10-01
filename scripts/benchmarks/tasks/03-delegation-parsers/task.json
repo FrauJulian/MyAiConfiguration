@@ -1,0 +1,8 @@
+{
+  "prompt": "Implement the three independent parsers in app/parsers (csv_parser, json_parser, ini_parser) according to their docstrings, and add unit tests for each. They share no code.",
+  "workflow": {
+    "kind": "larger change with justified delegation",
+    "min_agents": 1,
+    "max_agents": 3
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "prompt": "save_settings() loses keys it does not know about when it updates the settings file. Fix it so unknown keys survive.",
+  "workflow": {
+    "kind": "data-preserving bugfix"
+  }
+}

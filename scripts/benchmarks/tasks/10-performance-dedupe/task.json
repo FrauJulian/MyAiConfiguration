@@ -1,0 +1,6 @@
+{
+  "prompt": "dedupe() is far too slow for 100,000 items. Make it fast while keeping its behavior and the order of first occurrences.",
+  "workflow": {
+    "kind": "performance fix"
+  }
+}

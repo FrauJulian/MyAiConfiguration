@@ -1,0 +1,6 @@
+{
+  "prompt": "find_user() fails for user names that contain an apostrophe, such as O'Brien. Fix it.",
+  "workflow": {
+    "kind": "security-relevant bugfix"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "prompt": "Change the default request timeout from 30 to 60 seconds.",
+  "workflow": {
+    "kind": "small change without planning ceremony",
+    "forbid_skills": [
+      "superpowers:brainstorming",
+      "superpowers:writing-plans",
+      "superpowers:subagent-driven-development",
+      "superpowers:executing-plans"
+    ],
+    "max_agents": 0,
+    "max_tool_calls": 15
+  }
+}

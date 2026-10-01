@@ -1,0 +1,6 @@
+{
+  "prompt": "Rename the retries parameter of app.api.fetch to max_retries.",
+  "workflow": {
+    "kind": "API change with directly affected documentation"
+  }
+}

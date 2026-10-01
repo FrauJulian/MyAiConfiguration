@@ -1,0 +1,6 @@
+{
+  "prompt": "Remove the duplicated formatting logic in app/report.py without changing its output.",
+  "workflow": {
+    "kind": "behavior-preserving refactor"
+  }
+}
