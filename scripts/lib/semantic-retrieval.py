@@ -150,6 +150,8 @@ def sync(root, home, clients, enabled, dry_run, update, summary=False):
     save_state(state_path, state, False)
     python = ensure_runtime(target, False)
     ensure_models(python, target)
+    # Sandboxed clients may write only to data/; it cannot be created from inside the sandbox.
+    (target / 'data').mkdir(exist_ok=True)
     state['clients'] = list(dict.fromkeys(state['clients']))
     save_state(state_path, state, False)
     for client in clients:
