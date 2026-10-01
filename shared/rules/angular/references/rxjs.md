@@ -5,9 +5,7 @@
 * Prefer declarative observable pipelines.
 * Avoid nested `subscribe`.
 * Avoid manual subscriptions where `async`, signals or framework helpers are sufficient.
-* Prefer `takeUntilDestroyed` or equivalent Angular lifecycle integration for manual subscriptions.
-* Always consider subscription lifetime.
-* Avoid memory leaks from unmanaged subscriptions.
+* Bind every manual subscription's lifetime with `takeUntilDestroyed` or equivalent Angular lifecycle integration to avoid leaks.
 * Use the correct flattening operator for the required semantics.
 * Do not use `switchMap`, `mergeMap`, `concatMap` or `exhaustMap` interchangeably.
 * Avoid unnecessary `Subject` usage.
