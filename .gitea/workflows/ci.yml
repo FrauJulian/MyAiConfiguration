@@ -142,10 +142,13 @@ jobs:
   client-smoke:
     name: Installed client configuration smoke tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: [build]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
       - name: Build packages
         run: bash scripts/commands/build.sh --summary
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v22.16.0
@@ -153,6 +156,10 @@ jobs:
           node-version: '24'
       - name: Install current client CLIs
         run: npm install --global @openai/codex @anthropic-ai/claude-code
+      - name: Install Claude sandbox dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap socat
       - name: Validate current Codex and Claude settings
         run: |
           set -euo pipefail
@@ -160,6 +167,10 @@ jobs:
           cp generated/codex-powershell/config.toml "$schema_home/config.toml"
           CODEX_HOME="$schema_home" codex --strict-config --help >/dev/null
           claude --settings generated/claude-powershell/settings.json --help >/dev/null
+      - name: Run client behavior smoke tests
+        env:
+          AI_CONFIG_REQUIRE_CLIENTS: '1'
+        run: timeout 900 python scripts/tests/test-client-smoke.py -v
 
   retrieval:
     name: Qwen retrieval integration
