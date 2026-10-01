@@ -11,6 +11,7 @@ Arms:
             an empty home where you ran `codex login` once.
 """
 import argparse
+import fnmatch
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -279,7 +280,7 @@ def main():
                     merged[key] = result
         print(summarize(list(merged.values())))
         return 0
-    tasks = [TASKS / name for name in args.tasks] if args.tasks else sorted(path for path in TASKS.iterdir() if path.is_dir())
+    tasks = [path for path in sorted(TASKS.iterdir()) if path.is_dir() and (not args.tasks or any(fnmatch.fnmatch(path.name, pattern) for pattern in args.tasks))]
     for client in args.clients:
         if not shutil.which(client):
             parser.error(f'{client} CLI unavailable')
