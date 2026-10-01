@@ -40,8 +40,8 @@ def measure_package(package, client):
     )
 
     if client == 'claude':
-        rule_files = (package / 'skills' / 'rules').glob('rules-*/SKILL.md')
-        security_rule = package / 'skills' / 'rules' / 'rules-security' / 'SKILL.md'
+        rule_files = (package / 'skills').glob('rules-*/SKILL.md')
+        security_rule = package / 'skills' / 'rules-security' / 'SKILL.md'
         security_content = security_rule.read_text(encoding='utf-8-sig')
         security_header = re.match(r'\A---\r?\n.*?^---[ \t]*\r?$', security_content, re.MULTILINE | re.DOTALL)
         auto_loaded_rule_bytes = len(security_content[security_header.end():].encode('utf-8')) if security_header else len(security_content.encode('utf-8'))
