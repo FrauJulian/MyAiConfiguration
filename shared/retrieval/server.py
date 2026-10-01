@@ -11,6 +11,7 @@ import multiprocessing
 from multiprocessing import AuthenticationError
 from multiprocessing.connection import Client, Listener
 import os
+import queue
 from pathlib import Path
 import re
 import sqlite3
@@ -573,7 +574,23 @@ class Index:
             return result
 
 
+def pipes_available() -> bool:
+    """Sandboxes such as Codex on Windows forbid the pipes that the daemon and worker process need."""
+    try:
+        first, second = multiprocessing.Pipe()
+    except PermissionError:
+        return False
+    first.close()
+    second.close()
+    return True
+
+
 def run_direct(action: str, root: Path, data_dir: Path, model_cache: Path, query: str | None, top_k: int):
+    if not pipes_available():
+        # ponytail: in-process fallback has no worker timeout; the client's own command timeout still applies.
+        output = queue.Queue(1)
+        run_action(action, root, data_dir, model_cache, query, top_k, output)
+        return output.get()[1]
     output = multiprocessing.Queue(1)
     worker = multiprocessing.Process(target=run_action, args=(action, root, data_dir, model_cache, query, top_k, output))
     worker.start()
@@ -614,7 +631,7 @@ def main():
         parser.error("search requires --query")
     root = args.root.resolve()
     data_dir.mkdir(parents=True, exist_ok=True)
-    result = try_daemon(root, data_dir, model_cache, args.action, args.query, args.top_k)
+    result = try_daemon(root, data_dir, model_cache, args.action, args.query, args.top_k) if pipes_available() else None
     if result is None:
         result = run_direct(args.action, root, data_dir, model_cache, args.query, args.top_k)
     print(json.dumps(result, ensure_ascii=False))

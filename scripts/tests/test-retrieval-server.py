@@ -133,6 +133,13 @@ class RetrievalServerTests(unittest.TestCase):
                 self.assertNotEqual(MODULE.daemon_address(data_dir), old_address)
                 self.assertNotEqual(MODULE.daemon_lock_path(data_dir), old_lock)
 
+    def test_run_direct_runs_in_process_when_pipes_are_forbidden(self):
+        def action(action, root, data_dir, model_cache, query, top_k, output):
+            output.put((True, [query, top_k]))
+
+        with patch.object(MODULE, 'pipes_available', return_value=False), patch.object(MODULE, 'run_action', action):
+            self.assertEqual(MODULE.run_direct('search', Path('.'), Path('.'), Path('.'), 'two words', 3), ['two words', 3])
+
     def test_model_kwargs_use_bfloat16_only_on_supporting_gpus(self):
         bfloat16 = object()
         for available, supported, expected in [(True, True, {'dtype': bfloat16}), (True, False, {}), (False, True, {})]:
