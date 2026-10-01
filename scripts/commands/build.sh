@@ -204,11 +204,11 @@ for client in codex claude; do
   fi
   path="$output/$client-$shell/$file"
   content=$(<"$path")
+  # Claude can offer both shell tools on Windows, so every package denies the destructive commands in both.
+  deny_rules='["PowerShell(git reset --hard*)","PowerShell(git clean*)","PowerShell(Remove-Item *-Recurse*)","Bash(git reset --hard*)","Bash(git clean*)","Bash(rm -rf*)"]'
   if [ "$shell" = powershell ]; then
-    deny_rules='["PowerShell(git reset --hard*)","PowerShell(git clean*)","PowerShell(Remove-Item *-Recurse*)"]'
     allow_rules='["Agent","PowerShell(mcporter call context7.*)"]'
   else
-    deny_rules='["Bash(git reset --hard*)","Bash(git clean*)","Bash(rm -rf*)"]'
     allow_rules='["Agent","Bash(mcporter call context7.*)"]'
   fi
   content=${content//__HOOK_COMMAND__/$command}

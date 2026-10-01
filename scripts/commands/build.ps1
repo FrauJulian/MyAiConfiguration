@@ -202,11 +202,8 @@ foreach ($shell in @('powershell','bash')) {
         $script = if ($shell -eq 'powershell') { 'flashbang.ps1' } else { 'flashbang.sh' }
         $statusLineScript = if ($shell -eq 'powershell') { 'statusline.ps1' } else { 'statusline.sh' }
         $content = Get-Content -LiteralPath $path -Raw
-        $denyRules = if ($shell -eq 'powershell') {
-            @('PowerShell(git reset --hard*)','PowerShell(git clean*)','PowerShell(Remove-Item *-Recurse*)')
-        } else {
-            @('Bash(git reset --hard*)','Bash(git clean*)','Bash(rm -rf*)')
-        }
+        # Claude can offer both shell tools on Windows, so every package denies the destructive commands in both.
+        $denyRules = @('PowerShell(git reset --hard*)','PowerShell(git clean*)','PowerShell(Remove-Item *-Recurse*)','Bash(git reset --hard*)','Bash(git clean*)','Bash(rm -rf*)')
         $denyRulesJson = ConvertTo-Json -InputObject $denyRules -Compress
         $shellTool = if ($shell -eq 'powershell') { 'PowerShell' } else { 'Bash' }
         $allowRulesJson = ConvertTo-Json -InputObject @('Agent', "$shellTool(mcporter call context7.*)") -Compress
