@@ -63,7 +63,7 @@ try {
     $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'plugins'
     $mergedConfig = [System.IO.File]::ReadAllText($configPath)
     if (-not ($mergedConfig -replace "`r`n", "`n").Contains(($pluginState -replace "`r`n", "`n"))) { throw 'Updating config.toml must preserve local marketplace and plugin tables, including disabled plugins.' }
-    if (-not $mergedConfig.Contains("model = 'old'") -or -not $mergedConfig.Contains("model_reasoning_effort = 'high'") -or -not $mergedConfig.Contains("approvals_reviewer = 'auto_review'") -or $mergedConfig.Contains("approvals_reviewer = 'user'") -or $mergedConfig.Contains('[other]')) { throw 'Updating config.toml must preserve local model settings and enforce automatic review.' }
+    if (-not $mergedConfig.Contains("model = 'old'") -or -not $mergedConfig.Contains("model_reasoning_effort = 'high'") -or -not $mergedConfig.Contains("approvals_reviewer = 'auto_review'") -or $mergedConfig.Contains("approvals_reviewer = 'user'") -or -not $mergedConfig.Contains('[other]')) { throw 'Updating config.toml must preserve local settings and tables and enforce automatic review.' }
     if ($mergedConfig.IndexOf("model = 'old'") -gt $mergedConfig.IndexOf('[tui]') -or $mergedConfig.IndexOf("model_reasoning_effort = 'high'") -gt $mergedConfig.IndexOf('[tui]')) { throw 'Model settings must remain in the TOML root table.' }
     if ([System.IO.File]::ReadAllText((Join-Path $destination 'backups/plugins/config.toml')) -ne $originalConfig) { throw 'Original plugin configuration must be backed up.' }
     $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'plugins-repeat'

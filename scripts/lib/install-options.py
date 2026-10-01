@@ -129,10 +129,8 @@ def merge_toml(current_text, managed_text, statusline_enabled=True):
         owned_hook = any(re.search(r'(?:flashbang|statusline|record-compact|session-state-pointer)\.(?:ps1|sh)', line, re.I) for line in block)
         if plugin_table and header in managed_headers:
             raise ValueError('Cannot merge conflicting managed plugin tables.')
-        if (plugin_table and header not in managed_headers) or (array_table and not owned_hook):
+        if (header not in managed_headers and not array_table) or (array_table and not owned_hook):
             extras.extend(block)
-            continue
-        if header not in managed_headers:
             continue
         if array_table:
             continue

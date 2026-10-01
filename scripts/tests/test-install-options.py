@@ -31,6 +31,19 @@ class InstallOptionsTests(unittest.TestCase):
 
         self.assertIn(plugin_state, result)
 
+    def test_merge_toml_preserves_unmanaged_tables(self):
+        foreign = ('[mcp_servers.demo]\ncommand = "demo"\n\n[mcp_servers.demo.env]\nTOKEN_NAME = "x"\n\n'
+                   '[model_providers.custom]\nname = "Custom"\nbase_url = "https://example.invalid"\n')
+        current = "model = 'old'\n\n[tui]\nstatus_line = ['a']\ntheme = 'dark'\n\n" + foreign
+        managed = "model = 'new'\n\n[tui]\nstatus_line = ['b']\n"
+
+        result = tomllib.loads(OPTIONS.merge_toml(current, managed))
+
+        self.assertEqual(result['model'], 'new')
+        self.assertEqual(result['tui'], {'status_line': ['b'], 'theme': 'dark'})
+        self.assertEqual(result['mcp_servers'], {'demo': {'command': 'demo', 'env': {'TOKEN_NAME': 'x'}}})
+        self.assertEqual(result['model_providers'], {'custom': {'name': 'Custom', 'base_url': 'https://example.invalid'}})
+
     def test_filter_preserves_other_claude_hooks_and_status(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'settings.json'

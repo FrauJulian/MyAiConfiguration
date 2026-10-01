@@ -74,7 +74,7 @@ merged_config=$(cat "$destination/config.toml")
 merged_config_normalized=${merged_config//$'\r'/}
 plugin_state_normalized=${plugin_state//$'\r'/}
 [[ "$merged_config_normalized" == *"$plugin_state_normalized"* ]] || { printf 'Updating config.toml must preserve local marketplace and plugin tables, including disabled plugins.\n' >&2; exit 1; }
-[[ "$merged_config" == *"model = 'old'"* && "$merged_config" == *"model_reasoning_effort = 'high'"* && "$merged_config" == *"approvals_reviewer = 'auto_review'"* && "$merged_config" != *"approvals_reviewer = 'user'"* && "$merged_config" != *'[other]'* ]] || { printf 'Updating config.toml must preserve local model settings and enforce automatic review.\n' >&2; exit 1; }
+[[ "$merged_config" == *"model = 'old'"* && "$merged_config" == *"model_reasoning_effort = 'high'"* && "$merged_config" == *"approvals_reviewer = 'auto_review'"* && "$merged_config" != *"approvals_reviewer = 'user'"* && "$merged_config" == *'[other]'* ]] || { printf 'Updating config.toml must preserve local model settings and enforce automatic review.\n' >&2; exit 1; }
 [ "$(printf '%s\n' "$merged_config" | grep -n "model = 'old'" | cut -d: -f1)" -lt "$(printf '%s\n' "$merged_config" | grep -n '^\[tui\]$' | cut -d: -f1)" ] || { printf 'Model must remain in TOML root table.\n' >&2; exit 1; }
 [ "$(printf '%s\n' "$merged_config" | grep -n "model_reasoning_effort = 'high'" | cut -d: -f1)" -lt "$(printf '%s\n' "$merged_config" | grep -n '^\[tui\]$' | cut -d: -f1)" ] || { printf 'Model effort must remain in TOML root table.\n' >&2; exit 1; }
 [ "$(cat "$destination/backups/plugins/config.toml")" = "$original_config" ] || { printf 'Original plugin configuration must be backed up.\n' >&2; exit 1; }
