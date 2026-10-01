@@ -172,7 +172,9 @@ Bash:
 
 Rebuild when shared definitions, adapters, or generation logic change. Choose other verification according to the
 change's risk; documentation-only edits do not require a build. Building writes reproducible packages below
-`generated/` and may use temporary validation files; it does not install global user configuration.
+`generated/` and may use temporary validation files; it does not install global user configuration. Each build writes
+into its own `generated.build-*` directory and replaces `generated/` only after validation, so a failed or parallel
+build never leaves it partial.
 
 ## Installation Script
 
@@ -224,6 +226,8 @@ Every managed file, including `config.toml`, `settings.json`, and the manifest, 
 file and then renamed over the target, so an interrupted run never leaves a partly written file. Each destination is
 locked through `.ai-config.lock` while it syncs; a parallel install or update fails instead of interleaving writes.
 A lock left by an exited process of the same shell on the same host is replaced automatically.
+Before its first write, each sync records its planned changes in `.ai-config-transaction.json`; if a run is interrupted,
+the next install or update first rolls that destination back from the backups (`ROLLBACK <destination> <stamp>`).
 Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
