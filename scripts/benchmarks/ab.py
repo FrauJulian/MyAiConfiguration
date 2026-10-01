@@ -8,7 +8,11 @@ Arms:
   setup     the installed configuration (CLAUDE.md, settings, plugins, skills, MCP servers).
   baseline  Claude with --setting-sources "" --strict-mcp-config (no user settings, plugins,
             user skills, CLAUDE.md, or MCP servers); Codex with CODEX_HOME set to --codex-baseline-home,
-            an empty home where you ran `codex login` once.
+            an empty home where you ran `codex login` once, with every user and plugin skill disabled.
+
+Both arms of a client use the same pinned model and reasoning effort. Before any run, a preflight
+records what each arm actually loads (model, effort, skills by source, plugins, MCP servers,
+instructions) in <out>/provenance.json and stops if the arms are not comparable.
 """
 import argparse
 import fnmatch
@@ -70,16 +74,26 @@ def run_jsonl(command, cwd, env, timeout):
     return events, time.monotonic() - start, timed_out
 
 
-def claude_turn(prompt, cwd, arm, model, session, timeout):
-    command = [shutil.which('claude'), '-p', prompt, '--output-format', 'stream-json', '--verbose', '--model', model,
-               '--permission-mode', 'auto', '--allowedTools', *CLAUDE_TOOLS]
+def claude_flags(arm, args):
+    flags = ['--model', args.claude_model, '--effort', args.claude_effort]
     if arm == 'baseline':
-        command += ['--setting-sources', '', '--strict-mcp-config']
+        flags += ['--setting-sources', '', '--strict-mcp-config']
     if arm == 'setup-no-search':
-        command += ['--disallowedTools', 'Skill(semantic-search)', 'Bash(*semantic-retrieval*)', 'PowerShell(*semantic-retrieval*)',
-                    '--append-system-prompt', 'The semantic-search skill and the semantic retrieval CLI are unavailable in this session.']
+        flags += ['--disallowedTools', 'Skill(semantic-search)', 'Bash(*semantic-retrieval*)', 'PowerShell(*semantic-retrieval*)',
+                  '--append-system-prompt', 'The semantic-search skill and the semantic retrieval CLI are unavailable in this session.']
+    return flags
+
+
+def codex_env(arm, args):
+    return clean_env(CODEX_HOME=str(args.codex_baseline_home)) if arm == 'baseline' else clean_env()
+
+
+def claude_turn(prompt, cwd, arm, args, session):
+    command = [shutil.which('claude'), '-p', prompt, '--output-format', 'stream-json', '--verbose',
+               '--permission-mode', 'auto', '--allowedTools', *CLAUDE_TOOLS, *claude_flags(arm, args)]
     if session:
         command += ['--resume', session]
+    timeout = args.timeout
     events, seconds, timed_out = run_jsonl(command, cwd, clean_env(), timeout)
     result = next((event for event in reversed(events) if event.get('type') == 'result'), {})
     usage = result.get('usage', {})
@@ -93,21 +107,21 @@ def claude_turn(prompt, cwd, arm, model, session, timeout):
         'tool_calls': len(calls), 'agents': sum(call.get('name') == 'Agent' for call in calls),
         'skills': [str(call.get('input', {}).get('skill', '')) for call in calls if call.get('name') == 'Skill'],
         'commands': commands, 'final': str(result.get('result', '')),
+        'models': sorted({str(event['message']['model']) for event in events
+                          if event.get('type') == 'assistant' and event.get('message', {}).get('model')}),
         'error': str(result.get('result', '') or 'no result event')[:300] if result.get('is_error') or not result else '',
     }
 
 
-def codex_turn(prompt, cwd, arm, model, session, timeout, baseline_home):
+def codex_turn(prompt, cwd, arm, args, session):
     command = [shutil.which('codex'), 'exec']
     if session:
         command += ['resume', session]
-    command += ['--json', '--skip-git-repo-check', '--sandbox', 'workspace-write']
-    if model:
-        command += ['-m', model]
+    command += ['--json', '--skip-git-repo-check', '--sandbox', 'workspace-write',
+                '-m', args.codex_model, '-c', f'model_reasoning_effort="{args.codex_effort}"']
     command += ['-C', str(cwd)] if not session else []
     command.append(prompt)
-    env = clean_env(CODEX_HOME=str(baseline_home)) if arm == 'baseline' else clean_env()
-    events, seconds, timed_out = run_jsonl(command, cwd, env, timeout)
+    events, seconds, timed_out = run_jsonl(command, cwd, codex_env(arm, args), args.timeout)
     items = [event.get('item', {}) for event in events if event.get('type') == 'item.completed']
     tools = [item for item in items if item.get('type') not in ('agent_message', 'reasoning', 'error')]
     usage = [event.get('usage', {}) for event in events if event.get('type') == 'turn.completed']
@@ -119,9 +133,141 @@ def codex_turn(prompt, cwd, arm, model, session, timeout, baseline_home):
         'tool_calls': len(tools), 'agents': sum(item.get('type') == 'collab_tool_call' for item in tools),
         'skills': [], 'commands': [str(item.get('command', '')) for item in tools if item.get('type') == 'command_execution'],
         'final': next((str(item.get('text', '')) for item in reversed(items) if item.get('type') == 'agent_message'), ''),
+        'models': [args.codex_model],
         'error': next((str(event.get('message', event.get('error', '')))[:300] for event in events if event.get('type') in ('error', 'turn.failed')
                        and not str(event.get('message', '')).startswith('Reconnecting')), '') if not usage else '',
     }
+
+
+class AppServer:
+    """Minimal JSON-RPC client for `codex app-server`; every wait has a deadline."""
+
+    def __init__(self, env, cwd):
+        self.process = subprocess.Popen([shutil.which('codex'), 'app-server'], cwd=cwd, env=env, stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding='utf-8')
+        self.lines, self.next_id = queue.Queue(), 0
+        threading.Thread(target=lambda: [self.lines.put(line) for line in self.process.stdout], daemon=True).start()
+        self.call('initialize', {'clientInfo': {'name': 'ai-config-benchmark', 'version': '1'}})
+        self.process.stdin.write(json.dumps({'jsonrpc': '2.0', 'method': 'initialized'}) + '\n')
+
+    def call(self, method, params):
+        self.next_id += 1
+        self.process.stdin.write(json.dumps({'jsonrpc': '2.0', 'id': self.next_id, 'method': method, 'params': params}) + '\n')
+        self.process.stdin.flush()
+        while True:
+            message = json.loads(self.lines.get(timeout=120))
+            if message.get('id') == self.next_id:
+                if 'error' in message:
+                    raise RuntimeError(f'{method}: {message["error"]}')
+                return message['result']
+
+    def close(self):
+        kill_tree(self.process)
+
+
+def codex_configured(env, cwd):
+    server = AppServer(env, cwd)
+    try:
+        return server.call('config/read', {})['config']
+    finally:
+        server.close()
+
+
+def codex_provenance(arm, args, cwd):
+    server = AppServer(codex_env(arm, args), cwd)
+    try:
+        config = server.call('config/read', {})['config']
+        listing = lambda: server.call('skills/list', {'cwds': [str(cwd)], 'forceReload': True})['data'][0]['skills']
+        skills = listing()
+        if arm == 'baseline':
+            # Codex reads ~/.agents/skills from the real profile even with another CODEX_HOME; disable those skills there.
+            for skill in skills:
+                if skill.get('enabled', True) and (skill.get('scope') == 'user' or skill.get('pluginId')):
+                    server.call('skills/config/write', {'path': skill['path'], 'enabled': False})
+            skills = listing()
+    finally:
+        server.close()
+    prompt = subprocess.run([shutil.which('codex'), 'debug', 'prompt-input', '-c', f'model="{args.codex_model}"',
+                             '-c', f'model_reasoning_effort="{args.codex_effort}"', 'provenance probe'],
+                            cwd=cwd, env=codex_env(arm, args), capture_output=True, text=True, encoding='utf-8', timeout=180).stdout
+    setup_agents = Path.home() / '.codex' / 'AGENTS.md'
+    marker = next((line.strip() for line in setup_agents.read_text(encoding='utf-8-sig').splitlines() if line.strip()), '') if setup_agents.is_file() else ''
+    enabled = [skill for skill in skills if skill.get('enabled', True)]
+    return {
+        'model': args.codex_model, 'effort': args.codex_effort,
+        'configured_model': config.get('model'), 'configured_effort': config.get('model_reasoning_effort'),
+        'sandbox_mode': config.get('sandbox_mode'), 'approval_policy': config.get('approval_policy'),
+        'skills_by_scope': {scope: sum(skill.get('scope') == scope and not skill.get('pluginId') for skill in enabled)
+                            for scope in sorted({skill.get('scope') for skill in enabled})},
+        'plugin_skills': sorted(skill['name'] for skill in enabled if skill.get('pluginId')),
+        'user_skills': sorted(skill['name'] for skill in enabled if skill.get('scope') == 'user' and not skill.get('pluginId')),
+        'mcp_servers': sorted(config.get('mcp_servers') or {}),
+        'global_instructions_loaded': bool(marker) and marker in prompt,
+        'prompt_input_tokens_estimate': len(prompt.encode('utf-8')) // 4,
+    }
+
+
+def claude_provenance(arm, args, cwd):
+    claude = shutil.which('claude')
+    process = subprocess.Popen([claude, '-p', 'provenance probe', '--output-format', 'stream-json', '--verbose', *claude_flags(arm, args)],
+                               cwd=cwd, env=clean_env(), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               text=True, encoding='utf-8')
+    lines = queue.Queue()
+    threading.Thread(target=lambda: [lines.put(line) for line in process.stdout], daemon=True).start()
+    try:
+        init = {}
+        while init.get('subtype') != 'init':
+            init = json.loads(lines.get(timeout=180))
+    finally:
+        kill_tree(process)
+    context = json.loads(subprocess.run([claude, '-p', '/context', '--output-format', 'json', *claude_flags(arm, args)], cwd=cwd, env=clean_env(),
+                                        capture_output=True, text=True, encoding='utf-8', timeout=180).stdout).get('result', '')
+
+    def rows(heading):
+        section = re.search(rf'(?ms)^### {re.escape(heading)}\s*$(.*?)(?=^### |\Z)', context)
+        cells = [[cell.strip() for cell in line.strip().strip('|').split('|')] for line in (section.group(1) if section else '').splitlines() if line.startswith('|')]
+        return [row for row in cells[2:] if row and row[0]]
+
+    sources = {}
+    for row in rows('Skills'):
+        source = row[1].split(' (')[0] if len(row) > 1 else '?'
+        sources[source] = sources.get(source, 0) + 1
+    model = re.search(r'\*\*Model:\*\*\s*(\S+)', context)
+    return {
+        'model': init.get('model') or (model.group(1) if model else None), 'effort': args.claude_effort,
+        'permission_mode': init.get('permissionMode'),
+        'skills_by_source': sources, 'skills_listed': len(init.get('skills', [])),
+        'plugins': sorted(plugin.get('name', str(plugin)) if isinstance(plugin, dict) else str(plugin) for plugin in init.get('plugins', [])),
+        'mcp_servers': sorted(server.get('name', str(server)) if isinstance(server, dict) else str(server) for server in init.get('mcp_servers', [])),
+        'memory_files': [row[1] for row in rows('Memory Files') if len(row) > 1],
+    }
+
+
+def preflight(args, clients, arms):
+    """Record what each arm loads and return the problems that make the comparison invalid."""
+    provenance, problems = {}, []
+    with tempfile.TemporaryDirectory(prefix='ai-bench-preflight-', ignore_cleanup_errors=True) as directory:
+        subprocess.run(['git', 'init', '-q'], cwd=directory, check=True, timeout=60)
+        for client in clients:
+            for arm in arms:
+                if client == 'codex' and arm == 'setup-no-search':
+                    continue
+                data = (claude_provenance if client == 'claude' else codex_provenance)(arm, args, Path(directory))
+                provenance[f'{client}/{arm}'] = data
+                if client == 'claude' and arm == 'baseline':
+                    if set(data['skills_by_source']) - {'Built-in'}:
+                        problems.append(f'claude baseline loads non-built-in skills: {data["skills_by_source"]}')
+                    if data['memory_files'] or data['mcp_servers']:
+                        problems.append(f'claude baseline loads memory files {data["memory_files"]} or MCP servers {data["mcp_servers"]}')
+                if client == 'codex' and arm == 'baseline':
+                    if data['user_skills'] or data['plugin_skills']:
+                        problems.append(f'codex baseline still enables user or plugin skills: {data["user_skills"] + data["plugin_skills"]}')
+                    if data['global_instructions_loaded'] or data['mcp_servers']:
+                        problems.append('codex baseline loads the global AGENTS.md or MCP servers')
+            models = {provenance[key]['model'] for key in provenance if key.startswith(client + '/')}
+            if len(models) > 1:
+                problems.append(f'{client} arms resolve to different models: {sorted(models)}')
+    return provenance, problems
 
 
 RETRIEVAL = Path.home() / '.my-ai-configuration/semantic-retrieval'
@@ -198,10 +344,7 @@ def run_one(job, args):
             warm_index(work)
         turns, prompt, session = [], spec['prompt'], None
         for round_number in range(1 + args.rework):
-            if client == 'claude':
-                turn = claude_turn(prompt, work, arm, args.claude_model, session, args.timeout)
-            else:
-                turn = codex_turn(prompt, work, arm, args.codex_model, session, args.timeout, args.codex_baseline_home)
+            turn = (claude_turn if client == 'claude' else codex_turn)(prompt, work, arm, args, session)
             turns.append(turn)
             session = turn['session']
             if turn['error']:
@@ -222,6 +365,7 @@ def run_one(job, args):
         'cost_usd': round(sum(turn['cost_usd'] for turn in turns), 4), 'tool_calls': sum(turn['tool_calls'] for turn in turns),
         'agents': sum(turn['agents'] for turn in turns), 'skills': [skill for turn in turns for skill in turn['skills']],
         'commands': [command for turn in turns for command in turn['commands']],
+        'models': sorted({model for turn in turns for model in turn['models']}),
         'searches': sum('semantic-retrieval' in command for turn in turns for command in turn['commands'])
                     + sum(skill == 'semantic-search' for turn in turns for skill in turn['skills']),
         'timed_out': any(turn['timed_out'] for turn in turns), 'workflow_kind': spec['workflow'].get('kind'),
@@ -263,7 +407,10 @@ def main():
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--timeout', type=int, default=900, help='seconds per client turn')
     parser.add_argument('--claude-model', default='sonnet')
-    parser.add_argument('--codex-model', help='default: the CLI default, identical for both arms')
+    parser.add_argument('--claude-effort', default='medium', choices=('low', 'medium', 'high', 'xhigh', 'max'))
+    parser.add_argument('--codex-model', help="default: the setup's configured model, pinned for both arms")
+    parser.add_argument('--codex-effort', help="default: the setup's configured reasoning effort, pinned for both arms")
+    parser.add_argument('--allow-unisolated', action='store_true', help='run even when the preflight finds the arms not comparable')
     parser.add_argument('--codex-baseline-home', type=Path, default=Path.home() / '.my-ai-configuration/benchmark/codex-home')
     parser.add_argument('--out', type=Path, default=Path(tempfile.gettempdir()) / f'ai-config-ab-{time.strftime("%Y%m%d-%H%M%S")}')
     parser.add_argument('--dry-run', action='store_true', help='list the runs without starting clients')
@@ -288,6 +435,22 @@ def main():
         parser.error(f'Codex baseline needs a login: run CODEX_HOME="{args.codex_baseline_home}" codex login')
     jobs = [(client, arm, task, repetition) for repetition in range(args.first_repetition, args.first_repetition + args.repetitions)
             for task in tasks for client in args.clients for arm in args.arms if not (client == 'codex' and arm == 'setup-no-search')]
+    if 'codex' in args.clients and not (args.codex_model and args.codex_effort):
+        configured = codex_configured(clean_env(), Path.cwd())
+        args.codex_model = args.codex_model or configured.get('model')
+        args.codex_effort = args.codex_effort or configured.get('model_reasoning_effort') or 'medium'
+        if not args.codex_model:
+            parser.error('the setup configures no Codex model; pass --codex-model')
+    provenance, problems = preflight(args, args.clients, args.arms)
+    args.out.mkdir(parents=True, exist_ok=True)
+    (args.out / 'provenance.json').write_text(json.dumps({'provenance': provenance, 'problems': problems}, indent=2), encoding='utf-8')
+    for key, data in provenance.items():
+        print(f'{key}: model={data["model"]} effort={data["effort"]} ' + ' '.join(f'{name}={value}' for name, value in data.items()
+                                                                                if name in ('skills_by_source', 'skills_by_scope', 'plugins', 'mcp_servers')))
+    for problem in problems:
+        print(f'NOT COMPARABLE: {problem}')
+    if problems and not args.allow_unisolated:
+        return 2
     print(f'{len(jobs)} runs -> {args.out}')
     if args.dry_run:
         for client, arm, task, repetition in jobs:
