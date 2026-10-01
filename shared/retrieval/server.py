@@ -226,12 +226,18 @@ def reciprocal_rank_fusion(*rankings):
     return sorted(scores, key=lambda identifier: (-scores[identifier], identifier))
 
 
+def code_version() -> str:
+    """Hash of this file, so a daemon started by older code is never reused after an update."""
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
+
+
 def daemon_lock_path(data_dir: Path) -> Path:
-    return data_dir / "daemon.starting"
+    return data_dir / f"daemon-{code_version()}.starting"
 
 
 def daemon_address(data_dir: Path) -> str:
-    digest = hashlib.sha256(os.path.normcase(str(data_dir.resolve())).encode()).hexdigest()[:16]
+    identity = os.path.normcase(str(data_dir.resolve())) + "|" + code_version()
+    digest = hashlib.sha256(identity.encode()).hexdigest()[:16]
     if os.name == "nt":
         return r"\\.\pipe\ai-config-retrieval-" + digest
     return str(data_dir / f"daemon-{digest}.sock")

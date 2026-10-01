@@ -97,7 +97,7 @@ def check_runtime(target, state):
         if path.name == 'data' and (not path.is_dir() or any(
                 child.is_symlink() or not (
                     child.is_file() and (child.name in ('daemon.key', 'daemon.starting') or re.fullmatch(
-                        r'[0-9a-f]{64}\.sqlite3(?:-(?:wal|shm|journal))?', child.name))
+                        r'[0-9a-f]{64}\.sqlite3(?:-(?:wal|shm|journal))?|daemon-[0-9a-f]{12}\.starting', child.name))
                     or child.is_socket() and re.fullmatch(r'daemon-[0-9a-f]{16}\.sock', child.name))
                 for child in path.iterdir())):
             raise ValueError('Foreign or linked semantic retrieval path: data')

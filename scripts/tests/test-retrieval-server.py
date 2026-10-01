@@ -124,6 +124,15 @@ class RetrievalServerTests(unittest.TestCase):
         self.assertEqual(stopped.exception.code, 3)
         self.assertEqual(calls[0][2:], ['search', '--query', 'two words'])
 
+    def test_daemon_identity_changes_with_code_version(self):
+        with TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            with patch.object(MODULE, 'code_version', return_value='aaaaaaaaaaaa'):
+                old_address, old_lock = MODULE.daemon_address(data_dir), MODULE.daemon_lock_path(data_dir)
+            with patch.object(MODULE, 'code_version', return_value='bbbbbbbbbbbb'):
+                self.assertNotEqual(MODULE.daemon_address(data_dir), old_address)
+                self.assertNotEqual(MODULE.daemon_lock_path(data_dir), old_lock)
+
     def test_preferred_device_uses_cuda_with_cpu_fallback(self):
         with patch.dict('sys.modules', torch=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))):
             self.assertEqual(MODULE.preferred_device(), 'cuda')
