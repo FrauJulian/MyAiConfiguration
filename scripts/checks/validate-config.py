@@ -65,7 +65,10 @@ def validate_claude(path: Path) -> None:
 
 
 def validate_rule_skills(package: Path) -> None:
-    for path in (package / "skills" / "rules").glob("*/SKILL.md"):
+    paths = sorted((package / "skills").glob("rules-*/SKILL.md"))
+    if not paths:
+        fail(f"{package}: no generated rules-* skills found")
+    for path in paths:
         lines = path.read_text(encoding="utf-8-sig").splitlines()
         if len(lines) < 4 or lines[0] != "---" or lines[3] != "---" or not lines[1].startswith("name: ") or not lines[2].startswith("description: "):
             fail(f"{path}: invalid generated skill frontmatter")
