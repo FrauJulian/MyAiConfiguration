@@ -218,7 +218,7 @@ backed up and retained with a warning. Backups are stored under `backups/<timest
 Codex skill backups use `.agents/.ai-config-skill-backups/` instead, so Codex does not discover backup copies as skills.
 Existing `.agents/skills/backups/` content is moved there on the next install, update, or uninstall.
 Codex `config.toml` synchronization merges setup-owned keys while retaining other root keys, extra fields in managed
-tables, plugin and marketplace tables, and unowned array tables. Other standalone tables may be dropped; the previous
+tables, plugin and marketplace tables, other unmanaged tables, and unowned array tables. The previous
 file is backed up when content changes. Claude `settings.json` synchronization retains unrelated settings and hooks.
 Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
