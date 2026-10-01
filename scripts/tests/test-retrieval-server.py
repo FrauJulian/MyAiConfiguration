@@ -329,6 +329,28 @@ class RetrievalServerTests(unittest.TestCase):
             finally:
                 index.db.close()
 
+    def test_status_reports_index_freshness_without_creating_an_index(self):
+        with TemporaryDirectory() as temporary:
+            root, data = Path(temporary), Path(temporary) / 'data'
+            initialize_repository(root)
+            source = root / 'module.py'
+            source.write_text('value = 1\n', encoding='utf-8')
+            status = MODULE.index_status(root, data)
+            self.assertEqual((status['indexable_files'], status['indexed_files'], status['stale_files']), (1, 0, 1))
+            self.assertFalse(status['models_loaded'])
+            self.assertFalse(MODULE.index_database(root, data).exists())
+            index = MODULE.Index(root, data)
+            try:
+                metadata = source.stat()
+                with index.db:
+                    index.db.execute('insert into files values (?, ?, ?, ?, ?)',
+                                     ('module.py', 'digest', metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns))
+            finally:
+                index.db.close()
+            self.assertEqual(MODULE.index_status(root, data)['stale_files'], 0)
+            source.write_text('value = 22\n', encoding='utf-8')
+            self.assertEqual(MODULE.index_status(root, data)['stale_files'], 1)
+
     def test_max_files_is_configurable_via_environment(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

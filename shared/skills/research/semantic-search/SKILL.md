@@ -15,6 +15,15 @@ Search the current Git repository by meaning with the locally installed Qwen3 em
 
 Use `rg` or direct reads instead for known file paths, symbol names, exact strings, and error messages.
 
+## Decide by cost
+
+Check the cost of the next search first: run the command under Run with `status` in place of `search` and without `--query` and `--top-k`. It loads no models, takes about a second, and prints `{indexable_files, indexed_files, stale_files, models_loaded, in_process}`. Weigh that against the `rg` rounds you expect:
+
+- Fewer than about 200 indexable files, or one or two guessed terms likely to hit: use `rg`; a search costs more than it saves.
+- `stale_files` in the thousands, including a first index (`indexed_files` 0): the search embeds them first, which can take minutes. Pay that only for a large unfamiliar repository or several concept questions in this session.
+- `models_loaded` false: the search loads the models first, which takes tens of seconds. With `in_process` true, as inside the Codex sandbox, every search pays that again; search only when `rg` would need several rounds, and batch related questions into one precise query.
+- Index fresh and `models_loaded` true: a search takes seconds; use it for any concept question.
+
 ## Run
 
 PowerShell:
@@ -39,7 +48,6 @@ The output is a JSON list of `{path, symbol, text, score}`, best match first.
 
 ## Cost and limits
 
-- The first search in a repository builds its index, which can take minutes; later searches refresh only changed files.
-- Outside a sandbox a background daemon keeps the models loaded, so warm searches take seconds. Inside the Codex sandbox every search loads the models again and takes about half a minute; batch related questions into one precise query.
+- Searches refresh only changed files. Outside a sandbox a background daemon keeps the models loaded for 30 idle minutes; inside the Codex sandbox there is no daemon.
 - Only Git-tracked and unignored files up to 512 KB are indexed, by default at most 2000 files per repository.
 - If the command fails or the setup is missing, continue with `rg` and state the limitation briefly.

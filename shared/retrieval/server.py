@@ -368,6 +368,9 @@ def run_daemon(data_dir: Path, model_cache: Path):
                 response = (True, None)
                 try:
                     request = json.loads(connection.recv_bytes(DAEMON_MESSAGE_LIMIT))
+                    if isinstance(request, dict) and request.get("action") == "stop":
+                        connection.send_bytes(json.dumps((True, None)).encode("utf-8"))
+                        os._exit(0)
                     if not isinstance(request, dict) or request.get("action") not in ("search", "rebuild") or not isinstance(request.get("root"), str):
                         raise ValueError("Invalid semantic retrieval daemon request.")
                     index = indexes.get(request["root"])
@@ -395,16 +398,76 @@ def run_daemon(data_dir: Path, model_cache: Path):
         listener.close()
 
 
+def index_database(root: Path, data: Path) -> Path:
+    identity = json.dumps([os.path.normcase(str(root.resolve())), MODEL, MODEL_REVISION,
+                           EMBEDDING_DIMENSIONS, RETRIEVAL_INSTRUCTION, INDEX_VERSION,
+                           CHUNK_TOKENS, OVERLAP_TOKENS])
+    return data.resolve() / (hashlib.sha256(identity.encode()).hexdigest() + ".sqlite3")
+
+
+def daemon_running(data_dir: Path) -> bool:
+    if not pipes_available():
+        return False
+    try:
+        Client(daemon_address(data_dir), authkey=daemon_authkey(data_dir)).close()
+        return True
+    except (OSError, EOFError, AuthenticationError):
+        return False
+
+
+def index_status(root: Path, data_dir: Path) -> dict:
+    """Report what the next search costs without loading models or starting the daemon."""
+    database = index_database(root, data_dir)
+    previous = {}
+    if database.is_file():
+        connection = sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)
+        try:
+            previous = {path: (size, mtime, ctime) for path, size, mtime, ctime
+                        in connection.execute("select path, size, mtime, ctime from files")}
+        except sqlite3.OperationalError:
+            pass
+        finally:
+            connection.close()
+    files = indexable_files(root.resolve(), data_dir.resolve(), read_max_files())
+    stale = 0
+    for path in files:
+        metadata = path.stat()
+        stale += previous.get(path.relative_to(root.resolve()).as_posix()) != (metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns)
+    return {"indexable_files": len(files), "indexed_files": len(previous), "stale_files": stale,
+            "models_loaded": daemon_running(data_dir), "in_process": not pipes_available()}
+
+
+def indexable_files(root: Path, data: Path, max_files: int):
+    ignored = {".git", ".venv", "generated", "node_modules", ".my-ai-configuration", "bin", "obj"}
+    output = subprocess.run(["git", "-C", str(root), "ls-files", "--cached", "--others",
+                             "--exclude-standard", "-z", "--", "."],
+                            check=True, capture_output=True, timeout=30).stdout
+    candidates = [root / name for name in
+                  output.decode("utf-8", errors="surrogateescape").split("\0") if name
+                  and not any(part in ignored for part in Path(name).parts)]
+    result = []
+    for candidate in sorted(candidates):
+        if candidate.is_symlink():
+            continue
+        path = candidate.resolve()
+        if (not path.is_relative_to(root) or path.is_relative_to(data)
+                or path.suffix.lower() not in TEXT_EXTENSIONS or not path.is_file() or path.stat().st_size > 524288):
+            continue
+        result.append(path)
+        if len(result) == max_files:
+            print(f"Semantic retrieval: stopped scanning after {max_files} indexable files; "
+                  f"some files under {root} were not indexed. Set {MAX_FILES_ENV} to raise this limit.",
+                  file=sys.stderr)
+            return result
+    return result
+
+
 class Index:
     def __init__(self, root: Path, data: Path):
         self.root = root.resolve()
         self.data = data.resolve()
         self.data.mkdir(parents=True, exist_ok=True)
-        identity = json.dumps([os.path.normcase(str(self.root)), MODEL, MODEL_REVISION,
-                               EMBEDDING_DIMENSIONS, RETRIEVAL_INSTRUCTION, INDEX_VERSION,
-                               CHUNK_TOKENS, OVERLAP_TOKENS])
-        database = hashlib.sha256(identity.encode()).hexdigest() + ".sqlite3"
-        self.db = sqlite3.connect(self.data / database, check_same_thread=False, timeout=30)
+        self.db = sqlite3.connect(index_database(self.root, self.data), check_same_thread=False, timeout=30)
         self.db.execute("create table if not exists chunks (path text, symbol text, text text, vector blob)")
         self.db.execute("create index if not exists chunks_path on chunks (path)")
         self.db.execute("create virtual table if not exists lexical using fts5(document)")
@@ -420,28 +483,7 @@ class Index:
         self.vector_index = None
 
     def files(self):
-        ignored = {".git", ".venv", "generated", "node_modules", ".my-ai-configuration", "bin", "obj"}
-        output = subprocess.run(["git", "-C", str(self.root), "ls-files", "--cached", "--others",
-                                 "--exclude-standard", "-z", "--", "."],
-                                check=True, capture_output=True, timeout=30).stdout
-        candidates = [self.root / name for name in
-                      output.decode("utf-8", errors="surrogateescape").split("\0") if name
-                      and not any(part in ignored for part in Path(name).parts)]
-        result = []
-        for candidate in sorted(candidates):
-            if candidate.is_symlink():
-                continue
-            path = candidate.resolve()
-            if (not path.is_relative_to(self.root) or path.is_relative_to(self.data)
-                    or path.suffix.lower() not in TEXT_EXTENSIONS or not path.is_file() or path.stat().st_size > 524288):
-                continue
-            result.append(path)
-            if len(result) == self.max_files:
-                print(f"Semantic retrieval: stopped scanning after {self.max_files} indexable files; "
-                      f"some files under {self.root} were not indexed. Set {MAX_FILES_ENV} to raise this limit.",
-                      file=sys.stderr)
-                return result
-        return result
+        return indexable_files(self.root, self.data, self.max_files)
 
     def encoder(self):
         return shared_encoder()
@@ -609,7 +651,7 @@ def run_direct(action: str, root: Path, data_dir: Path, model_cache: Path, query
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("search", "rebuild", "daemon", "preload"))
+    parser.add_argument("action", choices=("search", "rebuild", "status", "stop", "daemon", "preload"))
     parser.add_argument("--query")
     parser.add_argument("--top-k", type=int, default=FINAL_RESULTS)
     parser.add_argument("--root", default=os.getcwd(), type=Path)
@@ -626,6 +668,17 @@ def main():
     if args.action == "daemon":
         data_dir.mkdir(parents=True, exist_ok=True)
         run_daemon(data_dir, model_cache)
+        return
+    if args.action == "status":
+        print(json.dumps(index_status(args.root, data_dir)))
+        return
+    if args.action == "stop":
+        try:
+            request_daemon(daemon_address(data_dir), {"action": "stop"}, data_dir)
+            stopped = True
+        except (OSError, EOFError, AuthenticationError):
+            stopped = False
+        print(json.dumps({"stopped": stopped}))
         return
     if args.action == "search" and not args.query:
         parser.error("search requires --query")
