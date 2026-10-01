@@ -41,7 +41,7 @@ $plugins = Select-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -C
 
 foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath -Shell $shell -Client $Client)) {
     Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp $stamp `
-        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -ClaudeConcurrency $claudeConcurrency -FlashbangEnabled $options.flashbang -StatusLineEnabled $options.statusline -DryRun:$DryRun -Summary:$Summary
+        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -ClaudeConcurrency $claudeConcurrency -FlashbangEnabled $options.flashbang -StatusLineEnabled $options.statusline -SemanticRetrievalEnabled $options.semantic_retrieval -DryRun:$DryRun -Summary:$Summary
 }
 
 Sync-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected

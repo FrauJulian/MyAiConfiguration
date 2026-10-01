@@ -122,6 +122,18 @@ try {
     if (@(Get-ChildItem -LiteralPath $destination -Filter '.ai-config-write-*' -File -Recurse).Count) { throw 'Atomic writes left a temporary file.' }
     if (Test-Path -LiteralPath (Join-Path $destination '.ai-config.lock')) { throw 'Sync must release its destination lock.' }
 
+    $searchSkill = Join-Path $source 'skills/semantic-search/SKILL.md'
+    New-Item (Split-Path $searchSkill -Parent) -ItemType Directory -Force | Out-Null
+    Set-Content $searchSkill 'search skill' -NoNewline
+    $installedSearchSkill = Join-Path $destination 'skills/semantic-search/SKILL.md'
+    $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'search-off' -SemanticRetrievalEnabled $false
+    if (Test-Path -LiteralPath $installedSearchSkill) { throw 'The semantic-search skill must not be installed while retrieval is disabled.' }
+    $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'search-on' -SemanticRetrievalEnabled $true
+    if (-not (Test-Path -LiteralPath $installedSearchSkill)) { throw 'The semantic-search skill must be installed while retrieval is enabled.' }
+    $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'search-off-again' -SemanticRetrievalEnabled $false
+    if (Test-Path -LiteralPath $installedSearchSkill) { throw 'Disabling retrieval must remove the setup-owned semantic-search skill.' }
+    Remove-Item -LiteralPath (Split-Path $searchSkill -Parent) -Recurse -Force
+
     $lockPath = Join-Path $destination '.ai-config.lock'
     [System.IO.File]::WriteAllText($lockPath, "bash other-host 1`n")
     $manifestBefore = [System.IO.File]::ReadAllText((Get-ManagedManifestPath $destination))

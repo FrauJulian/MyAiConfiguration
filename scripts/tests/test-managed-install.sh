@@ -137,6 +137,15 @@ sync_managed_destination "$source_dir" "$destination" concurrency "" "" "" false
 [ "$(cat "$destination/concurrency.txt")" = 7 ] || { printf 'Standalone concurrency placeholder must be resolved.\n' >&2; exit 1; }
 [ -z "$(find "$destination" -name '.ai-config-write.*' -print -quit)" ] || { printf 'Atomic writes left a temporary file.\n' >&2; exit 1; }
 [ ! -e "$destination/.ai-config.lock" ] || { printf 'Sync must release its destination lock.\n' >&2; exit 1; }
+mkdir -p "$source_dir/skills/semantic-search"
+printf 'search skill' > "$source_dir/skills/semantic-search/SKILL.md"
+sync_managed_destination "$source_dir" "$destination" search-off "" "" "" false false true 5 true false > /dev/null
+[ ! -e "$destination/skills/semantic-search/SKILL.md" ] || { printf 'The semantic-search skill must not be installed while retrieval is disabled.\n' >&2; exit 1; }
+sync_managed_destination "$source_dir" "$destination" search-on "" "" "" false false true 5 true true > /dev/null
+[ -f "$destination/skills/semantic-search/SKILL.md" ] || { printf 'The semantic-search skill must be installed while retrieval is enabled.\n' >&2; exit 1; }
+sync_managed_destination "$source_dir" "$destination" search-off-again "" "" "" false false true 5 true false > /dev/null
+[ ! -e "$destination/skills/semantic-search/SKILL.md" ] || { printf 'Disabling retrieval must remove the setup-owned semantic-search skill.\n' >&2; exit 1; }
+rm -r -- "$source_dir/skills/semantic-search"
 printf 'powershell other-host 1\n' > "$destination/.ai-config.lock"
 manifest_before=$(cat "$destination/.ai-config-manifest.tsv")
 if sync_managed_destination "$source_dir" "$destination" locked "" "" "" false > /dev/null 2>&1; then printf 'A held destination lock must block a parallel sync.\n' >&2; exit 1; fi

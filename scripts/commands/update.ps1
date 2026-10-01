@@ -51,7 +51,7 @@ $plugins = if ($Quick) {
 
 foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath -Shell $shell -Client $Client)) {
     Sync-ManagedDestination -Source $item.Source -Destination $item.Destination -Stamp $stamp `
-        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -FlashbangEnabled $options.flashbang -StatusLineEnabled $options.statusline -DryRun:$DryRun -Summary:$Summary
+        -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -FlashbangEnabled $options.flashbang -StatusLineEnabled $options.statusline -SemanticRetrievalEnabled $options.semantic_retrieval -DryRun:$DryRun -Summary:$Summary
 }
 
 $previousPluginNonInteractive = $script:PluginNonInteractive

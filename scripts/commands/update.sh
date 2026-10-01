@@ -63,7 +63,7 @@ fi
 while IFS='|' read -r source destination; do
   ai_config_root=$destination
   command -v cygpath >/dev/null && ai_config_root=$(cygpath -m "$destination")
-  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang" 5 "$statusline"
+  sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang" 5 "$statusline" "$semantic_retrieval"
 done < <(get_install_targets "$generated" "$home_path" "$shell" "$client")
 
 if [ "$quick" = true ]; then

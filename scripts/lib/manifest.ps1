@@ -142,6 +142,7 @@ function Sync-ManagedDestination {
         [string]$ClaudeConcurrency = '5',
         [bool]$FlashbangEnabled = $true,
         [bool]$StatusLineEnabled = $true,
+        [bool]$SemanticRetrievalEnabled = $true,
         [switch]$DryRun,
         [switch]$Summary
     )
@@ -169,6 +170,7 @@ function Invoke-ManagedSync {
         [string]$ClaudeConcurrency = '5',
         [bool]$FlashbangEnabled = $true,
         [bool]$StatusLineEnabled = $true,
+        [bool]$SemanticRetrievalEnabled = $true,
         [switch]$DryRun,
         [switch]$Summary
     )
@@ -193,6 +195,7 @@ function Invoke-ManagedSync {
         $relative = $_.FullName.Substring($Source.Length).TrimStart([char[]]@('\','/')).Replace('\','/')
         if ((Split-Path $Destination -Leaf) -eq '.codex' -and $relative.StartsWith('skills/')) { return }
         if ((Split-Path $Destination -Leaf) -eq '.claude' -and -not $StatusLineEnabled -and $relative.StartsWith('statusline/')) { return }
+        if (-not $SemanticRetrievalEnabled -and $relative -match '(^|/)semantic-search/') { return }
         $target = Resolve-ManagedPath -Destination $Destination -Relative $relative
         $rawContent = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
         $filterOptions = ((-not $FlashbangEnabled) -or (-not $StatusLineEnabled)) -and $relative -in @('settings.json', 'config.toml')
