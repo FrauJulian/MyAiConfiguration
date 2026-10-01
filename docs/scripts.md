@@ -50,6 +50,7 @@ Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
 | `tests/test-build-validation.ps1`, `tests/test-build-validation.sh` | Validate build failures and generated output. |
 | `tests/test-capabilities.ps1` | Guard PowerShell capability detection. |
 | `tests/test-install-guards.ps1`, `tests/test-install-guards.sh` | Validate install and update guard conditions. |
+| `tests/test-client-smoke.py` | Install a package into a temporary home with foreign settings and ask the installed Claude and Codex CLIs which skills, agents, and hooks they discover, without completing a model request. Skips a client whose CLI is unavailable. |
 | `tests/test-install-options.py` | Validate interactive option handling and generated manifest changes. |
 | `tests/test-managed-extensions.py` | Validate plugin, skill, and CLI ownership handling. |
 | `tests/test-managed-install.ps1`, `tests/test-managed-install.sh` | Validate managed-file synchronization and backups. |
