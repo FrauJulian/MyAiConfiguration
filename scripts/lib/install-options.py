@@ -73,18 +73,23 @@ def merge_json(current, managed):
                 groups = value.get(event, [])
                 old_groups = hooks.get(event, [])
                 if isinstance(groups, list) and isinstance(old_groups, list):
-                    retained = [group for group in old_groups if not any(
-                        re.search(r'(?:flashbang|statusline|record-compact|session-state-pointer)\.(?:ps1|sh)',
-                                  str(hook.get('command', '')) + str(hook.get('command_windows', '')), re.I)
-                        for hook in group.get('hooks', []) if isinstance(hook, dict)
-                    )]
+                    retained = []
+                    for group in old_groups:
+                        if not isinstance(group, dict) or not isinstance(group.get('hooks'), list):
+                            retained.append(group)
+                            continue
+                        foreign = [hook for hook in group['hooks'] if not (isinstance(hook, dict) and re.search(
+                            r'(?:flashbang|statusline|record-compact|session-state-pointer)\.(?:ps1|sh)',
+                            str(hook.get('command', '')) + str(hook.get('command_windows', '')), re.I))]
+                        if foreign:
+                            retained.append(dict(group, hooks=foreign))
                     merged = groups + [group for group in retained if group not in groups]
                     if merged:
                         hooks[event] = merged
                     else:
                         hooks.pop(event, None)
                 else:
-                    hooks[event] = value
+                    hooks[event] = groups
             result[key] = hooks
         elif isinstance(value, dict) and isinstance(result.get(key), dict):
             result[key] = merge_json(result[key], value)

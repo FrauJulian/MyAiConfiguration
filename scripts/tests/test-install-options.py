@@ -45,6 +45,19 @@ class InstallOptionsTests(unittest.TestCase):
         self.assertEqual(result['mcp_servers'], {'demo': {'command': 'demo', 'env': {'TOKEN_NAME': 'x'}}})
         self.assertEqual(result['model_providers'], {'custom': {'name': 'Custom', 'base_url': 'https://example.invalid'}})
 
+    def test_merge_json_removes_only_owned_hooks_from_mixed_group(self):
+        owned = {'type': 'command', 'command': 'bash "/old/hooks/flashbang.sh"', 'timeout': 8}
+        foreign = {'type': 'command', 'command': 'notify-done', 'timeout': 3}
+        current = {'hooks': {'Stop': [{'matcher': 'custom', 'hooks': [owned, foreign]}],
+                             'PreCompact': [{'hooks': [{'type': 'command', 'command': 'bash "/old/record-compact.sh"'}]}]}}
+        managed_stop = {'hooks': [{'type': 'command', 'command': 'bash "/new/hooks/flashbang.sh"', 'timeout': 8}]}
+        managed = {'hooks': {'Stop': [managed_stop], 'PreCompact': []}}
+
+        hooks = OPTIONS.merge_json(current, managed)['hooks']
+
+        self.assertEqual(hooks['Stop'], [managed_stop, {'matcher': 'custom', 'hooks': [foreign]}])
+        self.assertNotIn('PreCompact', hooks)
+
     def test_merge_cli_accepts_bom_input_and_preserves_non_ascii(self):
         with tempfile.TemporaryDirectory() as directory:
             current = Path(directory) / 'config.toml'
