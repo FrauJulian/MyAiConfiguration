@@ -9,4 +9,4 @@ Apply these rules when changing TypeScript syntax, control flow, or everyday cod
 * Use strict equality. Handle `null` and `undefined` intentionally and do not use `||` when `0`, `false`, or an empty string is a valid value.
 * Use optional chaining and nullish coalescing where they clarify behavior; avoid mixing nullish conventions without a project reason.
 * Keep naming descriptive and consistent. Avoid vague names and abbreviations unless they are established domain terms.
-* Remove dead code and unused imports. Do not add comments unless the user asks or a project rule requires them.
+* Remove dead code and unused imports. Add comments only for non-obvious decisions or public contracts.

@@ -38,7 +38,7 @@
 * Remove dead code.
 * Remove unused imports and dependencies.
 * Remove commented-out code instead of keeping it in source files.
-* Do not add comments unless the user explicitly requests them.
+* Add comments only for non-obvious decisions or public contracts.
 * Treat Angular, TypeScript and lint warnings seriously.
 * Do not suppress diagnostics without a concrete reason.
 * Prefer correctness, security and maintainability over cleverness.

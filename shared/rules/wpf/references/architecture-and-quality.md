@@ -44,7 +44,7 @@
 * Use descriptive names.
 * Remove dead code.
 * Remove commented-out code.
-* Do not add comments unless the user explicitly requests them.
+* Add comments only for non-obvious decisions or public contracts.
 * Treat compiler, analyzer and binding warnings seriously.
 * Do not suppress warnings without a concrete reason.
 * Prefer correctness, responsiveness, security and maintainability over cleverness.
