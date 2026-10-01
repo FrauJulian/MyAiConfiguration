@@ -4,6 +4,7 @@ sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
 network_access = true
+writable_roots = ['__AI_CONFIG_ROOT__/../.my-ai-configuration/semantic-retrieval/data']
 
 [windows]
 sandbox = "unelevated"
