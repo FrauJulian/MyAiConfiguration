@@ -74,6 +74,9 @@ def claude_turn(prompt, cwd, arm, model, session, timeout):
                '--permission-mode', 'auto', '--allowedTools', *CLAUDE_TOOLS]
     if arm == 'baseline':
         command += ['--setting-sources', '', '--strict-mcp-config']
+    if arm == 'setup-no-search':
+        command += ['--disallowedTools', 'Skill(semantic-search)', 'Bash(*semantic-retrieval*)', 'PowerShell(*semantic-retrieval*)',
+                    '--append-system-prompt', 'The semantic-search skill and the semantic retrieval CLI are unavailable in this session.']
     if session:
         command += ['--resume', session]
     events, seconds, timed_out = run_jsonl(command, cwd, clean_env(), timeout)
@@ -120,6 +123,40 @@ def codex_turn(prompt, cwd, arm, model, session, timeout, baseline_home):
     }
 
 
+RETRIEVAL = Path.home() / '.my-ai-configuration/semantic-retrieval'
+FILLER_TOPICS = [
+    ('statement', 'download', 'Render a statement download for the export queue.'),
+    ('trial', 'banner', 'Show the trial banner text in the marketing header.'),
+    ('upload', 'progress', 'Track upload progress for the dashboard widget.'),
+    ('network', 'status', 'Describe the network status shown in the footer.'),
+    ('invoice', 'label', 'Format the invoice label printed on envelopes.'),
+    ('retry', 'hint', 'Return the retry hint shown next to a failed form field.'),
+    ('cent', 'display', 'Format a cent amount for the price badge.'),
+    ('customer', 'greeting', 'Pick the greeting for a customer newsletter.'),
+]
+
+
+def generate_filler(work, count):
+    """Write deterministic distractor modules that share vocabulary with the task prompts but not their logic."""
+    for number in range(count):
+        noun, verb, doc = FILLER_TOPICS[number % len(FILLER_TOPICS)]
+        name = f'{noun}_{verb}_{number:03d}'
+        path = work / 'app' / 'modules' / f'{name}.py'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        body = [f'def {name}(value, locale="en"):', f'    """{doc}"""', '    text = str(value).strip()',
+                f'    return f"{{locale}}:{noun}:{verb}:{{text}}"', '']
+        path.write_text('\n'.join(body), encoding='utf-8')
+    (work / 'app' / 'modules' / '__init__.py').write_text('', encoding='utf-8')
+
+
+def warm_index(work):
+    """Build the semantic index before the session, as in a repository that was searched before."""
+    server = RETRIEVAL / 'server.py'
+    if server.is_file():
+        subprocess.run([sys.executable, str(server), 'rebuild', '--root', str(work), '--data-dir', str(RETRIEVAL / 'data'),
+                        '--model-cache', str(RETRIEVAL / 'model-cache')], capture_output=True, timeout=1800)
+
+
 def check(work, task):
     hidden = work / 'bench_hidden'
     shutil.rmtree(hidden, ignore_errors=True)
@@ -152,8 +189,12 @@ def run_one(job, args):
     with tempfile.TemporaryDirectory(prefix=f'ai-bench-{task.name[:2]}-', ignore_cleanup_errors=True) as directory:
         work = Path(directory)
         shutil.copytree(task / 'repo', work, dirs_exist_ok=True)
+        if spec.get('generate', {}).get('filler_modules'):
+            generate_filler(work, spec['generate']['filler_modules'])
         for git in (['init', '-q'], ['add', '-A'], ['-c', 'user.name=bench', '-c', 'user.email=bench@example.invalid', 'commit', '-qm', 'fixture']):
             subprocess.run(['git', '-c', 'core.autocrlf=false', *git], cwd=work, check=True, timeout=60)
+        if args.warm_index and arm == 'setup':
+            warm_index(work)
         turns, prompt, session = [], spec['prompt'], None
         for round_number in range(1 + args.rework):
             if client == 'claude':
@@ -180,6 +221,8 @@ def run_one(job, args):
         'cost_usd': round(sum(turn['cost_usd'] for turn in turns), 4), 'tool_calls': sum(turn['tool_calls'] for turn in turns),
         'agents': sum(turn['agents'] for turn in turns), 'skills': [skill for turn in turns for skill in turn['skills']],
         'commands': [command for turn in turns for command in turn['commands']],
+        'searches': sum('semantic-retrieval' in command for turn in turns for command in turn['commands'])
+                    + sum(skill == 'semantic-search' for turn in turns for skill in turn['skills']),
         'timed_out': any(turn['timed_out'] for turn in turns), 'workflow_kind': spec['workflow'].get('kind'),
         'workflow_violations': workflow_violations(spec['workflow'], turns), 'check_output': '' if passed else output,
     }
@@ -209,8 +252,10 @@ def summarize(results):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0], formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     parser.add_argument('--clients', nargs='+', choices=('claude', 'codex'), default=['claude', 'codex'])
-    parser.add_argument('--arms', nargs='+', choices=('setup', 'baseline'), default=['setup', 'baseline'])
-    parser.add_argument('--tasks', nargs='+', help='task directory names (default: all)')
+    parser.add_argument('--arms', nargs='+', choices=('setup', 'baseline', 'setup-no-search'), default=['setup', 'baseline'],
+                        help='setup-no-search is the setup with the semantic-search skill and CLI blocked (Claude only)')
+    parser.add_argument('--warm-index', action='store_true', help='build the semantic index before setup-arm sessions, outside the timing')
+    parser.add_argument('--tasks', nargs='+', help='task directory names or patterns such as 11-* (default: all)')
     parser.add_argument('--repetitions', type=int, default=3)
     parser.add_argument('--first-repetition', type=int, default=1, help='number of the first repetition, to rerun selected repetitions')
     parser.add_argument('--rework', type=int, default=1, help='rework turns after a failed check')
@@ -241,7 +286,7 @@ def main():
     if 'codex' in args.clients and 'baseline' in args.arms and not (args.codex_baseline_home / 'auth.json').is_file():
         parser.error(f'Codex baseline needs a login: run CODEX_HOME="{args.codex_baseline_home}" codex login')
     jobs = [(client, arm, task, repetition) for repetition in range(args.first_repetition, args.first_repetition + args.repetitions)
-            for task in tasks for client in args.clients for arm in args.arms]
+            for task in tasks for client in args.clients for arm in args.arms if not (client == 'codex' and arm == 'setup-no-search')]
     print(f'{len(jobs)} runs -> {args.out}')
     if args.dry_run:
         for client, arm, task, repetition in jobs:
