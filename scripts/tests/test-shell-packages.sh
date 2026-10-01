@@ -56,7 +56,12 @@ for shell in powershell bash; do
     [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
     test "$(find "$package/skills" -name SKILL.md | wc -l)" -eq "$expected_skill_count"
     test ! -e "$package/skills/debugging/SKILL.md"
-    test -f "$package/skills/reviews/security-review/SKILL.md"
+    if [ "$client" = claude ]; then
+      test -f "$package/skills/security-review/SKILL.md"
+      test "$(find "$package/skills" -mindepth 3 -name SKILL.md | wc -l)" -eq 0
+    else
+      test -f "$package/skills/reviews/security-review/SKILL.md"
+    fi
     test -f "$package/skills/copywriting/SKILL.md"
     test -f "$package/skills/marketing-psychology/SKILL.md"
     test -f "$package/skills/image/SKILL.md"
@@ -96,7 +101,7 @@ for shell in powershell bash; do
     if [ "$client" = claude ]; then
       for rule_path in "${rule_paths[@]}"; do
         skill_name=$(rule_skill_name "$rule_path")
-        test -f "$package/skills/rules/$skill_name/SKILL.md"
+        test -f "$package/skills/$skill_name/SKILL.md"
       done
     fi
     printf '%s' "$doc_content" | grep -Fq 'Use the `mcporter` CLI for MCP servers this configuration registers there'
@@ -116,7 +121,7 @@ for shell in powershell bash; do
       if [ "$client" = codex ]; then
         references_dir="$package/rules/$split_rule/references"
       else
-        references_dir="$package/skills/rules/rules-$split_rule/references"
+        references_dir="$package/skills/rules-$split_rule/references"
       fi
       if [ ! -d "$references_dir" ] || [ -z "$(find "$references_dir" -maxdepth 1 -name '*.md' -print -quit)" ]; then
         printf '%s is missing reference files for %s\n' "$package" "$split_rule" >&2

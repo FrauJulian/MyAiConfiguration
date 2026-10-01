@@ -94,7 +94,18 @@ foreach ($shell in @('powershell','bash')) {
     New-Item (Join-Path $output "codex-$shell") -ItemType Directory -Force | Out-Null
     New-Item (Join-Path $output "claude-$shell") -ItemType Directory -Force | Out-Null
     Copy-Directory (Join-Path $shared 'skills') (Join-Path $output "codex-$shell/skills")
-    Copy-Directory (Join-Path $shared 'skills') (Join-Path $output "claude-$shell/skills")
+    # Claude discovers only skills/<name>/SKILL.md, so flatten the categorized source tree.
+    $claudeSkills = Join-Path $output "claude-$shell/skills"
+    New-Item $claudeSkills -ItemType Directory -Force | Out-Null
+    Get-ChildItem (Join-Path $shared 'skills') -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $claudeSkills $_.Name) -Force }
+    $claudeSkillNames = @{}
+    foreach ($skillFile in Get-ChildItem (Join-Path $shared 'skills') -File -Filter 'SKILL.md' -Recurse) {
+        $skillName = $skillFile.Directory.Name
+        if (@(Get-Content -LiteralPath $skillFile.FullName -TotalCount 6) -notcontains "name: $skillName") { throw "Skill name must match its directory: $($skillFile.FullName)" }
+        if ($claudeSkillNames.ContainsKey($skillName)) { throw "Duplicate Claude skill name: $skillName" }
+        $claudeSkillNames[$skillName] = $true
+        Copy-Directory $skillFile.DirectoryName (Join-Path $claudeSkills $skillName)
+    }
     Copy-Directory (Join-Path $shared 'rules') (Join-Path $output "codex-$shell/rules")
     Copy-Directory (Join-Path $shared 'hooks') (Join-Path $output "codex-$shell/hooks")
     Copy-Directory (Join-Path $shared 'hooks') (Join-Path $output "claude-$shell/hooks")
@@ -117,12 +128,12 @@ foreach ($shell in @('powershell','bash')) {
                 $ruleName = "rules-$($ruleDirectory.Name)-$($ruleParts -join '-')"
                 $references = $null
             }
-            if ($ruleSkills.Name -contains $ruleName) { throw "Duplicate generated rule skill name: $ruleName" }
+            if ($ruleSkills.Name -contains $ruleName -or $claudeSkillNames.ContainsKey($ruleName)) { throw "Duplicate generated rule skill name: $ruleName" }
             $ruleSkills += [pscustomobject]@{ Name = $ruleName; Body = $ruleFile.FullName; References = $references }
         }
     }
     foreach ($ruleSkill in $ruleSkills | Sort-Object Name) {
-        $skillDir = Join-Path $output "claude-$shell/skills/rules/$($ruleSkill.Name)"
+        $skillDir = Join-Path $claudeSkills $ruleSkill.Name
         New-Item $skillDir -ItemType Directory -Force | Out-Null
         $ruleContent = Get-Content $ruleSkill.Body -Raw
         $ruleTitle = (Get-Content $ruleSkill.Body | Where-Object { $_ -match '^#+\s+' } | Select-Object -First 1) -replace '^#+\s+', ''

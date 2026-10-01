@@ -79,7 +79,19 @@ done
 for shell in powershell bash; do
 mkdir -p "$output/codex-$shell" "$output/claude-$shell"
 copy_directory "$shared/skills" "$output/codex-$shell/skills"
-copy_directory "$shared/skills" "$output/claude-$shell/skills"
+# Claude discovers only skills/<name>/SKILL.md, so flatten the categorized source tree.
+claude_skills="$output/claude-$shell/skills"
+mkdir -p "$claude_skills"
+find "$shared/skills" -maxdepth 1 -type f -exec cp {} "$claude_skills"/ \;
+declare -A claude_skill_names=()
+while IFS= read -r skill_file; do
+  skill_source=$(dirname -- "$skill_file")
+  skill_name=$(basename -- "$skill_source")
+  head -n 6 "$skill_file" | grep -qx "name: $skill_name" || { printf 'Skill name must match its directory: %s\n' "$skill_file" >&2; exit 1; }
+  [ -z "${claude_skill_names[$skill_name]+x}" ] || { printf 'Duplicate Claude skill name: %s\n' "$skill_name" >&2; exit 1; }
+  claude_skill_names[$skill_name]=1
+  copy_directory "$skill_source" "$claude_skills/$skill_name"
+done < <(find "$shared/skills" -type f -name SKILL.md | sort)
 copy_directory "$shared/rules" "$output/codex-$shell/rules"
 copy_directory "$shared/hooks" "$output/codex-$shell/hooks"
 copy_directory "$shared/hooks" "$output/claude-$shell/hooks"
@@ -103,12 +115,12 @@ while IFS= read -r rule_path; do
     *.md) skill_name="rules-${rule_path%.md}"; rule_body="$shared/rules/$rule_path"; references_dir='' ;;
     *) continue ;;
   esac
-  if [[ -n "${rule_skill_names[$skill_name]:-}" ]]; then
+  if [[ -n "${rule_skill_names[$skill_name]:-}" || -n "${claude_skill_names[$skill_name]:-}" ]]; then
     printf 'Duplicate generated rule skill name: %s\n' "$skill_name" >&2
     exit 1
   fi
   rule_skill_names[$skill_name]=1
-  skill_dir="$output/claude-$shell/skills/rules/$skill_name"
+  skill_dir="$claude_skills/$skill_name"
   mkdir -p "$skill_dir"
   rule_title=$(sed -n 's/^#\{1,6\} *//p' "$rule_body" | head -n 1)
   if [ -z "$rule_title" ]; then printf 'Missing rule title in %s\n' "$rule_body" >&2; exit 1; fi

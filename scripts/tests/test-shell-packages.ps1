@@ -48,7 +48,9 @@ foreach ($shell in @('powershell','bash')) {
         if ($client -eq 'claude' -and (Get-Content (Join-Path $package 'agents/reviewer.md') -Raw) -notmatch "(?m)^tools: Read,Grep,Glob,$expectedReviewerShellTool\r?`$") { throw "Reviewer capability profile is missing in $package" }
         $expectedSkillCount = if ($client -eq 'claude') { $sourceSkillCount + $ruleSkillCount } else { $sourceSkillCount }
         if (@(Get-ChildItem "$package/skills" -Filter SKILL.md -Recurse).Count -ne $expectedSkillCount) { throw "Missing skills in $package" }
-        if ((Test-Path "$package/skills/debugging/SKILL.md") -or -not (Test-Path "$package/skills/reviews/security-review/SKILL.md") -or -not (Test-Path "$package/skills/copywriting/SKILL.md") -or -not (Test-Path "$package/skills/marketing-psychology/SKILL.md") -or -not (Test-Path "$package/skills/image/SKILL.md") -or (Test-Path "$package/skills/marketing-plan/SKILL.md") -or (Test-Path "$package/skills/social/SKILL.md")) { throw "Incorrect skill catalog in $package" }
+        $securityReview = if ($client -eq 'claude') { 'skills/security-review/SKILL.md' } else { 'skills/reviews/security-review/SKILL.md' }
+        if ($client -eq 'claude' -and @(Get-ChildItem "$package/skills" -Filter SKILL.md -Recurse | Where-Object { $_.Directory.Parent.FullName -ne (Resolve-Path "$package/skills").Path }).Count) { throw "Nested Claude skills in $package" }
+        if ((Test-Path "$package/skills/debugging/SKILL.md") -or -not (Test-Path "$package/$securityReview") -or -not (Test-Path "$package/skills/copywriting/SKILL.md") -or -not (Test-Path "$package/skills/marketing-psychology/SKILL.md") -or -not (Test-Path "$package/skills/image/SKILL.md") -or (Test-Path "$package/skills/marketing-plan/SKILL.md") -or (Test-Path "$package/skills/social/SKILL.md")) { throw "Incorrect skill catalog in $package" }
         $expected = if ($shell -eq 'powershell') { '__POWERSHELL_COMMAND__ .*flashbang.ps1' } else { 'bash .*flashbang.sh' }
         if ($content -notmatch $expected -or $content -match '__HOOK_|__POWERSHELL_HOOK_') { throw "Incorrect shell command in $package" }
         if ($shell -eq 'powershell' -and $content -match 'WindowStyle\s+Hidden') { throw "PowerShell hook hides the terminal in $package" }
@@ -76,7 +78,7 @@ foreach ($shell in @('powershell','bash')) {
         if ($docContent -notmatch [regex]::Escape('rules/security/index.md')) { throw "$package is missing common rule loading instructions." }
         if ($client -eq 'claude') {
             foreach ($ruleSource in $ruleSources) {
-                $skillPath = Join-Path $package "skills/rules/$($ruleSource.Skill)/SKILL.md"
+                $skillPath = Join-Path $package "skills/$($ruleSource.Skill)/SKILL.md"
                 if (-not (Test-Path -LiteralPath $skillPath)) { throw "$package is missing generated skill $($ruleSource.Skill)." }
             }
         }
@@ -87,7 +89,7 @@ foreach ($shell in @('powershell','bash')) {
         if ($client -eq 'codex' -and $docContent -match 'Always load and apply `rules/general\.md`') { throw "$package must not still instruct loading general.md by path" }
         if ($client -eq 'claude' -and (Test-Path (Join-Path $package 'rules/general.md'))) { throw 'Claude must not automatically load a second copy of general rules.' }
         foreach ($splitRule in @('angular','wpf','ui-ux')) {
-            $referencesDir = if ($client -eq 'codex') { Join-Path $package "rules/$splitRule/references" } else { Join-Path $package "skills/rules/rules-$splitRule/references" }
+            $referencesDir = if ($client -eq 'codex') { Join-Path $package "rules/$splitRule/references" } else { Join-Path $package "skills/rules-$splitRule/references" }
             if (-not (Test-Path $referencesDir) -or (Get-ChildItem $referencesDir -Filter '*.md').Count -eq 0) { throw "$package is missing reference files for $splitRule" }
         }
     }
