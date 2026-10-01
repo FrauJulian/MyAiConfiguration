@@ -119,6 +119,21 @@ try {
     Set-Content (Join-Path $source 'concurrency.txt') '__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__' -NoNewline
     $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'concurrency' -ClaudeConcurrency '7'
     if ((Get-Content (Join-Path $destination 'concurrency.txt') -Raw) -ne '7') { throw 'Standalone concurrency placeholder must be resolved.' }
+    if (@(Get-ChildItem -LiteralPath $destination -Filter '.ai-config-write-*' -File -Recurse).Count) { throw 'Atomic writes left a temporary file.' }
+    if (Test-Path -LiteralPath (Join-Path $destination '.ai-config.lock')) { throw 'Sync must release its destination lock.' }
+
+    $lockPath = Join-Path $destination '.ai-config.lock'
+    [System.IO.File]::WriteAllText($lockPath, "bash other-host 1`n")
+    $manifestBefore = [System.IO.File]::ReadAllText((Get-ManagedManifestPath $destination))
+    $blocked = $false
+    try { $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'locked' } catch { $blocked = $_.Exception.Message -like 'Another installation or update holds*' }
+    if (-not $blocked) { throw 'A held destination lock must block a parallel sync.' }
+    if ([System.IO.File]::ReadAllText((Get-ManagedManifestPath $destination)) -ne $manifestBefore) { throw 'A blocked sync must not write the manifest.' }
+    $exited = Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList '-NoProfile', '-Command', 'exit 0' -PassThru -WindowStyle Hidden
+    $exited.WaitForExit()
+    [System.IO.File]::WriteAllText($lockPath, "powershell $([Environment]::MachineName) $($exited.Id)`n")
+    $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'stale-lock'
+    if (Test-Path -LiteralPath $lockPath) { throw 'A stale lock from an exited process must be replaced and released.' }
 
     if ($Summary) { Write-Output 'Tests: PASS | managed install' } else { Write-Output 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free, skill migration' }
 } finally {

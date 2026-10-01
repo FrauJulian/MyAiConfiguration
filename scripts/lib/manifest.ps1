@@ -86,6 +86,26 @@ function Write-ManagedManifest {
     Write-ManagedFileAtomically -Path $ManifestPath -Bytes ((New-Object System.Text.UTF8Encoding($false)).GetBytes($content))
 }
 
+function Enter-ManagedLock {
+    param([Parameter(Mandatory=$true)][string]$Destination)
+    New-Item $Destination -ItemType Directory -Force | Out-Null
+    $lockPath = Join-Path $Destination '.ai-config.lock'
+    $owner = "powershell $([Environment]::MachineName) $PID"
+    foreach ($attempt in 1, 2) {
+        try {
+            $stream = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            try { $bytes = [System.Text.Encoding]::UTF8.GetBytes("$owner`n"); $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+            return $lockPath
+        } catch [System.IO.IOException] {
+            $holder = @(([System.IO.File]::ReadAllText($lockPath)).Trim() -split ' ')
+            # ponytail: only same-shell, same-host owners are checked for staleness; other stale locks need manual removal.
+            $stale = $attempt -eq 1 -and $holder.Count -eq 3 -and $holder[0] -eq 'powershell' -and $holder[1] -eq [Environment]::MachineName -and -not (Get-Process -Id ([int]$holder[2]) -ErrorAction SilentlyContinue)
+            if (-not $stale) { throw "Another installation or update holds $lockPath; wait for it to finish, or remove the file if no update is running." }
+            [System.IO.File]::Delete($lockPath)
+        }
+    }
+}
+
 function Invoke-InstallOptions {
     param([Parameter(Mandatory=$true)][string[]]$Arguments, [byte[]]$Managed, [Parameter(Mandatory=$true)][string]$ErrorMessage)
     # Exchange content through UTF-8 files: Windows PowerShell pipes re-encode text by console code page.
@@ -107,6 +127,30 @@ function Invoke-InstallOptions {
 }
 
 function Sync-ManagedDestination {
+    <#
+    .SYNOPSIS
+        Runs Invoke-ManagedSync while holding the destination lock, so parallel
+        installs or updates cannot interleave writes to the same destination.
+    #>
+    param(
+        [Parameter(Mandatory=$true)][string]$Source,
+        [Parameter(Mandatory=$true)][string]$Destination,
+        [Parameter(Mandatory=$true)][string]$Stamp,
+        [string]$AiConfigRoot,
+        [string]$ShellCommand,
+        [string]$PowerShellCommand,
+        [string]$ClaudeConcurrency = '5',
+        [bool]$FlashbangEnabled = $true,
+        [bool]$StatusLineEnabled = $true,
+        [switch]$DryRun,
+        [switch]$Summary
+    )
+    if ($DryRun) { return Invoke-ManagedSync @PSBoundParameters }
+    $lockPath = Enter-ManagedLock $Destination
+    try { Invoke-ManagedSync @PSBoundParameters } finally { [System.IO.File]::Delete($lockPath) }
+}
+
+function Invoke-ManagedSync {
     <#
     .SYNOPSIS
         Installs one generated source tree into a destination directory, tracking

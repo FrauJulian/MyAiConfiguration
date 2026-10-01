@@ -135,5 +135,16 @@ sync_managed_destination "${targets[0]%%|*}" "${targets[0]#*|}" skill-remove "" 
 printf '__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__' > "$source_dir/concurrency.txt"
 sync_managed_destination "$source_dir" "$destination" concurrency "" "" "" false false true 7 > /dev/null
 [ "$(cat "$destination/concurrency.txt")" = 7 ] || { printf 'Standalone concurrency placeholder must be resolved.\n' >&2; exit 1; }
+[ -z "$(find "$destination" -name '.ai-config-write.*' -print -quit)" ] || { printf 'Atomic writes left a temporary file.\n' >&2; exit 1; }
+[ ! -e "$destination/.ai-config.lock" ] || { printf 'Sync must release its destination lock.\n' >&2; exit 1; }
+printf 'powershell other-host 1\n' > "$destination/.ai-config.lock"
+manifest_before=$(cat "$destination/.ai-config-manifest.tsv")
+if sync_managed_destination "$source_dir" "$destination" locked "" "" "" false > /dev/null 2>&1; then printf 'A held destination lock must block a parallel sync.\n' >&2; exit 1; fi
+[ "$(cat "$destination/.ai-config-manifest.tsv")" = "$manifest_before" ] || { printf 'A blocked sync must not write the manifest.\n' >&2; exit 1; }
+bash -c 'exit 0' & exited_pid=$!
+wait "$exited_pid"
+printf 'bash %s %s\n' "$(uname -n)" "$exited_pid" > "$destination/.ai-config.lock"
+sync_managed_destination "$source_dir" "$destination" stale-lock "" "" "" false > /dev/null
+[ ! -e "$destination/.ai-config.lock" ] || { printf 'A stale lock from an exited process must be replaced and released.\n' >&2; exit 1; }
 
 if [ "$summary" = true ]; then printf 'Tests: PASS | managed install\n'; else printf 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free, skill migration\n'; fi

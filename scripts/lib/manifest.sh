@@ -94,8 +94,34 @@ write_managed_manifest() {
   return "$status"
 }
 
-# sync_managed_destination <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <powershell-command> <dry-run: true|false> [summary: true|false] [flashbang] [claude-concurrency] [statusline]
+# acquire_managed_lock <destination>: create <destination>/.ai-config.lock exclusively.
+acquire_managed_lock() {
+  local lock="$1/.ai-config.lock" owner holder_shell holder_host holder_pid
+  mkdir -p -- "$1"
+  owner="bash $(uname -n) $$"
+  if (set -o noclobber; printf '%s\n' "$owner" > "$lock") 2>/dev/null; then return 0; fi
+  read -r holder_shell holder_host holder_pid < "$lock" 2>/dev/null || true
+  # ponytail: only same-shell, same-host owners are checked for staleness; other stale locks need manual removal.
+  if [ "$holder_shell" = bash ] && [ "$holder_host" = "$(uname -n)" ] && [[ "$holder_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$holder_pid" 2>/dev/null; then
+    rm -f -- "$lock"
+    if (set -o noclobber; printf '%s\n' "$owner" > "$lock") 2>/dev/null; then return 0; fi
+  fi
+  printf 'Another installation or update holds %s; wait for it to finish, or remove the file if no update is running.\n' "$lock" >&2
+  return 1
+}
+
+# sync_managed_destination: same arguments as run_managed_sync; holds the destination lock unless dry-running.
 sync_managed_destination() {
+  [ "$7" != true ] || { run_managed_sync "$@"; return; }
+  acquire_managed_lock "$2" || return 1
+  local status=0
+  run_managed_sync "$@" || status=$?
+  rm -f -- "$2/.ai-config.lock"
+  return "$status"
+}
+
+# run_managed_sync <source-dir> <destination-dir> <stamp> <ai-config-root> <shell-command> <powershell-command> <dry-run: true|false> [summary: true|false] [flashbang] [claude-concurrency] [statusline]
+run_managed_sync() {
   local source=$1 destination=$2 stamp=$3 ai_config_root=$4 shell_command=$5 powershell_command=$6 dry_run=$7 summary=${8:-false} flashbang_enabled=${9:-true} claude_concurrency=${10:-5} statusline_enabled=${11:-true}
   [ "$summary" = true ] || printf 'SOURCE %s -> %s\n' "$source" "$destination"
   local manifest
