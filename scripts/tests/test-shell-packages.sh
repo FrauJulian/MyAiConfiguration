@@ -80,6 +80,8 @@ for shell in powershell bash; do
       ! grep -q 'flashbang-if-input' "$package/$file"
       ! grep -q '"async"[[:space:]]*:[[:space:]]*true' "$package/$file"
       grep -q '"defaultMode"[[:space:]]*:[[:space:]]*"auto"' "$package/$file"
+      grep -q '"CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS"[[:space:]]*:[[:space:]]*"5"' "$package/$file"
+      grep -q '"CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH"[[:space:]]*:[[:space:]]*"1"' "$package/$file"
       python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); expected={"enabled": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True, "network": {"allowedDomains": ["mcp.context7.com"]}} if sys.argv[2] == "true" else {"enabled": False}; assert settings["sandbox"] == expected' "$package/$file" "$sandbox_supported"
       statusline_extension='sh'
       [ "$shell" != powershell ] || statusline_extension=ps1

@@ -62,6 +62,8 @@ foreach ($shell in @('powershell','bash')) {
             throw "Claude finish hook is incorrect in $package"
         } elseif ($content -notmatch '"defaultMode"\s*:\s*"auto"') {
             throw "Claude auto permission mode is missing in $package"
+        } elseif ($settings.env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS -ne '5' -or $settings.env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH -ne '1') {
+            throw "Claude subagent limits are missing in $package"
         } elseif ($sandboxSupported -and ($settings.sandbox.enabled -ne $true -or $settings.sandbox.allowUnsandboxedCommands -ne $false -or $settings.sandbox.failIfUnavailable -ne $true -or (@($settings.sandbox.network.allowedDomains) -join ',') -ne 'mcp.context7.com' -or @($settings.sandbox.PSObject.Properties).Count -ne 4)) {
             throw "Claude strict sandbox is missing in $package"
         } elseif (-not $sandboxSupported -and ($settings.sandbox.enabled -ne $false -or @($settings.sandbox.PSObject.Properties).Count -ne 1)) {
