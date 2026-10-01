@@ -220,6 +220,10 @@ Existing `.agents/skills/backups/` content is moved there on the next install, u
 Codex `config.toml` synchronization merges setup-owned keys while retaining other root keys, extra fields in managed
 tables, plugin and marketplace tables, other unmanaged tables, and unowned array tables. The previous
 file is backed up when content changes. Claude `settings.json` synchronization retains unrelated settings and hooks.
+Every managed file, including `config.toml`, `settings.json`, and the manifest, is written to a temporary sibling
+file and then renamed over the target, so an interrupted run never leaves a partly written file. Each destination is
+locked through `.ai-config.lock` while it syncs; a parallel install or update fails instead of interleaving writes.
+A lock left by an exited process of the same shell on the same host is replaced automatically.
 Dry runs still rebuild `generated/`, but do not modify installation destinations.
 
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
