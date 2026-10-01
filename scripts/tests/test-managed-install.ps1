@@ -129,7 +129,10 @@ try {
     try { $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'locked' } catch { $blocked = $_.Exception.Message -like 'Another installation or update holds*' }
     if (-not $blocked) { throw 'A held destination lock must block a parallel sync.' }
     if ([System.IO.File]::ReadAllText((Get-ManagedManifestPath $destination)) -ne $manifestBefore) { throw 'A blocked sync must not write the manifest.' }
-    $exited = Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList '-NoProfile', '-Command', 'exit 0' -PassThru -WindowStyle Hidden
+    $exitedStart = New-Object System.Diagnostics.ProcessStartInfo((Get-Process -Id $PID).Path, '-NoProfile -Command exit 0')
+    $exitedStart.UseShellExecute = $false
+    $exitedStart.CreateNoWindow = $true
+    $exited = [System.Diagnostics.Process]::Start($exitedStart)
     $exited.WaitForExit()
     [System.IO.File]::WriteAllText($lockPath, "powershell $([Environment]::MachineName) $($exited.Id)`n")
     $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'stale-lock'
