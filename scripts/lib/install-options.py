@@ -173,18 +173,24 @@ if __name__ == '__main__':
     parser.add_argument('--current', type=Path)
     parser.add_argument('--flashbang', choices=('true', 'false'))
     parser.add_argument('--statusline', choices=('true', 'false'), default='true')
+    parser.add_argument('--managed', type=Path)
+    parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
         if args.action == 'filter':
-            print(filter_options(args.path, args.flashbang == 'true', args.statusline == 'true'), end='')
+            result = filter_options(args.path, args.flashbang == 'true', args.statusline == 'true')
         else:
+            managed = args.managed.read_text(encoding='utf-8-sig') if args.managed else sys.stdin.buffer.read().decode('utf-8-sig')
+            current = args.current.read_text(encoding='utf-8-sig')
             if args.action == 'merge-json':
-                current = json.loads(args.current.read_text(encoding='utf-8-sig'))
-                managed = json.load(sys.stdin)
-                print(json.dumps(merge_json(current, managed), indent=2, ensure_ascii=False) + '\n', end='')
+                result = json.dumps(merge_json(json.loads(current), json.loads(managed)), indent=2, ensure_ascii=False) + '\n'
             else:
-                print(merge_toml(args.current.read_text(encoding='utf-8-sig'), sys.stdin.read(), args.statusline == 'true'), end='')
+                result = merge_toml(current, managed, args.statusline == 'true')
+        if args.output:
+            args.output.write_text(result, encoding='utf-8', newline='')
+        else:
+            sys.stdout.reconfigure(encoding='utf-8')
+            print(result, end='')
     except (OSError, ValueError, KeyError) as error:
         print(f'Install options: {error}', file=sys.stderr)
         sys.exit(1)

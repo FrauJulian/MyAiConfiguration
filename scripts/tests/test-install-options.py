@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import tomllib
 import unittest
@@ -43,6 +44,21 @@ class InstallOptionsTests(unittest.TestCase):
         self.assertEqual(result['tui'], {'status_line': ['b'], 'theme': 'dark'})
         self.assertEqual(result['mcp_servers'], {'demo': {'command': 'demo', 'env': {'TOKEN_NAME': 'x'}}})
         self.assertEqual(result['model_providers'], {'custom': {'name': 'Custom', 'base_url': 'https://example.invalid'}})
+
+    def test_merge_cli_accepts_bom_input_and_preserves_non_ascii(self):
+        with tempfile.TemporaryDirectory() as directory:
+            current = Path(directory) / 'config.toml'
+            current.write_text('# Größe\n[mcp_servers.demo]\ncommand = "ä"\n', encoding='utf-8')
+            output = Path(directory) / 'out.toml'
+            script = str(ROOT / 'scripts/lib/install-options.py')
+            managed = '﻿model = "new"\n'.encode('utf-8')
+            piped = subprocess.run([sys.executable, script, 'merge-toml', '--current', str(current), '--output', str(output)], input=managed)
+            self.assertEqual(piped.returncode, 0)
+            self.assertEqual(tomllib.loads(output.read_text(encoding='utf-8'))['mcp_servers']['demo']['command'], 'ä')
+            managed_path = Path(directory) / 'managed.toml'
+            managed_path.write_bytes(managed)
+            subprocess.run([sys.executable, script, 'merge-toml', '--current', str(current), '--managed', str(managed_path), '--output', str(output)], check=True)
+            self.assertIn('# Größe', output.read_text(encoding='utf-8'))
 
     def test_filter_preserves_other_claude_hooks_and_status(self):
         with tempfile.TemporaryDirectory() as directory:

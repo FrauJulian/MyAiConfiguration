@@ -86,6 +86,26 @@ function Write-ManagedManifest {
     [System.IO.File]::WriteAllText($ManifestPath, $content, (New-Object System.Text.UTF8Encoding($false)))
 }
 
+function Invoke-InstallOptions {
+    param([Parameter(Mandatory=$true)][string[]]$Arguments, [byte[]]$Managed, [Parameter(Mandatory=$true)][string]$ErrorMessage)
+    # Exchange content through UTF-8 files: Windows PowerShell pipes re-encode text by console code page.
+    $outputPath = [System.IO.Path]::GetTempFileName()
+    $managedPath = $null
+    try {
+        if ($null -ne $Managed) {
+            $managedPath = [System.IO.Path]::GetTempFileName()
+            [System.IO.File]::WriteAllBytes($managedPath, $Managed)
+            $Arguments += @('--managed', $managedPath)
+        }
+        & python (Join-Path $PSScriptRoot 'install-options.py') @Arguments --output $outputPath
+        if ($LASTEXITCODE -ne 0) { throw $ErrorMessage }
+        return [System.IO.File]::ReadAllText($outputPath, (New-Object System.Text.UTF8Encoding($false)))
+    } finally {
+        Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
+        if ($managedPath) { Remove-Item -LiteralPath $managedPath -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 function Sync-ManagedDestination {
     <#
     .SYNOPSIS
@@ -135,8 +155,7 @@ function Sync-ManagedDestination {
         if ($filterOptions) {
             $flashbangOption = if ($FlashbangEnabled) { 'true' } else { 'false' }
             $statusLineOption = if ($StatusLineEnabled) { 'true' } else { 'false' }
-            $rawContent = (& python (Join-Path $PSScriptRoot 'install-options.py') filter --path $_.FullName --flashbang $flashbangOption --statusline $statusLineOption | Out-String)
-            if ($LASTEXITCODE -ne 0) { throw 'Could not configure install options.' }
+            $rawContent = Invoke-InstallOptions -Arguments @('filter', '--path', $_.FullName, '--flashbang', $flashbangOption, '--statusline', $statusLineOption) -ErrorMessage 'Could not configure install options.'
         }
         $needsSubstitution = $filterOptions -or $rawContent.Contains('__AI_CONFIG_ROOT__') -or $rawContent.Contains('__HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_COMMAND__') -or $rawContent.Contains('__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__')
         if ($needsSubstitution) {
@@ -147,13 +166,11 @@ function Sync-ManagedDestination {
         }
         if ($relative -eq 'config.toml' -and (Test-Path -LiteralPath $target)) {
             $statusLineFlag = if ($StatusLineEnabled) { 'true' } else { 'false' }
-            $content = [System.Text.Encoding]::UTF8.GetString($newBytes) | & python (Join-Path $PSScriptRoot 'install-options.py') merge-toml --current $target --statusline $statusLineFlag | Out-String
-            if ($LASTEXITCODE -ne 0) { throw 'Could not merge managed config.toml keys.' }
+            $content = Invoke-InstallOptions -Arguments @('merge-toml', '--current', $target, '--statusline', $statusLineFlag) -Managed $newBytes -ErrorMessage 'Could not merge managed config.toml keys.'
             $newBytes = [System.Text.Encoding]::UTF8.GetBytes($content)
         }
         if ($relative -eq 'settings.json' -and (Test-Path -LiteralPath $target)) {
-            $finalContent = [System.Text.Encoding]::UTF8.GetString($newBytes) | & python (Join-Path $PSScriptRoot 'install-options.py') merge-json --current $target | Out-String
-            if ($LASTEXITCODE -ne 0) { throw 'Could not merge managed settings.json keys.' }
+            $finalContent = Invoke-InstallOptions -Arguments @('merge-json', '--current', $target) -Managed $newBytes -ErrorMessage 'Could not merge managed settings.json keys.'
             $newBytes = [System.Text.Encoding]::UTF8.GetBytes($finalContent)
         }
         $newHash = Get-Sha256HashOfBytes $newBytes
