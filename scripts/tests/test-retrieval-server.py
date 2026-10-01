@@ -133,6 +133,10 @@ class RetrievalServerTests(unittest.TestCase):
                 self.assertNotEqual(MODULE.daemon_address(data_dir), old_address)
                 self.assertNotEqual(MODULE.daemon_lock_path(data_dir), old_lock)
 
+    def test_query_prompt_matches_qwen_format(self):
+        self.assertTrue(MODULE.QUERY_PROMPT.startswith('Instruct: '))
+        self.assertTrue(MODULE.QUERY_PROMPT.endswith('\nQuery:'))
+
     def test_preferred_device_uses_cuda_with_cpu_fallback(self):
         with patch.dict('sys.modules', torch=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))):
             self.assertEqual(MODULE.preferred_device(), 'cuda')

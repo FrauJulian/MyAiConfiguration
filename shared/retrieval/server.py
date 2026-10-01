@@ -36,6 +36,8 @@ CLI_TIMEOUT_SECONDS = 300
 RRF_K = 60
 INDEX_VERSION = 3
 RETRIEVAL_INSTRUCTION = "Given a codebase question, retrieve relevant code and documentation that answer the question."
+# Qwen3-Embedding query format from the model card: no space after "Query:".
+QUERY_PROMPT = f"Instruct: {RETRIEVAL_INSTRUCTION}\nQuery:"
 TEXT_EXTENSIONS = {".c", ".cjs", ".cpp", ".cs", ".csproj", ".css", ".go", ".gradle", ".html", ".java", ".js", ".json", ".jsx", ".kt", ".kts",
                    ".md", ".mjs", ".props", ".ps1", ".psm1", ".py", ".razor", ".rs", ".scss", ".sh", ".sql", ".targets", ".toml", ".ts",
                    ".tsx", ".txt", ".xaml", ".xml", ".yaml", ".yml"}
@@ -201,8 +203,7 @@ def shared_encoder():
         if _shared_encoder is None:
             from sentence_transformers import SentenceTransformer
             _shared_encoder = SentenceTransformer(MODEL, revision=MODEL_REVISION, truncate_dim=EMBEDDING_DIMENSIONS,
-                                                   prompts={"query": f"Instruct: {RETRIEVAL_INSTRUCTION}\nQuery: "},
-                                                   device=preferred_device())
+                                                   prompts={"query": QUERY_PROMPT}, device=preferred_device())
         return _shared_encoder
 
 
@@ -522,7 +523,7 @@ class Index:
     def cache_key(self, query: str, top_k: int):
         identity = json.dumps([
             query, top_k,
-            RERANKER_MODEL, RERANKER_MODEL_REVISION, RETRIEVAL_INSTRUCTION,
+            RERANKER_MODEL, RERANKER_MODEL_REVISION, RETRIEVAL_INSTRUCTION, QUERY_PROMPT,
             DENSE_CANDIDATES, LEXICAL_CANDIDATES, RERANK_CANDIDATES, FINAL_RESULTS, RRF_K,
         ], ensure_ascii=False, separators=(",", ":"))
         return hashlib.sha256(identity.encode("utf-8")).hexdigest()
