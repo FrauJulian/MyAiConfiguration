@@ -76,6 +76,12 @@ write_managed_file() {
   { cat -- "$content_file" > "$temporary" && chmod "$mode" "$temporary" && mv -f -- "$temporary" "$target"; } || { rm -f -- "$temporary"; return 1; }
 }
 
+# json_string <value>: print value as a JSON string. Managed paths and stamps never contain control characters.
+json_string() {
+  local value=${1//\\/\\\\}
+  printf '"%s"' "${value//\"/\\\"}"
+}
+
 # write_managed_manifest <manifest-file> <assoc-array-name>
 write_managed_manifest() {
   local path=$1 content
@@ -133,6 +139,52 @@ run_managed_sync() {
   local created=0 updated=0 unchanged=0 removed=0 warned=0
   local backup_root old_backup_root
   backup_root=$(managed_backup_root "$destination") || return 1
+  local journal
+  journal=$(managed_target "$destination" '.ai-config-transaction.json') || return 1
+  if [ -f "$journal" ]; then
+    # An earlier run was interrupted after it started writing; undo its changes before syncing.
+    local entries entry entry_action entry_path entry_backup entry_hash entry_target
+    local -a journal_lines
+    # One stamp line, then one unit-separated line per file (an empty field must survive read).
+    entries=$(python3 -c '
+import json, sys
+journal = json.load(open(sys.argv[1], encoding="utf-8-sig"))
+lines = [str(journal["stamp"])]
+for entry in journal.get("files") or []:
+    lines.append("\x1f".join([entry["action"], entry["path"], entry.get("backup", ""), entry.get("sha256", "")]))
+sys.stdout.buffer.write(("\n".join(lines) + "\n").encode("utf-8"))
+' "$journal") || { printf 'Could not read transaction journal %s\n' "$journal" >&2; return 1; }
+    mapfile -t journal_lines <<< "$entries"
+    if [ "$dry_run" = true ]; then
+      printf 'DRYRUN ROLLBACK %s %s\n' "$destination" "${journal_lines[0]}"
+    else
+      for entry in "${journal_lines[@]:1}"; do
+        IFS=$'\x1f' read -r entry_action entry_path entry_backup entry_hash <<< "$entry"
+        entry_target=$(managed_target "$destination" "$entry_path") || return 1
+        case "$entry_action" in
+          create)
+            [ -f "$entry_target" ] || continue
+            if [ "$(sha256_of_file "$entry_target")" = "$(printf '%s' "$entry_hash" | tr '[:upper:]' '[:lower:]')" ]; then
+              rm -f -- "$entry_target"
+            else
+              printf 'WARN %s was created by an interrupted run and has changed since; it was left in place.\n' "$entry_target"
+              warned=$((warned + 1))
+            fi
+            ;;
+          update|remove)
+            # A missing backup means the interrupted run never reached this file.
+            entry_backup=$(managed_target "$backup_root" "$entry_backup") || return 1
+            [ -f "$entry_backup" ] || continue
+            mkdir -p -- "$(dirname -- "$entry_target")"
+            write_managed_file "$entry_target" "$entry_backup" "$entry_backup" || return 1
+            ;;
+          *) printf 'Invalid transaction journal action in %s: %s\n' "$journal" "$entry_action" >&2; return 1 ;;
+        esac
+      done
+      printf 'ROLLBACK %s %s\n' "$destination" "${journal_lines[0]}"
+      rm -f -- "$journal"
+    fi
+  fi
   old_backup_root=$(managed_target "$destination" backups) || return 1
   if [ "$backup_root" != "$old_backup_root" ] && [ -e "$old_backup_root" ]; then
     if [ "$dry_run" = true ]; then
@@ -146,6 +198,8 @@ run_managed_sync() {
     fi
   fi
 
+  # Plan every change before writing anything, so the journal can describe the whole run.
+  local -a plan_relative=() plan_target=() plan_action=() plan_hash=() plan_source=() plan_sub=() plan_content=()
   while IFS= read -r -d '' source_file; do
     local relative target content needs_sub new_hash exists current_hash action backup
     relative=${source_file#"$source/"}
@@ -186,47 +240,15 @@ run_managed_sync() {
     fi
     new_manifest[$relative]=$new_hash
 
-    exists=false
-    [ -f "$target" ] && exists=true
-    if [ "$exists" = true ]; then
-      current_hash=$(sha256_of_file "$target")
-      if [ "$current_hash" = "$new_hash" ]; then
-        unchanged=$((unchanged + 1))
-        [ "$summary" = true ] || printf 'UNCHANGED %s\n' "$target"
-        continue
-      fi
+    action=CREATE
+    if [ -f "$target" ]; then
       action=UPDATE
-    else
-      action=CREATE
+      current_hash=$(sha256_of_file "$target")
+      [ "$current_hash" != "$new_hash" ] || action=UNCHANGED
     fi
-
-    if [ "$dry_run" = true ]; then
-      [ "$summary" = true ] || printf 'DRYRUN %s %s\n' "$action" "$target"
-      [ "$action" = CREATE ] && created=$((created + 1)) || updated=$((updated + 1))
-      continue
-    fi
-
-    if [ "$exists" = true ]; then
-      backup=$(managed_target "$backup_root" "$stamp/$relative") || return 1
-      mkdir -p "$(dirname -- "$backup")"
-      cp -- "$target" "$backup"
-      [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"
-      if [ -z "${old_manifest[$relative]+x}" ]; then
-        printf 'WARN %s existed before this installation but was not tracked by a previous run; it was backed up before being overwritten.\n' "$target"
-        warned=$((warned + 1))
-      fi
-    fi
-    mkdir -p "$(dirname -- "$target")"
-    if [ "$needs_sub" = true ]; then
-      local rendered
-      rendered=$(mktemp) || return 1
-      printf '%s' "$content" > "$rendered" && write_managed_file "$target" "$rendered" "$source_file" || { rm -f -- "$rendered"; return 1; }
-      rm -f -- "$rendered"
-    else
-      write_managed_file "$target" "$source_file" "$source_file" || return 1
-    fi
-    [ "$summary" = true ] || printf '%s %s\n' "$action" "$target"
-    [ "$action" = CREATE ] && created=$((created + 1)) || updated=$((updated + 1))
+    [ "$needs_sub" = true ] || content=''
+    plan_relative+=("$relative"); plan_target+=("$target"); plan_action+=("$action"); plan_hash+=("$new_hash")
+    plan_source+=("$source_file"); plan_sub+=("$needs_sub"); plan_content+=("$content")
   done < <(find "$source" -type f -print0)
 
   local relative target current_hash backup
@@ -234,27 +256,91 @@ run_managed_sync() {
     [ -z "${new_manifest[$relative]+x}" ] || continue
     target=$(managed_target "$destination" "$relative") || return 1
     [ -f "$target" ] || continue
-    if [ "$dry_run" = true ]; then
-      [ "$summary" = true ] || printf 'DRYRUN REMOVE %s\n' "$target"
-      removed=$((removed + 1))
-      continue
-    fi
-    backup=$(managed_target "$backup_root" "$stamp/$relative") || return 1
-    mkdir -p "$(dirname -- "$backup")"
-    cp -- "$target" "$backup"
-    [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"
-    current_hash=$(sha256_of_file "$target")
-    if [ "$current_hash" = "${old_manifest[$relative]}" ]; then
-      rm -f -- "$target"
-      [ "$summary" = true ] || printf 'REMOVE %s\n' "$target"
-      removed=$((removed + 1))
-    else
-      printf 'WARN %s was managed by a previous installation and has changed locally; it was backed up but left in place instead of being removed.\n' "$target"
-      warned=$((warned + 1))
-    fi
+    # A stale file changed locally is backed up but kept; only an unmodified one is removed.
+    action=KEEP
+    [ "$(sha256_of_file "$target")" != "${old_manifest[$relative]}" ] || action=REMOVE
+    plan_relative+=("$relative"); plan_target+=("$target"); plan_action+=("$action"); plan_hash+=('')
+    plan_source+=(''); plan_sub+=(false); plan_content+=('')
   done
 
-  if [ "$dry_run" != true ]; then write_managed_manifest "$manifest" new_manifest || return 1; fi
+  local index entry journal_content first_entry=true
+  if [ "$dry_run" != true ]; then
+    journal_content=$(mktemp) || return 1
+    {
+      printf '{"stamp": %s, "files": [' "$(json_string "$stamp")"
+      for index in "${!plan_action[@]}"; do
+        case "${plan_action[$index]}" in
+          CREATE) entry=$(printf '{"path": %s, "action": "create", "sha256": "%s"}' "$(json_string "${plan_relative[$index]}")" "${plan_hash[$index]}") ;;
+          UPDATE) entry=$(printf '{"path": %s, "action": "update", "backup": %s, "sha256": "%s"}' "$(json_string "${plan_relative[$index]}")" "$(json_string "$stamp/${plan_relative[$index]}")" "${plan_hash[$index]}") ;;
+          REMOVE) entry=$(printf '{"path": %s, "action": "remove", "backup": %s}' "$(json_string "${plan_relative[$index]}")" "$(json_string "$stamp/${plan_relative[$index]}")") ;;
+          *) continue ;;
+        esac
+        [ "$first_entry" = true ] || printf ', '
+        first_entry=false
+        printf '%s' "$entry"
+      done
+      printf ']}\n'
+    } > "$journal_content" && mkdir -p -- "$destination" && write_managed_file "$journal" "$journal_content" || { rm -f -- "$journal_content"; return 1; }
+    rm -f -- "$journal_content"
+  fi
+
+  for index in "${!plan_action[@]}"; do
+    relative=${plan_relative[$index]} target=${plan_target[$index]} action=${plan_action[$index]}
+    if [ "$action" = UNCHANGED ]; then
+      unchanged=$((unchanged + 1))
+      [ "$summary" = true ] || printf 'UNCHANGED %s\n' "$target"
+      continue
+    fi
+    if [ "$dry_run" = true ]; then
+      case "$action" in
+        REMOVE|KEEP) [ "$summary" = true ] || printf 'DRYRUN REMOVE %s\n' "$target"; removed=$((removed + 1)) ;;
+        *) [ "$summary" = true ] || printf 'DRYRUN %s %s\n' "$action" "$target"; [ "$action" = CREATE ] && created=$((created + 1)) || updated=$((updated + 1)) ;;
+      esac
+      continue
+    fi
+    if [ "$action" != CREATE ]; then
+      backup=$(managed_target "$backup_root" "$stamp/$relative") || return 1
+      mkdir -p "$(dirname -- "$backup")"
+      # Atomic, so a rollback after an interruption never restores a truncated backup.
+      write_managed_file "$backup" "$target" "$target" || return 1
+      [ "$summary" = true ] || printf 'BACKUP %s -> %s\n' "$target" "$backup"
+    fi
+    case "$action" in
+      REMOVE)
+        rm -f -- "$target"
+        [ "$summary" = true ] || printf 'REMOVE %s\n' "$target"
+        removed=$((removed + 1))
+        continue
+        ;;
+      KEEP)
+        printf 'WARN %s was managed by a previous installation and has changed locally; it was backed up but left in place instead of being removed.\n' "$target"
+        warned=$((warned + 1))
+        continue
+        ;;
+      UPDATE)
+        if [ -z "${old_manifest[$relative]+x}" ]; then
+          printf 'WARN %s existed before this installation but was not tracked by a previous run; it was backed up before being overwritten.\n' "$target"
+          warned=$((warned + 1))
+        fi
+        ;;
+    esac
+    mkdir -p "$(dirname -- "$target")"
+    if [ "${plan_sub[$index]}" = true ]; then
+      local rendered
+      rendered=$(mktemp) || return 1
+      printf '%s' "${plan_content[$index]}" > "$rendered" && write_managed_file "$target" "$rendered" "${plan_source[$index]}" || { rm -f -- "$rendered"; return 1; }
+      rm -f -- "$rendered"
+    else
+      write_managed_file "$target" "${plan_source[$index]}" "${plan_source[$index]}" || return 1
+    fi
+    [ "$summary" = true ] || printf '%s %s\n' "$action" "$target"
+    [ "$action" = CREATE ] && created=$((created + 1)) || updated=$((updated + 1))
+  done
+
+  if [ "$dry_run" != true ]; then
+    write_managed_manifest "$manifest" new_manifest || return 1
+    rm -f -- "$journal"
+  fi
   if [ "$summary" = true ]; then
     printf 'SYNC %s: %s created, %s updated, %s unchanged, %s removed, %s warnings\n' "$destination" "$created" "$updated" "$unchanged" "$removed" "$warned"
   fi

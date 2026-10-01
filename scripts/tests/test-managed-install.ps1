@@ -150,7 +150,47 @@ try {
     $null = Sync-ManagedDestination -Source $source -Destination $destination -Stamp 'stale-lock'
     if (Test-Path -LiteralPath $lockPath) { throw 'A stale lock from an exited process must be replaced and released.' }
 
-    if ($Summary) { Write-Output 'Tests: PASS | managed install' } else { Write-Output 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free, skill migration' }
+    if (Test-Path -LiteralPath (Join-Path $destination '.ai-config-transaction.json')) { throw 'A completed sync must delete its transaction journal.' }
+    if ([System.IO.File]::ReadAllText((Get-ManagedManifestPath $destination)).Contains('.ai-config-transaction')) { throw 'The transaction journal must never be listed in the manifest.' }
+
+    # Simulate a run with stamp tx2 interrupted after it updated keep.md, removed gone.md, and created new.md and edited.md.
+    $txSource = Join-Path $work 'tx-source'
+    $txDestination = Join-Path $work 'tx-destination'
+    New-Item $txSource -ItemType Directory -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $txSource 'keep.md'), 'v1')
+    [System.IO.File]::WriteAllText((Join-Path $txSource 'gone.md'), 'G')
+    $null = Sync-ManagedDestination -Source $txSource -Destination $txDestination -Stamp 'tx1'
+    New-Item (Join-Path $txDestination 'backups/tx2') -ItemType Directory -Force | Out-Null
+    Copy-Item (Join-Path $txDestination 'keep.md') (Join-Path $txDestination 'backups/tx2/keep.md')
+    Move-Item (Join-Path $txDestination 'gone.md') (Join-Path $txDestination 'backups/tx2/gone.md')
+    [System.IO.File]::WriteAllText((Join-Path $txDestination 'keep.md'), 'v2')
+    [System.IO.File]::WriteAllText((Join-Path $txDestination 'new.md'), 'N')
+    [System.IO.File]::WriteAllText((Join-Path $txDestination 'edited.md'), 'edited by the user')
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $journalPath = Join-Path $txDestination '.ai-config-transaction.json'
+    $journal = [ordered]@{ stamp = 'tx2'; files = @(
+        [ordered]@{ path = 'keep.md'; action = 'update'; backup = 'tx2/keep.md'; sha256 = (Get-Sha256HashOfBytes $utf8.GetBytes('v2')) },
+        [ordered]@{ path = 'gone.md'; action = 'remove'; backup = 'tx2/gone.md' },
+        [ordered]@{ path = 'new.md'; action = 'create'; sha256 = (Get-Sha256HashOfBytes $utf8.GetBytes('N')) },
+        [ordered]@{ path = 'edited.md'; action = 'create'; sha256 = (Get-Sha256HashOfBytes $utf8.GetBytes('E')) },
+        [ordered]@{ path = 'unreached.md'; action = 'update'; backup = 'tx2/unreached.md'; sha256 = ('0' * 64) }
+    ) }
+    [System.IO.File]::WriteAllText($journalPath, (ConvertTo-Json -InputObject $journal -Depth 4))
+    $outTxDry = @(Sync-ManagedDestination -Source $txSource -Destination $txDestination -Stamp 'tx-dry' -DryRun)
+    if (@($outTxDry | Where-Object { $_ -eq "DRYRUN ROLLBACK $txDestination tx2" }).Count -ne 1) { throw "Dry run must report the pending rollback: $($outTxDry -join '; ')" }
+    if (-not (Test-Path -LiteralPath $journalPath) -or [System.IO.File]::ReadAllText((Join-Path $txDestination 'keep.md')) -ne 'v2') { throw 'Dry run must not roll back.' }
+    $outTx = @(Sync-ManagedDestination -Source $txSource -Destination $txDestination -Stamp 'tx3')
+    if (@($outTx | Where-Object { $_ -eq "ROLLBACK $txDestination tx2" }).Count -ne 1) { throw "Expected a ROLLBACK line: $($outTx -join '; ')" }
+    if (@($outTx | Where-Object { $_ -match '^WARN .*edited\.md' }).Count -ne 1) { throw "A created file changed since the interruption must be reported: $($outTx -join '; ')" }
+    if ([System.IO.File]::ReadAllText((Join-Path $txDestination 'keep.md')) -ne 'v1') { throw 'Rollback must restore an updated file from its backup.' }
+    if ([System.IO.File]::ReadAllText((Join-Path $txDestination 'gone.md')) -ne 'G') { throw 'Rollback must restore a removed file from its backup.' }
+    if (Test-Path -LiteralPath (Join-Path $txDestination 'new.md')) { throw 'Rollback must delete a file the interrupted run created.' }
+    if ([System.IO.File]::ReadAllText((Join-Path $txDestination 'edited.md')) -ne 'edited by the user') { throw 'Rollback must keep a created file that changed since.' }
+    if (Test-Path -LiteralPath (Join-Path $txDestination 'unreached.md')) { throw 'Rollback must skip entries the interrupted run never reached.' }
+    if (Test-Path -LiteralPath $journalPath) { throw 'Rollback must delete the journal.' }
+    if (@($outTx | Where-Object { $_ -notlike 'UNCHANGED*' -and $_ -notlike 'SOURCE *' -and $_ -notlike 'ROLLBACK *' -and $_ -notlike 'WARN *' }).Count -ne 0) { throw "The sync after a rollback must find the prior state: $($outTx -join '; ')" }
+
+    if ($Summary) { Write-Output 'Tests: PASS | managed install' } else { Write-Output 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free, skill migration, interrupted-run rollback' }
 } finally {
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 }

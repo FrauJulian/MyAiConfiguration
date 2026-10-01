@@ -155,5 +155,44 @@ wait "$exited_pid"
 printf 'bash %s %s\n' "$(uname -n)" "$exited_pid" > "$destination/.ai-config.lock"
 sync_managed_destination "$source_dir" "$destination" stale-lock "" "" "" false > /dev/null
 [ ! -e "$destination/.ai-config.lock" ] || { printf 'A stale lock from an exited process must be replaced and released.\n' >&2; exit 1; }
+[ ! -e "$destination/.ai-config-transaction.json" ] || { printf 'A completed sync must delete its transaction journal.\n' >&2; exit 1; }
+! grep -q 'ai-config-transaction' "$destination/.ai-config-manifest.tsv" || { printf 'The transaction journal must never be listed in the manifest.\n' >&2; exit 1; }
 
-if [ "$summary" = true ]; then printf 'Tests: PASS | managed install\n'; else printf 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free, skill migration\n'; fi
+# Simulate a run with stamp tx2 interrupted after it updated keep.md, removed gone.md, and created new.md and edited.md.
+tx_source="$work/tx-source"
+tx_destination="$work/tx-destination"
+mkdir -p "$tx_source"
+printf 'v1' > "$tx_source/keep.md"
+printf 'G' > "$tx_source/gone.md"
+sync_managed_destination "$tx_source" "$tx_destination" tx1 "" "" "" false > /dev/null
+mkdir -p "$tx_destination/backups/tx2"
+cp "$tx_destination/keep.md" "$tx_destination/backups/tx2/keep.md"
+mv "$tx_destination/gone.md" "$tx_destination/backups/tx2/gone.md"
+printf 'v2' > "$tx_destination/keep.md"
+printf 'N' > "$tx_destination/new.md"
+printf 'edited by the user' > "$tx_destination/edited.md"
+journal="$tx_destination/.ai-config-transaction.json"
+cat > "$journal" <<EOF
+{"stamp": "tx2", "files": [
+  {"path": "keep.md", "action": "update", "backup": "tx2/keep.md", "sha256": "$(sha256_of_string v2)"},
+  {"path": "gone.md", "action": "remove", "backup": "tx2/gone.md"},
+  {"path": "new.md", "action": "create", "sha256": "$(sha256_of_string N)"},
+  {"path": "edited.md", "action": "create", "sha256": "$(sha256_of_string E)"},
+  {"path": "unreached.md", "action": "update", "backup": "tx2/unreached.md", "sha256": "$(printf '0%.0s' {1..64})"}
+]}
+EOF
+out_tx_dry=$(sync_managed_destination "$tx_source" "$tx_destination" tx-dry "" "" "" true)
+printf '%s\n' "$out_tx_dry" | grep -qx "DRYRUN ROLLBACK $tx_destination tx2" || { printf 'Dry run must report the pending rollback:\n%s\n' "$out_tx_dry" >&2; exit 1; }
+[ -f "$journal" ] && [ "$(cat "$tx_destination/keep.md")" = v2 ] || { printf 'Dry run must not roll back.\n' >&2; exit 1; }
+out_tx=$(sync_managed_destination "$tx_source" "$tx_destination" tx3 "" "" "" false)
+printf '%s\n' "$out_tx" | grep -qx "ROLLBACK $tx_destination tx2" || { printf 'Expected a ROLLBACK line:\n%s\n' "$out_tx" >&2; exit 1; }
+[ "$(printf '%s\n' "$out_tx" | grep -c '^WARN .*edited\.md')" -eq 1 ] || { printf 'A created file changed since the interruption must be reported:\n%s\n' "$out_tx" >&2; exit 1; }
+[ "$(cat "$tx_destination/keep.md")" = v1 ] || { printf 'Rollback must restore an updated file from its backup.\n' >&2; exit 1; }
+[ "$(cat "$tx_destination/gone.md")" = G ] || { printf 'Rollback must restore a removed file from its backup.\n' >&2; exit 1; }
+[ ! -e "$tx_destination/new.md" ] || { printf 'Rollback must delete a file the interrupted run created.\n' >&2; exit 1; }
+[ "$(cat "$tx_destination/edited.md")" = 'edited by the user' ] || { printf 'Rollback must keep a created file that changed since.\n' >&2; exit 1; }
+[ ! -e "$tx_destination/unreached.md" ] || { printf 'Rollback must skip entries the interrupted run never reached.\n' >&2; exit 1; }
+[ ! -e "$journal" ] || { printf 'Rollback must delete the journal.\n' >&2; exit 1; }
+[ -z "$(printf '%s\n' "$out_tx" | grep -Ev '^(UNCHANGED|SOURCE|ROLLBACK|WARN) ')" ] || { printf 'The sync after a rollback must find the prior state:\n%s\n' "$out_tx" >&2; exit 1; }
+
+if [ "$summary" = true ]; then printf 'Tests: PASS | managed install\n'; else printf 'PASS managed manifest: idempotent, stale removal, modified-file protection, foreign files preserved, dry run side-effect free, skill migration, interrupted-run rollback\n'; fi
