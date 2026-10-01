@@ -1,0 +1,9 @@
+{
+  "prompt": "Uploads that fail with a temporary network error are never retried. Make at most three attempts in total before giving up with the last error; other errors must not be retried.",
+  "generate": {
+    "filler_modules": 250
+  },
+  "workflow": {
+    "kind": "concept search in a large repository"
+  }
+}
