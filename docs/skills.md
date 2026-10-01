@@ -4,16 +4,17 @@ Skills are reusable workflows. Rules are persistent constraints and agents are s
 
 The current structure is organized by purpose:
 
-- `debugging/`
-- `planning/`: implementation planning, impact analysis, and work-item definition
+- `planning/`: impact analysis and work-item definition
 - `research/`: technical and repository research
-- `reviews/`: code, security, performance, WPF, UI/UX, business, API, and EF Core reviews
+- `reviews/`: security, performance, WPF, UI/UX, business, API, and EF Core reviews
 - `implementation/`: SQL, unit-test, and integration-test writing
-- `verification/`: facts, work-item, and regression verification
+- `verification/`: facts and work-item verification
 - `git/`: pull request reviews
 - `content-strategy/`, `copy-editing/`, `copywriting/`: planning, editing, and writing text
 - `image/`, `site-architecture/`: visuals and website structure
 - `marketing-psychology/`, `offers/`, `product-marketing/`, `cro/`: audience understanding, value framing, and conversion
+
+General planning, debugging, code review, and completion verification workflows come from Superpowers, so the catalog does not duplicate their triggers. The remaining skills cover focused domains Superpowers does not.
 
 Each skill defines a focused workflow with the investigation, decision points, and output expected for that task. Keep guidance specific to the skill; shared repository constraints belong in the rules.
 
