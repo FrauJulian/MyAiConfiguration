@@ -55,7 +55,8 @@ for shell in powershell bash; do
     expected_skill_count=$source_skill_count
     [ "$client" != claude ] || expected_skill_count=$((source_skill_count + rule_skill_count))
     test "$(find "$package/skills" -name SKILL.md | wc -l)" -eq "$expected_skill_count"
-    test -f "$package/skills/debugging/SKILL.md"
+    test ! -e "$package/skills/debugging/SKILL.md"
+    test -f "$package/skills/reviews/security-review/SKILL.md"
     test -f "$package/skills/copywriting/SKILL.md"
     test -f "$package/skills/marketing-psychology/SKILL.md"
     test -f "$package/skills/image/SKILL.md"
