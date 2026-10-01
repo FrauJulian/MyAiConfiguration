@@ -24,7 +24,7 @@ case "$platform" in
     ;;
 esac
 sandbox='{"enabled": false}'
-[ "$sandbox_supported" != true ] || sandbox='{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}'
+[ "$sandbox_supported" != true ] || sandbox='{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true, "network": {"allowedDomains": ["mcp.context7.com"]}}'
 plugin_manifest="$root/adapters/plugins.tsv"
 capability_manifest="$root/adapters/claude/capabilities.tsv"
 

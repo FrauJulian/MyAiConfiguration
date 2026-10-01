@@ -9,7 +9,7 @@ if ($sandboxSupported) {
     $kernel = (& uname -r 2>$null | Out-String).Trim()
     if ($kernel -match '(?i)microsoft') { $sandboxSupported = $kernel -match '(?i)microsoft-standard-WSL2' }
 }
-$claudeSandbox = if ($sandboxSupported) { '{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}' } else { '{"enabled": false}' }
+$claudeSandbox = if ($sandboxSupported) { '{"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true, "network": {"allowedDomains": ["mcp.context7.com"]}}' } else { '{"enabled": false}' }
 $pluginManifest = Join-Path $root 'adapters/plugins.tsv'
 $capabilityManifest = Join-Path $root 'adapters/claude/capabilities.tsv'
 

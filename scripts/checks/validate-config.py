@@ -11,7 +11,7 @@ from pathlib import Path
 
 CLAUDE_TOP_LEVEL = {"permissions", "sandbox", "env", "statusLine", "hooks"}
 CLAUDE_PERMISSION_KEYS = {"defaultMode", "allow", "deny"}
-CLAUDE_SANDBOX_KEYS = {"enabled", "allowUnsandboxedCommands", "failIfUnavailable"}
+CLAUDE_SANDBOX_KEYS = {"enabled", "allowUnsandboxedCommands", "failIfUnavailable", "network"}
 CLAUDE_STATUS_LINE_KEYS = {"type", "command"}
 CLAUDE_HOOK_KEYS = {"type", "command", "timeout"}
 CLAUDE_PERMISSION_MODES = {"acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"}
@@ -40,7 +40,8 @@ def validate_claude(path: Path) -> None:
         if not isinstance(permissions.get(key), list) or not all(isinstance(item, str) for item in permissions[key]):
             fail(f"permissions.{key} must be an array of strings")
     sandbox = require_keys(settings.get("sandbox"), CLAUDE_SANDBOX_KEYS, "sandbox")
-    if sandbox != {"enabled": False} and sandbox != {"enabled": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True}:
+    if sandbox != {"enabled": False} and sandbox != {"enabled": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True,
+                                                   "network": {"allowedDomains": ["mcp.context7.com"]}}:
         fail("sandbox must be disabled or enabled with fail-closed settings")
     env = settings.get("env")
     if not isinstance(env, dict) or not all(isinstance(key, str) and isinstance(value, str) for key, value in env.items()):
