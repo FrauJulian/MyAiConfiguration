@@ -81,3 +81,26 @@ For each major piece, produce:
 - **social** — atomization/repurposing workflows and platform-native execution
 - **emails** — the owned channel that converts distributed attention
 - **ai-seo** — making owned content citable by LLMs (another distribution surface)
+
+---
+
+## Skill Overview: Create Once, Distribute Twice
+
+Creating content is half the job—distribution is the other half, and most teams skip it. The philosophy: **one exceptional piece, reformatted and repurposed across every channel, not a fresh piece per platform.** Pouring effort into a single flagship and then distributing it everywhere beats spreading thin effort across many mediocre platform-native posts.
+
+Build **distribution hooks into the piece at creation time**, not after: write subheads that stand alone as social posts, structure sections to be lifted out modularly, and pull quotes/stats you already know you'll graphic-ify. A well-designed guide is a distribution kit in disguise.
+
+**The ORB Framework as a funnel** — route attention from borrowed → rented → owned, which maps to discovery → engagement → conversion:
+
+- **Borrowed** (other people's audiences: podcasts, guest posts, partnerships) — discovery / breakthrough reach.
+- **Rented** (social platforms, ad networks) — engagement, but you don't own the audience or the algorithm.
+- **Owned** (email list, blog, community) — conversion and the only durable asset. Everything upstream should funnel here.
+
+This skill covers the distribution side of content strategy.
+
+**Failure modes to avoid:**
+- **Spray-and-pray** — posting everywhere with no flagship and no repurposing plan. Effort scatters, nothing compounds.
+- **Platform dependency** — building on rented land. Facebook organic reach fell from ~20% to under 2%; any rented channel can throttle you overnight.
+- **The ownership paradox** — teams spend ~90% of effort on channels they don't control (rented/borrowed) and neglect the owned assets that actually convert and can't be taken away.
+
+For the full distribution spine—the Content Distribution Flywheel, platform half-lives, and the atomization checklist—see the sections above in this file.
