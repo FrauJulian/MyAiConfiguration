@@ -1,0 +1,13 @@
+{
+  "prompt": "mergeConfig() drops nested settings from the base configuration when the override sets only some keys of a nested object. Merge nested objects deeply; arrays from the override replace base arrays, and neither input may be mutated.",
+  "check": [
+    "node",
+    "--experimental-strip-types",
+    "--no-warnings",
+    "--test",
+    "bench_hidden/check.test.ts"
+  ],
+  "workflow": {
+    "kind": "TypeScript change"
+  }
+}

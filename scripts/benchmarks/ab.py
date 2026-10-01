@@ -33,7 +33,8 @@ import time
 TASKS = Path(__file__).resolve().parent / 'tasks'
 CHECK = [sys.executable, '-m', 'unittest', 'discover', '-s', 'bench_hidden', '-t', '.']
 CLAUDE_TOOLS = ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'Agent', 'Skill', 'TodoWrite', 'Bash(python *)', 'Bash(git *)',
-                'Bash(ls *)', 'PowerShell(python *)', 'PowerShell(git *)', 'PowerShell(Get-ChildItem *)']
+                'Bash(ls *)', 'Bash(dotnet *)', 'Bash(node *)', 'PowerShell(python *)', 'PowerShell(git *)', 'PowerShell(Get-ChildItem *)',
+                'PowerShell(dotnet *)', 'PowerShell(node *)']
 
 
 def clean_env(**values):
@@ -308,7 +309,12 @@ def check(work, task):
     hidden = work / 'bench_hidden'
     shutil.rmtree(hidden, ignore_errors=True)
     shutil.copytree(task / 'hidden', hidden)
-    result = subprocess.run(CHECK, cwd=work, capture_output=True, text=True, timeout=300)
+    spec = json.loads((task / 'task.json').read_text(encoding='utf-8'))
+    command = CHECK
+    if spec.get('check'):
+        program, *arguments = spec['check']
+        command = [sys.executable if program == 'python' else shutil.which(program) or program, *arguments]
+    result = subprocess.run(command, cwd=work, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600)
     shutil.rmtree(hidden, ignore_errors=True)
     return result.returncode == 0, (result.stdout + result.stderr)[-3000:]
 

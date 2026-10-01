@@ -1,0 +1,13 @@
+{
+  "prompt": "POST /orders accepts orders with a zero or negative quantity and orders with an empty SKU. Reject those with HTTP 400 and a validation problem response; valid orders must still return 201.",
+  "check": [
+    "dotnet",
+    "run",
+    "--project",
+    "bench_hidden/Check",
+    "--nologo"
+  ],
+  "workflow": {
+    "kind": "C#/ASP.NET change"
+  }
+}

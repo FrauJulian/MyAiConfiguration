@@ -1,0 +1,13 @@
+{
+  "prompt": "Requesting an unknown customer with GET /customers/{id} returns HTTP 500. Return 404 instead, and keep known customers working.",
+  "check": [
+    "dotnet",
+    "run",
+    "--project",
+    "bench_hidden/Check",
+    "--nologo"
+  ],
+  "workflow": {
+    "kind": "C#/ASP.NET change"
+  }
+}

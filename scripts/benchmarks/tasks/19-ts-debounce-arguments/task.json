@@ -1,0 +1,13 @@
+{
+  "prompt": "debounce() calls the wrapped function with the arguments of the first call in a burst instead of the last one. Fix it so the trailing call uses the latest arguments.",
+  "check": [
+    "node",
+    "--experimental-strip-types",
+    "--no-warnings",
+    "--test",
+    "bench_hidden/check.test.ts"
+  ],
+  "workflow": {
+    "kind": "TypeScript change"
+  }
+}

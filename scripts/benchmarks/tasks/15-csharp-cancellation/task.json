@@ -1,0 +1,13 @@
+{
+  "prompt": "Cancelling a report build does nothing: BuildAsync keeps running until every section is rendered. Make it honor cancellation promptly by throwing OperationCanceledException.",
+  "check": [
+    "dotnet",
+    "run",
+    "--project",
+    "bench_hidden/Check",
+    "--nologo"
+  ],
+  "workflow": {
+    "kind": "C#/ASP.NET change"
+  }
+}

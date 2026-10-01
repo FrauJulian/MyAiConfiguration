@@ -1,0 +1,13 @@
+{
+  "prompt": "Back-to-back bookings, where one ends exactly when the next starts, are wrongly reported as overlapping. Fix overlaps() without breaking real overlaps.",
+  "check": [
+    "node",
+    "--experimental-strip-types",
+    "--no-warnings",
+    "--test",
+    "bench_hidden/check.test.ts"
+  ],
+  "workflow": {
+    "kind": "TypeScript change"
+  }
+}
