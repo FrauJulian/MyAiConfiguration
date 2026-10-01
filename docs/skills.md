@@ -5,7 +5,7 @@ Skills are reusable workflows. Rules are persistent constraints and agents are s
 The current structure is organized by purpose:
 
 - `planning/`: impact analysis and work-item definition
-- `research/`: technical and repository research
+- `research/`: technical and repository research, plus `semantic-search`, which is installed only while semantic retrieval is enabled
 - `reviews/`: security, performance, WPF, UI/UX, business, API, and EF Core reviews
 - `implementation/`: SQL, unit-test, and integration-test writing
 - `verification/`: facts and work-item verification
