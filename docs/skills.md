@@ -20,7 +20,7 @@ Each skill defines a focused workflow with the investigation, decision points, a
 
 The single catalog in `shared/skills/` includes development skills and focused skills for writing, images, content and site structure, positioning, psychology, and conversion. Builds include every retained skill for both clients. Updating a managed installation backs up and removes unchanged setup-owned skills deleted from the catalog; local changes are backed up and retained.
 
-Claude's generated package additionally has `skills/rules/`: one skill per focused rule file or directory in
+Claude discovers only `skills/<name>/SKILL.md`, so its generated package flattens the categorized catalog to one directory per skill name, together with the skill's `references/`; the build fails on duplicate names or a `name` that differs from its directory. Claude's package additionally has a `rules-*` skill for each focused rule file or directory in
 `shared/rules/`. The rule-to-skill loading conditions live in `shared/global-instructions.md`, so full rule text loads
 only when Claude invokes a matching skill instead of sitting permanently in context. Codex reads the matching rule
 files directly. Both clients embed the general rules in their global instructions.
