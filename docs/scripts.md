@@ -22,6 +22,8 @@ Run scripts from the repository root. PowerShell and Bash commands have equivale
 | `commands/uninstall.ps1`, `commands/uninstall.sh` | Remove setup-owned configuration and extensions. |
 | `commands/doctor.ps1`, `commands/doctor.sh` | Check generated output and installed configuration. |
 | `commands/prompt-budget.ps1`, `commands/prompt-budget.sh` | Track permanent context, skill metadata, the rule catalog, and agent metadata; warn above 10,000 permanent-context tokens, fail when any token estimate exceeds its baseline by 10%, or permanent context exceeds 15,000 tokens. |
+| `commands/context-report.ps1`, `commands/context-report.sh` | Report the context installed Claude and Codex actually load, from Claude `/context`, `/skill-doctor`, and its init event, and Codex `debug prompt-input`: categories, active plugins, listed skills, installed skills missing from the listing, and skills listed without description context. `--check` fails on missing or description-less skills. No model request is made. |
+| `commands/benchmark.ps1`, `commands/benchmark.sh` | Run the ten tasks under `scripts/benchmarks/tasks/` with and without the installed setup and compare pass rate, rework turns, duration, tokens, tool calls, cost, and workflow checks (no planning ceremony for a small change, targeted verification for a bugfix, bounded delegation for a larger change). Starts real model sessions; use `--dry-run` to list runs. The Codex baseline needs one `codex login` with `CODEX_HOME` set to `--codex-baseline-home`. |
 | `commands/repository-context.ps1`, `commands/repository-context.sh` | Refresh the local repository-context cache. |
 | `commands/session-state.ps1`, `commands/session-state.sh` | Read or update the local agent session state. |
 | `commands/telemetry.ps1`, `commands/telemetry.sh` | Append a local telemetry event. |
@@ -38,7 +40,7 @@ To undo an added instruction, pass the same text to `remove-instruction` with `-
 Credential commands currently require PowerShell and Windows Credential Manager, including their Bash wrappers. Use `~/.my-ai-configuration/bin/with-credential.ps1` or `.sh` to run a tool with a stored key available only in that child process. The key must be a valid environment-variable name; its value is never written to configuration.
 Use `remove-credentials` with `-Client`/`--client` and `-Key`/`--key` to delete only that credential. The shared `with-credential` helpers remain installed for other keys.
 
-Qwen Auto selection uses `shared/retrieval/benchmark.py`; run it through `scripts/lib/semantic-retrieval.py benchmark --root . --home <home-directory>`. This warm-model check uses synthetic, repeated short documents. Its result does not measure model startup, first indexing, real code chunks, CLI latency, or memory use; do not use it as an end-to-end performance estimate.
+The A/B benchmark measures whole sessions. Qwen Auto selection uses `shared/retrieval/benchmark.py`; run it through `scripts/lib/semantic-retrieval.py benchmark --root . --home <home-directory>`. This warm-model check uses synthetic, repeated short documents. Its result does not measure model startup, first indexing, real code chunks, CLI latency, or memory use; do not use it as an end-to-end performance estimate.
 
 ## Checks and tests
 
