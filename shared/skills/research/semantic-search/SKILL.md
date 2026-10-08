@@ -9,7 +9,7 @@ Search the current Git repository, plus the user's registered QMD collections, b
 
 ## Rule
 
-Run this search first whenever you do not already know the exact identifier, path, or string. Do not start with `rg` guesses for a concept. `rg` comes after the search, for callers and tests of verified hits.
+Run this search first whenever you do not already know the exact identifier, path, or string. Do not start with `rg` guesses for a concept. This skill locates code; `repository-research` then traces the flow from the verified hits.
 
 ## Run
 
@@ -21,10 +21,10 @@ Output: JSON list of `{path, line, score, snippet}`, best first. Repository path
 
 ## Use the results
 
-1. Phrase the query as a full question about behavior, not a keyword list.
-2. Open the top hits and verify them against the current files before acting.
-3. Follow verified hits with `rg` for their symbols to find callers and tests.
-4. If no hit is relevant, run one rephrased search before switching to `rg`.
+1. Phrase the query as a full question about behavior, not a keyword list. Batch related questions into one precise query.
+2. Open the top hits and verify them against the current files before acting; the index can lag behind uncommitted edits.
+3. If no hit is relevant, run one rephrased search before switching to `rg`.
+4. Continue with `repository-research` from the verified hits: callers, tests, and conventions.
 
 ## Failure
 
