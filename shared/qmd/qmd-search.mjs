@@ -16,23 +16,36 @@ export function toCliResults(items, collection) {
   });
 }
 
+const notRunning = (message, cause) => Object.assign(new Error(message, { cause }), { notRunning: true });
+
 async function callDaemon(path, body) {
   const info = readJson(daemonFile(), null);
-  if (!info?.port || !info?.token) throw new Error('daemon not running');
-  const response = await fetch(`http://127.0.0.1:${info.port}${path}`, {
-    method: 'POST', headers: { 'x-qmd-token': info.token, 'content-type': 'application/json' },
-    body: JSON.stringify(body), signal: AbortSignal.timeout(600_000) });
+  if (!info?.port || !info?.token) throw notRunning('daemon not running');
+  let response;
+  try {
+    response = await fetch(`http://127.0.0.1:${info.port}${path}`, {
+      method: 'POST', headers: { 'x-qmd-token': info.token, 'content-type': 'application/json' },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(600_000) });
+  } catch (error) {
+    // fetch rejects with a TypeError when the connection is refused or reset; a timeout is a different error.
+    if (error instanceof TypeError) throw notRunning('daemon not reachable', error);
+    throw error;
+  }
   if (!response.ok) throw new Error(`daemon answered ${response.status}`);
   return response.json();
 }
 
-export async function startDaemon() {
+export async function startDaemon({ spawnChild = spawn } = {}) {
   const device = readJson(setupStatePath(), {}).device || 'cpu';
-  const child = spawn(process.execPath, [join(here, 'qmd-daemon.mjs')], { detached: true, stdio: 'ignore', windowsHide: true, env: deviceEnv(device) });
+  const child = spawnChild(process.execPath, [join(here, 'qmd-daemon.mjs')], { detached: true, stdio: 'ignore', windowsHide: true, env: deviceEnv(device) });
+  let failure = null;
+  child.once('error', (error) => { failure = error; });
+  child.once('exit', (code) => { failure ||= new Error(`daemon exited with code ${code}`); });
   child.unref();
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     await new Promise((done) => setTimeout(done, 500));
+    if (failure) throw failure;
     const info = readJson(daemonFile(), null);
     if (info?.port && info?.token && info.pid === child.pid) return;
   }
@@ -46,16 +59,22 @@ function runCli(args) {
 
 export async function runSearch({ root, query, topK, daemon = callDaemon, startDaemon: start = startDaemon, cli = runCli }) {
   const body = { repo: root, query, limit: topK };
+  const ask = async () => {
+    const reply = await daemon('/search', body);
+    if (!Array.isArray(reply?.results)) throw new Error('daemon reply has no results');
+    return reply.results;
+  };
   try {
-    return (await daemon('/search', body)).results;
-  } catch {
     try {
+      return await ask();
+    } catch (error) {
+      if (!error.notRunning) throw error;
       await start();
-      return (await daemon('/search', body)).results;
-    } catch {
-      const collection = collectionName(root);
-      return toCliResults(await cli(['query', query, '--json', '-n', String(topK), '-c', collection, '--chunk-strategy', 'auto']), collection);
+      return await ask();
     }
+  } catch {
+    const collection = collectionName(root);
+    return toCliResults(await cli(['query', query, '--json', '-n', String(topK), '-c', collection, '--chunk-strategy', 'auto']), collection);
   }
 }
 
