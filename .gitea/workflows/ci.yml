@@ -184,12 +184,12 @@ jobs:
           node-version: '24'
       - name: Install QMD
         run: npm install --global @tobilu/qmd@2.8.3
+      - name: Run QMD unit tests
+        run: node --test scripts/tests/test-qmd-lib.mjs scripts/tests/test-qmd-daemon.mjs scripts/tests/test-qmd-search.mjs scripts/tests/test-qmd-warm.mjs scripts/tests/test-qmd-benchmark.mjs
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/qmd-models
           key: qmd-models-${{ runner.os }}-2.8.3-qwen3
-      - name: Run QMD unit tests
-        run: node --test scripts/tests/test-qmd-lib.mjs scripts/tests/test-qmd-daemon.mjs scripts/tests/test-qmd-search.mjs scripts/tests/test-qmd-warm.mjs scripts/tests/test-qmd-benchmark.mjs
       - name: Run QMD integration test with real models
         env:
           QMD_TEST_CACHE: ${{ github.workspace }}/.cache/qmd-models

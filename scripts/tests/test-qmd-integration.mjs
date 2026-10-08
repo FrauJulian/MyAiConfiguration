@@ -6,7 +6,9 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const search = resolve('shared/qmd/qmd-search.mjs');
+import { runQmdCli } from '../../shared/qmd/qmd-lib.mjs';
+
+const search =resolve('shared/qmd/qmd-search.mjs');
 
 test('wrapper finds the retry logic through the daemon and stops it', { timeout: 1_800_000 }, () => {
   const home = mkdtempSync(join(tmpdir(), 'qmd-it-home-'));
@@ -18,7 +20,8 @@ test('wrapper finds the retry logic through the daemon and stops it', { timeout:
   execFileSync('git', ['add', '-A'], { cwd: repo });
   const env = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, '.config'), XDG_CACHE_HOME: process.env.QMD_TEST_CACHE || join(home, '.cache'), QMD_FORCE_CPU: '1' };
   execFileSync('node', ['shared/qmd/qmd-config.mjs', 'set-models'], { env });
-  const results = JSON.parse(execFileSync('node', [search, '--root', repo, '--query', 'Where are failed uploads retried after temporary errors?'], { env, encoding: 'utf8', timeout: 1_700_000 }));
-  assert.equal(results[0].path.replace(/\/g, '/'), 'src/upload.ts');
+  runQmdCli(['pull'], { env, timeout: 1_700_000, stdio: 'inherit' }); // download models first so the search only measures indexing and query
+  const results =JSON.parse(execFileSync('node', [search, '--root', repo, '--query', 'Where are failed uploads retried after temporary errors?'], { env, encoding: 'utf8', timeout: 1_700_000 }));
+  assert.equal(results[0].path.replaceAll('\\', '/'), 'src/upload.ts');
   execFileSync('node', [search, '--stop'], { env });
 });
