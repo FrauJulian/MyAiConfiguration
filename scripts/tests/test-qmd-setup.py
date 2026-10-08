@@ -267,6 +267,29 @@ class SetupTest(unittest.TestCase):
         self.setup(FakeRunner(fail=('--detect',))).enable(['claude'])
         self.assertEqual(self.state()['device'], 'cpu')
 
+    def legacy_install(self):
+        legacy = self.home / '.my-ai-configuration/semantic-retrieval'
+        python = legacy / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+        python.parent.mkdir(parents=True)
+        python.write_text('')
+        (legacy / 'server.py').write_text('')
+        return legacy, python
+
+    def test_migration_stops_the_legacy_daemon_before_removal(self):
+        legacy, python = self.legacy_install()
+        seen = []
+        runner = FakeRunner(installed=True, on_call=lambda a: seen.append(legacy.exists()) if 'server.py' in ' '.join(a) else None)
+        self.setup(runner).enable(['claude'])
+        self.assertIn([str(python), str(legacy / 'server.py'), 'stop', '--data-dir', str(legacy / 'data'),
+                       '--model-cache', str(legacy / 'model-cache')], runner.calls)
+        self.assertEqual(seen, [True], 'stop runs while the legacy directory still exists')
+        self.assertFalse(legacy.exists())
+
+    def test_failing_legacy_stop_does_not_block_migration(self):
+        legacy, _ = self.legacy_install()
+        self.setup(FakeRunner(installed=True, fail=('server.py',))).enable(['claude'])
+        self.assertFalse(legacy.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

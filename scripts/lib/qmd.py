@@ -87,6 +87,17 @@ class Setup:
         if not node_version_ok(self.run(['node', '--version'])):
             raise ValueError('QMD local search needs Node.js 22 or newer.')
 
+    def stop_legacy_daemon(self, legacy):
+        """Ask the old Python daemon to exit so its files can be deleted (Windows keeps open files locked)."""
+        python = legacy / '.venv' / ('Scripts/python.exe' if WINDOWS else 'bin/python')
+        server = legacy / 'server.py'
+        if python.is_file() and server.is_file():
+            try:
+                self.run([str(python), str(server), 'stop', '--data-dir', str(legacy / 'data'),
+                          '--model-cache', str(legacy / 'model-cache')], timeout=60, check=False)
+            except (ValueError, OSError, subprocess.SubprocessError):
+                pass
+
     def migrate(self, state=None):
         state = self.load() if state is None else state
         legacy_state = self.base / 'semantic-retrieval.json'
@@ -95,6 +106,7 @@ class Setup:
             if legacy.is_symlink():
                 raise ValueError('Legacy semantic retrieval directory must not be a symbolic link.')
             if legacy.exists():
+                self.stop_legacy_daemon(legacy)
                 shutil.rmtree(legacy)
             legacy_state.unlink(missing_ok=True)
             self.say('Removed the previous Python semantic retrieval installation.')
