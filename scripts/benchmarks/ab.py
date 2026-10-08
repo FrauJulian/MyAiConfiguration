@@ -51,11 +51,15 @@ def kill_tree(process):
     process.wait(timeout=30)
 
 
-def run_jsonl(command, cwd, env, timeout):
-    """Run a client, return (events, seconds, timed_out); output is read on a thread so the deadline holds."""
+def run_jsonl(command, cwd, env, timeout, prompt):
+    """Run a client, return (events, seconds, timed_out); output is read on a thread so the deadline holds.
+
+    The prompt goes through stdin: on Windows the clients start through .cmd shims that cut arguments at newlines.
+    """
     start = time.monotonic()
-    process = subprocess.Popen(command, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+    process = subprocess.Popen(command, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.DEVNULL, text=True, encoding='utf-8', errors='replace')
+    threading.Thread(target=lambda: (process.stdin.write(prompt), process.stdin.close()), daemon=True).start()
     lines = queue.Queue()
     threading.Thread(target=lambda: ([lines.put(line) for line in process.stdout], lines.put(None)), daemon=True).start()
     events, timed_out = [], False
@@ -90,12 +94,12 @@ def codex_env(arm, args):
 
 
 def claude_turn(prompt, cwd, arm, args, session):
-    command = [shutil.which('claude'), '-p', prompt, '--output-format', 'stream-json', '--verbose',
+    command = [shutil.which('claude'), '-p', '--output-format', 'stream-json', '--verbose',
                '--permission-mode', 'auto', '--allowedTools', *CLAUDE_TOOLS, *claude_flags(arm, args)]
     if session:
         command += ['--resume', session]
     timeout = args.timeout
-    events, seconds, timed_out = run_jsonl(command, cwd, clean_env(), timeout)
+    events, seconds, timed_out = run_jsonl(command, cwd, clean_env(), timeout, prompt)
     result = next((event for event in reversed(events) if event.get('type') == 'result'), {})
     usage = result.get('usage', {})
     calls = [block for event in events if event.get('type') == 'assistant'
@@ -121,8 +125,8 @@ def codex_turn(prompt, cwd, arm, args, session):
     command += ['--json', '--skip-git-repo-check', '--sandbox', 'workspace-write',
                 '-m', args.codex_model, '-c', f'model_reasoning_effort="{args.codex_effort}"']
     command += ['-C', str(cwd)] if not session else []
-    command.append(prompt)
-    events, seconds, timed_out = run_jsonl(command, cwd, codex_env(arm, args), args.timeout)
+    command.append('-')
+    events, seconds, timed_out = run_jsonl(command, cwd, codex_env(arm, args), args.timeout, prompt)
     items = [event.get('item', {}) for event in events if event.get('type') == 'item.completed']
     tools = [item for item in items if item.get('type') not in ('agent_message', 'reasoning', 'error')]
     usage = [event.get('usage', {}) for event in events if event.get('type') == 'turn.completed']
