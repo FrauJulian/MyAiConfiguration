@@ -10,7 +10,7 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . (Join-Path $root 'scripts/lib/plugins.ps1')
 . (Join-Path $root 'scripts/lib/manifest.ps1')
 . (Join-Path $root 'scripts/lib/install-targets.ps1')
-. (Join-Path $root 'scripts/lib/semantic-retrieval.ps1')
+. (Join-Path $root 'scripts/lib/qmd.ps1')
 
 $Client = Read-InstallClient -Client $Client
 $homePath = [Environment]::GetFolderPath('UserProfile')
@@ -24,7 +24,7 @@ if (-not $DryRun -and -not $Force) {
     if ([Console]::IsInputRedirected -or $env:CI -eq 'true' -or $env:AI_CONFIG_NO_INTERACTIVE -eq '1') {
         throw 'Refusing to uninstall without confirmation in a non-interactive session. Pass -Force to proceed.'
     }
-    Write-Host "This removes the managed configuration, extensions, and semantic retrieval setup for $Client under $homePath."
+    Write-Host "This removes the managed configuration, extensions, and QMD local search setup for $Client under $homePath."
     Write-Host 'Backups already on disk are kept; anything this setup never installed is left untouched.'
     $confirm = Read-Host -Prompt 'Continue? [y/N]'
     if ($null -eq $confirm) { $confirm = '' }
@@ -57,7 +57,7 @@ try {
 }
 
 Sync-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries @()
-Sync-SemanticRetrieval -RepositoryRoot $root -HomePath $homePath -Client $Client -Enabled $false -DryRun:$DryRun -Summary:$Summary
+Sync-Qmd -RepositoryRoot $root -HomePath $homePath -Client $Client -Enabled $false -DryRun:$DryRun -Summary:$Summary
 
 if (-not $DryRun) {
     $remaining = @($targets | Where-Object { Test-Path -LiteralPath (Get-ManagedManifestPath $_.Destination) })

@@ -25,4 +25,18 @@ any_manifest_present "$installed" "$missing" || { printf 'Expected an installed 
 ! all_manifests_present "$installed" "$missing" || { printf 'Update guard must fail when any selected destination is not installed.\n' >&2; exit 1; }
 all_manifests_present "$installed" || { printf 'Update guard must pass when every selected destination is installed.\n' >&2; exit 1; }
 
+# QMD prompt: Auto maps benchmark exit codes; No never calls the benchmark.
+(
+  home_path=$(mktemp -d)
+  . "$root/scripts/lib/install-options.sh"
+  test_qmd_device() { return 1; }
+  [ "$(printf 'a\n' | read_semantic_retrieval_option false 2>/dev/null)" = false ] || { echo 'Auto unsuitable must yield false' >&2; exit 1; }
+  test_qmd_device() { return 0; }
+  [ "$(printf 'a\n' | read_semantic_retrieval_option false 2>/dev/null)" = true ] || { echo 'Auto suitable must yield true' >&2; exit 1; }
+  test_qmd_device() { echo 'must not run' >&2; exit 9; }
+  [ "$(printf 'n\n' | read_semantic_retrieval_option true 2>/dev/null)" = false ] || { echo 'No must yield false' >&2; exit 1; }
+  printf 'n\n' | read_semantic_retrieval_option true 2>&1 >/dev/null | grep -q 'Enable local QMD search models' || { echo 'prompt text changed' >&2; exit 1; }
+  rm -rf -- "$home_path"
+)
+
 if [ "$summary" = true ]; then printf 'Tests: PASS | install guards\n'; else printf 'PASS install guards: already-installed and not-installed detection\n'; fi

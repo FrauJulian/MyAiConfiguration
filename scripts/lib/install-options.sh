@@ -41,7 +41,7 @@ read_semantic_retrieval_option() {
   local default=$1 hint=y/N/a answer
   [ "$default" = false ] || hint=Y/n/a
   while :; do
-    printf 'Enable Qwen3 embedding and reranking semantic retrieval? [%s] ' "$hint" >&2
+    printf 'Enable local QMD search models (Qwen3 embedding, Qwen3 reranker, QMD query expansion)? [%s] ' "$hint" >&2
     IFS= read -r answer || { printf 'Input ended before semantic retrieval was confirmed.\n' >&2; return 1; }
     answer=${answer%$'\r'}
     case "$answer" in
@@ -49,7 +49,7 @@ read_semantic_retrieval_option() {
       y|Y|yes|Yes|YES) printf 'true\n'; return ;;
       n|N|no|No|NO) printf 'false\n'; return ;;
       a|A|auto|Auto|AUTO)
-        if test_semantic_retrieval_device "$root" "$home_path"; then printf 'true\n'; return; else status=$?; fi
+        if test_qmd_device "$root" "$home_path"; then printf 'true\n'; return; else status=$?; fi
         [ "$status" -eq 1 ] && { printf 'false\n'; return; }
         return "$status"
         ;;

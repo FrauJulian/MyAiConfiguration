@@ -32,14 +32,14 @@ function Read-SemanticRetrievalOption {
     param([bool]$Default,[string]$RepositoryRoot,[string]$HomePath)
     $hint = if ($Default) { 'Y/n/a' } else { 'y/N/a' }
     while ($true) {
-        Write-Host "Enable Qwen3 embedding and reranking semantic retrieval? [$hint] " -NoNewline
+        Write-Host "Enable local QMD search models (Qwen3 embedding, Qwen3 reranker, QMD query expansion)? [$hint] " -NoNewline
         $answer = [Console]::ReadLine()
         if ($null -eq $answer) { throw 'Input ended before semantic retrieval was confirmed.' }
         switch ($answer.Trim().ToLowerInvariant()) {
             '' { return $Default }
             { $_ -in @('y', 'yes') } { return $true }
             { $_ -in @('n', 'no') } { return $false }
-            { $_ -in @('a', 'auto') } { return Test-SemanticRetrievalDevice -RepositoryRoot $RepositoryRoot -HomePath $HomePath }
+            { $_ -in @('a', 'auto') } { return Test-QmdDevice -RepositoryRoot $RepositoryRoot -HomePath $HomePath }
         }
     }
 }

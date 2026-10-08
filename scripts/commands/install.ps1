@@ -12,7 +12,7 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . (Join-Path $root 'scripts/lib/install-targets.ps1')
 . (Join-Path $root 'scripts/lib/selection-state.ps1')
 . (Join-Path $root 'scripts/lib/install-options.ps1')
-. (Join-Path $root 'scripts/lib/semantic-retrieval.ps1')
+. (Join-Path $root 'scripts/lib/qmd.ps1')
 
 $Shell = Read-InstallShell -Shell $Shell
 $shell = $Shell.ToLowerInvariant()
@@ -44,8 +44,8 @@ foreach ($item in (Get-InstallTargets -Generated $generated -HomePath $homePath 
         -AiConfigRoot $item.Destination.Replace('\','/') -ShellCommand $shellCommand -PowerShellCommand $powerShellCommand -ClaudeConcurrency $claudeConcurrency -FlashbangEnabled $options.flashbang -StatusLineEnabled $options.statusline -SemanticRetrievalEnabled $options.semantic_retrieval -DryRun:$DryRun -Summary:$Summary
 }
 
+Sync-Qmd -RepositoryRoot $root -HomePath $homePath -Client $Client -Enabled $options.semantic_retrieval -DryRun:$DryRun -Summary:$Summary
 Sync-ConfiguredPlugins -RepositoryRoot $root -HomePath $homePath -Client $Client -DryRun:$DryRun -Summary:$Summary -Entries $plugins.Selected
-Sync-SemanticRetrieval -RepositoryRoot $root -HomePath $homePath -Client $Client -Enabled $options.semantic_retrieval -DryRun:$DryRun -Summary:$Summary
 if (-not $DryRun) { Save-UpdateSelection -HomePath $homePath -RepositoryRoot $root -Shell $Shell -Client $Client -Plugins $plugins -Flashbang $options.flashbang -StatusLine $options.statusline -SemanticRetrieval $options.semantic_retrieval }
 if ($Summary) { Write-Output "Install: PASS | $Client, $Shell$(if ($DryRun) { ', dry-run' })" } else { Write-Output ($(if ($DryRun) { 'PASS install dry-run' } else { 'PASS install' })) }
 exit 0

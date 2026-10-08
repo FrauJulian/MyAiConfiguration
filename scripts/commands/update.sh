@@ -23,7 +23,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 . "$root/scripts/lib/install-targets.sh"
 . "$root/scripts/lib/selection-state.sh"
 . "$root/scripts/lib/install-options.sh"
-. "$root/scripts/lib/semantic-retrieval.sh"
+. "$root/scripts/lib/qmd.sh"
 
 home_path=${HOME:?HOME is required}
 selected_plugins=()
@@ -66,12 +66,12 @@ while IFS='|' read -r source destination; do
   sync_managed_destination "$source" "$destination" "$stamp" "$ai_config_root" "$shell_command" "$powershell_command" "$dry_run" "$summary" "$flashbang" 5 "$statusline" "$semantic_retrieval"
 done < <(get_install_targets "$generated" "$home_path" "$shell" "$client")
 
+sync_qmd "$root" "$client" "$home_path" "$semantic_retrieval" "$dry_run" true "$summary"
 if [ "$quick" = true ]; then
   CI=true sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" true selected_plugins "$summary" </dev/null
 else
   sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" true selected_plugins "$summary"
 fi
-sync_semantic_retrieval "$root" "$client" "$home_path" "$semantic_retrieval" "$dry_run" true "$summary"
 if [ "$dry_run" = false ]; then save_update_selection; fi
 
 if [ "$summary" = true ]; then

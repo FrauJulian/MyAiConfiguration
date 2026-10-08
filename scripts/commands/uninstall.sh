@@ -19,7 +19,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 . "$root/scripts/lib/plugins.sh"
 . "$root/scripts/lib/manifest.sh"
 . "$root/scripts/lib/install-targets.sh"
-. "$root/scripts/lib/semantic-retrieval.sh"
+. "$root/scripts/lib/qmd.sh"
 
 client=$(read_install_client "$client")
 home_path=${HOME:?HOME is required}
@@ -40,7 +40,7 @@ if [ "$dry_run" = false ] && [ "$force" = false ]; then
     printf 'Refusing to uninstall without confirmation in a non-interactive session. Pass --force to proceed.\n' >&2
     exit 1
   fi
-  printf 'This removes the managed configuration, extensions, and semantic retrieval setup for %s under %s.\n' "$client" "$home_path"
+  printf 'This removes the managed configuration, extensions, and QMD local search setup for %s under %s.\n' "$client" "$home_path"
   printf 'Backups already on disk are kept; anything this setup never installed is left untouched.\n'
   read -r -p "Continue? [y/N]: " confirm || confirm=""
   case "$confirm" in
@@ -75,7 +75,7 @@ done
 # shellcheck disable=SC2034
 selected_plugins=()
 sync_configured_plugins "$root" "$client" "$home_path" "$dry_run" false selected_plugins "$summary"
-sync_semantic_retrieval "$root" "$client" "$home_path" false "$dry_run" false "$summary"
+sync_qmd "$root" "$client" "$home_path" false "$dry_run" false "$summary"
 
 if [ "$dry_run" = false ]; then
   remaining=0
