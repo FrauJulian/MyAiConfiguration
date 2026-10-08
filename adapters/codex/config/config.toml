@@ -10,7 +10,7 @@ writable_roots = ['__AI_CONFIG_ROOT__/../.my-ai-configuration/qmd', '__AI_CONFIG
 sandbox = "elevated"
 
 [tui]
-status_line = ["model", "reasoning", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]
+status_line = ["model", "reasoning", "fast-mode", "approval-mode", "five-hour-limit", "weekly-limit", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]
 
 [agents]
 enabled = true

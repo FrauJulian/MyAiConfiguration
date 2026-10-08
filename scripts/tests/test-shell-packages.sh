@@ -79,7 +79,7 @@ for shell in powershell bash; do
       ! grep -Eq '^async[[:space:]]*=[[:space:]]*true[[:space:]]*$' "$package/$file"
       grep -q 'approvals_reviewer[[:space:]]*=[[:space:]]*"auto_review"' "$package/$file"
       grep -Eq '^max_depth[[:space:]]*=[[:space:]]*1[[:space:]]*$' "$package/$file"
-      grep -Fq 'status_line = ["model", "reasoning", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]' "$package/$file"
+      grep -Fq 'status_line = ["model", "reasoning", "fast-mode", "approval-mode", "five-hour-limit", "weekly-limit", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]' "$package/$file"
     else
       python3 -c 'import json,sys; settings=json.load(open(sys.argv[1], encoding="utf-8-sig")); assert set(settings["hooks"]) == {"PreCompact", "SessionStart", "Stop"}' "$package/$file"
       ! grep -q 'flashbang-if-input' "$package/$file"

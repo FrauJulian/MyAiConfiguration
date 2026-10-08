@@ -18,7 +18,7 @@ On native Windows, the Codex adapter selects `windows.sandbox = "elevated"`, the
 
 ## Status displays
 
-Codex's native `tui.status_line` contains `model`, `reasoning`, `approval-mode`, `project-name`, `git-branch`, `context-window-size`, `context-used`, and `used-tokens`, in that order. `approval-mode` reports the active command review mode. Rendering and colors are controlled by Codex; the adapter does not define custom colors per field.
+Codex's native `tui.status_line` contains `model`, `reasoning`, `fast-mode`, `approval-mode`, `five-hour-limit`, `weekly-limit`, `project-name`, `git-branch`, `context-window-size`, `context-used`, and `used-tokens`, in that order. `fast-mode` shows `Fast on` or `Fast off` for supported models; it does not change the selected mode. `five-hour-limit` and `weekly-limit` show remaining usage in the primary and secondary quota windows, typically five hours and one week, and are omitted when Codex has no quota data. `approval-mode` reports the active command review mode. Rendering and colors are controlled by Codex; the adapter does not define custom colors per field. These native fields are supported by [Codex 0.161.0](https://github.com/openai/codex/blob/rust-v0.161.0/codex-rs/tui/src/chatwidget/status_surfaces.rs).
 
 Claude runs `shared/statusline/statusline.ps1` for PowerShell or `statusline.sh` for Bash. Its two-line display is:
 
