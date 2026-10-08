@@ -1,16 +1,16 @@
 ---
 name: technical-research
-description: Use before implementation when an unfamiliar or changing technology, API, standard, or technical trade-off needs current evidence. Prefer primary sources; do not use for repository-only code discovery.
+description: MUST use before relying on an external library, API, tool, product version, or standard whose current behavior you have not verified in this session, and before choosing between technical options. Prefer primary sources. Not for repository code discovery (use repository-research).
 ---
 
 # Technical Research
 
-Use before implementation when an unfamiliar technology, API, current product behavior, or technical trade-off could change the solution.
+Verify external technology before it shapes the solution. Do not rely on remembered API signatures, defaults, or version behavior when they could have changed.
 
 ## Workflow
 
-1. Turn the implementation question into specific facts or decisions that need evidence.
-2. Prefer current primary sources: official product documentation, standards, release notes, or the original research. Check version and date when behavior may have changed.
+1. Turn the question into specific facts or decisions that need evidence. When the question concerns how this repository already uses the technology, run `repository-research` first and research only what the code does not answer.
+2. Prefer current primary sources: official documentation, standards, release notes, or source code of the exact version in use. Check version and date when behavior may have changed.
 3. Compare only viable options against the user's constraints, compatibility needs, security properties, and maintenance cost.
 4. Separate source-backed facts from interpretation. Record assumptions and any material evidence that is missing or conflicting.
 5. Recommend an option only when evidence supports it. Explain the deciding trade-off briefly.
