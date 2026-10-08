@@ -147,8 +147,12 @@ class Setup:
         atomic_json(self.state_path, state)
 
     def detect_gpu(self):
-        found = json.loads(self.node('qmd-benchmark.mjs', '--detect', timeout=DEVICE_TIMEOUT) or '{}')
-        gpu = found.get('gpu') or False
+        try:
+            found = json.loads(self.node('qmd-benchmark.mjs', '--detect', timeout=DEVICE_TIMEOUT) or '{}')
+            gpu = found.get('gpu') or False
+        except Exception as error:  # any probe failure means: use the CPU
+            self.say(f'QMD GPU detection failed, using the CPU: {str(error)[:200]}')
+            return False
         names = ', '.join(found.get('devices') or []) or 'unnamed device'
         self.say(f"QMD devices: {f'{str(gpu).upper()}: {names}' if gpu else 'no GPU'}; CPU threads: {found.get('threads', '?')}")
         return gpu
@@ -219,7 +223,15 @@ class Setup:
         if self.dry_run:
             self.say('DRYRUN benchmark QMD local search on GPU, then CPU')
             return True
-        self.install(state)
+        try:
+            self.install(state)
+        except (ValueError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
+            print(f'QMD local search is not suitable for this computer: {error}')
+            try:
+                self.remove_all(state)
+            except (ValueError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as cleanup:
+                print(f'QMD cleanup was incomplete: {cleanup}')
+            return False
         results = []
         devices = (['gpu'] if self.detect_gpu() else []) + ['cpu']
         for device in devices:

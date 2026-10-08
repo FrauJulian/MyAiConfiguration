@@ -1,7 +1,10 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -13,16 +16,22 @@ spec.loader.exec_module(qmd)
 
 
 class FakeRunner:
-    def __init__(self, installed=False, gpu='cuda', gpu_result=None, cpu_result=None, previous=None, fail_pull=False, list_output=None):
+    def __init__(self, installed=False, gpu='cuda', gpu_result=None, cpu_result=None, previous=None, fail_pull=False, list_output=None,
+                 node='v22.4.0', fail=(), on_call=None):
         self.calls, self.installed, self.gpu = [], installed, gpu
         self.previous, self.fail_pull, self.list_output = previous, fail_pull, list_output
+        self.node, self.fail, self.on_call = node, fail, on_call
         self.results = {'gpu': gpu_result, 'cpu': cpu_result}
 
     def __call__(self, arguments, env=None, timeout=None, check=True):
         self.calls.append(list(arguments))
         joined = ' '.join(arguments)
+        if self.on_call:
+            self.on_call(arguments)
+        if any(part in joined for part in self.fail):
+            raise ValueError(f'{joined} failed')
         if arguments[:2] == ['node', '--version']:
-            return 'v22.4.0'
+            return self.node
         if arguments[-1:] == ['set-models']:
             return json.dumps({'previous': self.previous}) + chr(10)
         if self.fail_pull and arguments[:2] == ['qmd', 'pull']:
@@ -47,6 +56,10 @@ class SetupTest(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
+        environment = mock.patch.dict(os.environ)
+        environment.start()
+        self.addCleanup(environment.stop)
+        os.environ.pop('XDG_CACHE_HOME', None)
         (self.home / '.cache/qmd/models').mkdir(parents=True)
 
     def setup(self, runner, dry_run=False):
@@ -220,6 +233,39 @@ class SetupTest(unittest.TestCase):
         self.setup(runner, dry_run=True).enable(['claude'])
         self.assertFalse((self.home / '.my-ai-configuration/qmd.json').exists())
         self.assertFalse(any('npm install' in ' '.join(c) for c in runner.calls))
+
+    def scripts_dir(self):
+        return self.home / '.my-ai-configuration/qmd'
+
+    def test_benchmark_with_too_old_node_is_unsuitable(self):
+        runner = FakeRunner(node='v20.11.1', cpu_result={'device': 'cpu', 'passed': True})
+        self.assertFalse(self.setup(runner).benchmark())
+        self.assertFalse((self.home / '.my-ai-configuration/qmd.json').exists())
+        self.assertFalse(any('npm install' in ' '.join(c) for c in runner.calls))
+
+    def test_benchmark_npm_install_failure_is_unsuitable(self):
+        runner = FakeRunner(fail=('npm install',), cpu_result={'device': 'cpu', 'passed': True})
+        self.assertFalse(self.setup(runner).benchmark())
+        self.assertFalse((self.home / '.my-ai-configuration/qmd.json').exists())
+        self.assertFalse(any('--device' in c for c in runner.calls))
+
+    def test_benchmark_download_failure_cleans_up_what_it_created(self):
+        runner = FakeRunner(fail_pull=True, cpu_result={'device': 'cpu', 'passed': True})
+        self.assertFalse(self.setup(runner).benchmark())
+        self.assertTrue(any(c[-1:] == ['unset-models'] for c in runner.calls))
+        self.assertIn(['npm', 'uninstall', '--global', '@tobilu/qmd'], runner.calls)
+        self.assertFalse(self.scripts_dir().exists())
+        self.assertFalse((self.home / '.my-ai-configuration/qmd.json').exists())
+
+    def test_benchmark_detect_crash_runs_cpu_only(self):
+        runner = FakeRunner(fail=('--detect',), gpu_result={'device': 'gpu', 'passed': True}, cpu_result={'device': 'cpu', 'passed': True})
+        self.assertTrue(self.setup(runner).benchmark())
+        self.assertEqual(self.state()['device'], 'cpu')
+        self.assertFalse(any('--device' in c and 'gpu' in c for c in runner.calls))
+
+    def test_enable_with_detect_crash_uses_cpu(self):
+        self.setup(FakeRunner(fail=('--detect',))).enable(['claude'])
+        self.assertEqual(self.state()['device'], 'cpu')
 
 
 if __name__ == '__main__':
