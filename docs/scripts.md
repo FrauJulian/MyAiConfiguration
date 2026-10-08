@@ -40,7 +40,7 @@ To undo an added instruction, pass the same text to `remove-instruction` with `-
 Credential commands currently require PowerShell and Windows Credential Manager, including their Bash wrappers. Use `~/.my-ai-configuration/bin/with-credential.ps1` or `.sh` to run a tool with a stored key available only in that child process. The key must be a valid environment-variable name; its value is never written to configuration.
 Use `remove-credentials` with `-Client`/`--client` and `-Key`/`--key` to delete only that credential. The shared `with-credential` helpers remain installed for other keys.
 
-The A/B benchmark measures whole sessions. Qwen Auto selection uses `shared/retrieval/benchmark.py`; run it through `scripts/lib/semantic-retrieval.py benchmark --root . --home <home-directory>`. This warm-model check uses synthetic, repeated short documents. Its result does not measure model startup, first indexing, real code chunks, CLI latency, or memory use; do not use it as an end-to-end performance estimate.
+The A/B benchmark measures whole sessions. Auto selection of local QMD search uses `shared/qmd/qmd-benchmark.mjs`, run through `scripts/lib/qmd.py`. It measures median search latency and embedding throughput on GPU, then CPU, and is not an end-to-end performance estimate.
 
 ## Checks and tests
 
@@ -63,8 +63,8 @@ Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
 | `tests/test-quick-update.py` | Validate saved Quickupdate choices. |
 | `tests/test-remove-customizations.py` | Validate targeted instruction and credential removal without accessing the real credential store. |
 | `tests/test-quick-update.ps1`, `tests/test-quick-update.sh` | Run the Quickupdate test through the relevant shell. |
-| `tests/test-retrieval-server.py` | Validate retrieval indexing, ranking, and optional real-model execution. |
-| `tests/test-semantic-retrieval.py` | Validate retrieval installation and removal. |
+| `tests/test-qmd-*.mjs` | Validate the QMD library, search, daemon, warm-up, and benchmark scripts. |
+| `tests/test-qmd-setup.py` | Validate QMD installation, migration, and removal. |
 | `tests/test-session-state.py` | Validate session-state helpers. |
 | `tests/test-shell-packages.ps1`, `tests/test-shell-packages.sh` | Validate generated package contents and client settings. |
 | `tests/test-runtime-status.ps1`, `tests/test-runtime-status.sh` | Validate build summaries and status-line output. |
@@ -88,6 +88,6 @@ Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
 | `lib/remove-instruction.py` | Remove an exact client-specific instruction block. |
 | `lib/selection-state.ps1`, `lib/selection-state.sh` | Persist choices used by Quickupdate. |
 | `lib/selection-state.py` | Read and write Quickupdate state. |
-| `lib/semantic-retrieval.ps1`, `lib/semantic-retrieval.sh` | Invoke semantic retrieval from the installation flow. |
-| `lib/semantic-retrieval.py` | Install, index, benchmark, and remove the local retrieval service. |
-| `shared/retrieval/benchmark.py` | Check warm Qwen embedding and reranking speed for Auto selection; not an end-to-end benchmark. |
+| `lib/qmd.sh`, `lib/qmd.ps1` | Invoke local QMD search from the installation flow. |
+| `lib/qmd.py` | Install, migrate, benchmark, and remove local QMD search. |
+| `shared/qmd/*.mjs` | Installed QMD scripts: search CLI, daemon, warm-up, benchmark, and shared library. |

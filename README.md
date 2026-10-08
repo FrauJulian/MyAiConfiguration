@@ -30,7 +30,7 @@ Bash:
 ## Quickstart
 
 With the [requirements](#requirements) installed, clone the repository, build it, then install it.
-Stop if any command fails. Installation asks for the shell, client, Flashbang, status line, Qwen retrieval, and extension choices.
+Stop if any command fails. Installation asks for the shell, client, Flashbang, status line, local QMD search models, and extension choices.
 
 PowerShell:
 
@@ -96,11 +96,10 @@ Install and update also rebuild internally; the explicit build above lets you ch
 - Separate install, update, and uninstall scripts: install refuses to run against an already-installed destination,
   update refuses to run against one that is not installed yet, and uninstall refuses to run against one that was
   never installed.
-- User-level extension installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, QMD, MCPorter,
+- User-level extension installation for Ponytail, i-have-adhd, Superpowers, Context7, Caveman, MCPorter,
   Humanizer, Impeccable, and Anthropic Frontend Design, with an interactive extension toggle during both install and update. Only extensions
   installed and recorded by this setup can be removed through deselection.
-- Optional local semantic retrieval for both clients using Qwen3-Embedding-0.6B embeddings and Qwen3-Reranker-0.6B
-  reranking, disabled by default and removable through the install/update choice.
+- Optional local search for both clients through QMD with Qwen3-Embedding-0.6B, Qwen3-Reranker-0.6B, and QMD Query Expansion 1.7B (Yes/No/Auto; Auto benchmarks GPU, then CPU).
 
 ## Requirements
 
@@ -108,8 +107,8 @@ Install and update also rebuild internally; the explicit build above lets you ch
 - Bash 4.3 or newer, with standard utilities such as `awk`, `sed`, and `sha256sum`.
 - Python 3.11 or newer for configuration validation and task-state hooks/helpers (`python` for PowerShell scripts, `python3` for Bash scripts).
 - `jq` for Claude's Bash status line; without it, that status line produces no output.
-- Python `venv` and `pip` when the optional semantic retrieval layer is enabled.
-- Node.js 22 or newer and `npm` when QMD or MCPorter is selected.
+- Node.js 22 or newer and `npm` when local QMD search is enabled.
+- Node.js 22 or newer and `npm` when MCPorter is selected.
 
 Core Bash setup scripts do not require PowerShell. The credential commands use Windows Credential Manager and require
 PowerShell, including when invoked through their Bash wrappers. The PowerShell scripts remain compatible with
@@ -232,11 +231,11 @@ Dry runs still rebuild `generated/`, but do not modify installation destinations
 
 Selecting Codex also installs shared skills to `.agents/skills`. An interactive extension list includes plugins and
 Codex skills; unchecked extensions are skipped on installation. Normal install and update ask whether to enable
-Flashbang, apply the custom status line, and enable Qwen3 semantic retrieval. Choices are saved for Quickupdate.
+Flashbang, apply the custom status line, and enable local QMD search. Choices are saved for Quickupdate.
 The shared skill catalog includes development skills and focused writing, image, site structure, psychology, and
 conversion skills. All retained skills are included in both generated clients.
 The status line defaults to enabled to preserve existing behavior. Disabling it removes the custom client setting and,
-for Claude, the setup-owned status line script. Disabling retrieval on update removes its setup-owned runtime and index.
+for Claude, the setup-owned status line script. Disabling local QMD search on update removes only its setup-owned package, models, and repository collections.
 Dry runs preview changes without updating extensions or retrieval. See [Plugins](docs/plugins.md) for client-specific behavior.
 
 ## Update Script
@@ -263,7 +262,7 @@ setup; pre-existing or manually installed extensions are retained. Quickupdate r
 ## Uninstall Script
 
 Remove everything this setup previously installed for the selected client(s): managed files tracked in each
-destination's manifest, extensions and skills recorded in the extension ledger, an enabled semantic retrieval setup,
+destination's manifest, extensions and skills recorded in the extension ledger, an enabled local QMD search setup,
 and the saved Quickupdate selection (once no destination remains installed for any client).
 
 PowerShell:
@@ -289,7 +288,7 @@ touched. Codex skill backups are kept under `.agents/.ai-config-skill-backups/`.
 deleted once it is fully empty; backups already on disk are always kept.
 Extensions and skills recorded in the ledger are removed the same way `update` removes a deselected extension:
 pre-existing or manually installed ones outside the ledger are left alone, and a skill file modified since it was
-installed is kept with a warning. An enabled semantic retrieval setup is disabled and its setup-owned runtime and
+installed is kept with a warning. An enabled local QMD search setup is disabled and its setup-owned runtime and
 index removed for the selected client(s). The saved Quickupdate selection (`~/.my-ai-configuration/selection.json`)
 is only removed once uninstalling leaves no client installed at all, so uninstalling just one client out of a
 `Both` installation keeps the saved choices for the client that remains.

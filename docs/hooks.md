@@ -9,6 +9,7 @@ The adapters register these events:
 | Codex and Claude | `Stop` | Run the finish notification (`flashbang`). |
 | Claude | `PreCompact` | Record the compaction timestamp under the installed configuration root and point to existing workspace task state. |
 | Claude | `SessionStart` | Print an absolute pointer if the workspace's `.ai-session/state.json` exists. |
+| Codex and Claude | SessionStart | Warm the QMD index and search daemon in the background (only while local QMD search is enabled). |
 
 The main agent alone maintains canonical task state. Hooks never write or summarize it, print its contents, or infer completed verification. They use the hook event's `cwd`, falling back to the process working directory when no workspace is supplied. Malformed event data does not fall back to another project. An absent state file is a successful no-op. Legacy state under the installed configuration root is not automatically adopted; confirm its task before migrating it. The scripts do not grant permissions, bypass approvals, or replace client permission systems.
 
