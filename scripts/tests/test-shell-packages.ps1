@@ -56,7 +56,7 @@ foreach ($shell in @('powershell','bash')) {
         if ($shell -eq 'powershell' -and $content -match 'WindowStyle\s+Hidden') { throw "PowerShell hook hides the terminal in $package" }
         if ($client -eq 'codex') {
             $events = @([regex]::Matches($content, '(?m)^\[\[hooks\.([^.\]]+)\]\]\s*$') | ForEach-Object { $_.Groups[1].Value })
-            if ($events.Count -ne 1 -or $events[0] -ne 'Stop' -or $content -match 'flashbang-if-input' -or $content -match '(?m)^async\s*=\s*true\s*$') { throw "Codex finish hook is incorrect in $package" }
+            if ((($events | Sort-Object) -join ',') -ne 'SessionStart,Stop' -or $content -match 'flashbang-if-input' -or $content -match '(?m)^async\s*=\s*true\s*$') { throw "Codex finish hook is incorrect in $package" }
             if ($content -notmatch 'approvals_reviewer\s*=\s*"auto_review"') { throw "Codex auto review is missing in $package" }
             if ($content -notmatch '(?m)^max_depth\s*=\s*1\s*$') { throw "Codex agent depth limit is missing in $package" }
             if ($content -notmatch 'status_line\s*=\s*\["model", "reasoning", "fast-mode", "approval-mode", "five-hour-limit", "weekly-limit", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"\]') { throw "Codex status line is incorrect in $package" }

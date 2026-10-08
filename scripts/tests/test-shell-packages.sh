@@ -74,7 +74,7 @@ for shell in powershell bash; do
       grep -q 'bash .*flashbang.sh' "$package/$file"
     fi
     if [ "$client" = codex ]; then
-      [ "$(sed -n 's/^\[\[hooks\.\([^].]*\)\]\]$/\1/p' "$package/$file")" = Stop ]
+      [ "$(sed -n 's/^\[\[hooks\.\([^].]*\)\]\]$/\1/p' "$package/$file" | sort)" = $'SessionStart\nStop' ]
       ! grep -q 'flashbang-if-input' "$package/$file"
       ! grep -Eq '^async[[:space:]]*=[[:space:]]*true[[:space:]]*$' "$package/$file"
       grep -q 'approvals_reviewer[[:space:]]*=[[:space:]]*"auto_review"' "$package/$file"
