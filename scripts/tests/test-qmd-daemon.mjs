@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createServer, gitFingerprint, keepModelsLoaded } from '../../shared/qmd/qmd-daemon.mjs';
+import { createServer, gitFingerprint, ignoreGlobs, keepModelsLoaded } from '../../shared/qmd/qmd-daemon.mjs';
 import { collectionName } from '../../shared/qmd/qmd-lib.mjs';
 
 const defaultHits = () => [{ displayPath: `${collectionName('/r')}/src/a.ts`, body: 'x\nretry here', bestChunkPos: 2, bestChunk: 'retry here', score: 0.91 }];
@@ -30,7 +30,8 @@ async function start(t, overrides = {}, { updateGate, hits } = {}) {
   const daemon = createServer({
     store, token: 't0k', idleMs: 1000, now: () => clock, onIdle: () => idle.push(clock),
     extractSnippet: () => ({ line: 2, snippet: 'retry here' }),
-    git: () => 'fingerprint-1', excludeCollection: async () => {}, recordCollection: () => {}, ...overrides,
+    git: () => 'fingerprint-1', excludeCollection: async () => {}, recordCollection: () => {},
+    ignored: () => [], persistIgnore: async () => {}, ...overrides,
   });
   await new Promise((done) => daemon.server.listen(0, '127.0.0.1', done));
   t.after(() => { daemon.server.closeAllConnections(); daemon.server.close(); });
@@ -173,4 +174,30 @@ test('keepModelsLoaded disables QMD unloading models after 5 idle minutes', () =
   const llm = { inactivityTimeoutMs: 5 * 60 * 1000, disposeModelsOnInactivity: true };
   keepModelsLoaded({ internal: { llm } });
   assert.deepEqual(llm, { inactivityTimeoutMs: 0, disposeModelsOnInactivity: false });
+});
+
+test('ignoreGlobs turns git ignored paths into escaped QMD ignore globs', () => {
+  const escape = (path) => path.replace(/[()[\]]/g, '\\$&');
+  assert.deepEqual(ignoreGlobs('dist/\0a b.ts\0out (1)/\0x[1].md\0', escape), ['dist/**', 'a b.ts', 'out \\(1\\)/**', 'x\\[1\\].md']);
+  assert.deepEqual(ignoreGlobs('', escape), []);
+});
+
+test('git ignored paths reach addCollection and are persisted only when they change', async (t) => {
+  let ignore = ['dist/**'];
+  let fingerprint = 'one';
+  const persisted = [];
+  const s = await start(t, { ignored: () => ignore, git: () => fingerprint, persistIgnore: async (name, list) => persisted.push([name, list]) });
+  await s.call('/search', { repo: '/r', query: 'q' });
+  assert.deepEqual(s.store.calls.find((c) => c[0] === 'add')[2].ignore, ['dist/**']);
+  assert.deepEqual(persisted, [[collectionName('/r'), ['dist/**']]]);
+  const order = s.store.calls.map((c) => c[0]);
+  assert.ok(order.indexOf('add') < order.indexOf('update'));
+  fingerprint = 'two';
+  await s.call('/search', { repo: '/r', query: 'q' });
+  assert.equal(persisted.length, 1, 'an unchanged list is not written again');
+  ignore = ['dist/**', 'tmp/**'];
+  fingerprint = 'three';
+  await s.call('/search', { repo: '/r', query: 'q' });
+  assert.deepEqual(persisted[1], [collectionName('/r'), ['dist/**', 'tmp/**']]);
+  assert.equal(s.store.calls.filter((c) => c[0] === 'update').length, 3);
 });

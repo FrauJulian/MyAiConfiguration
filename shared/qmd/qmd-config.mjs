@@ -1,4 +1,4 @@
-// shared/qmd/qmd-config.mjs — edits only the models: block of QMD's index.yml.
+// shared/qmd/qmd-config.mjs — edits only the models: block and setup-owned collection ignore lists in QMD's index.yml.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -31,6 +31,16 @@ export function unsetModels(text, YAML) {
   if (document.errors.length) throw new Error(`index.yml cannot be parsed: ${document.errors[0].message}`);
   if (document.contents !== null) document.delete('models');
   return document.contents === null || document.contents.items?.length === 0 ? '' : document.toString();
+}
+
+// Returns the new text, or null when index.yml has no such collection (QMD's write-through always creates it).
+export function setCollectionIgnore(text, YAML, name, ignore) {
+  const document = YAML.parseDocument(text || '');
+  if (document.errors.length) throw new Error(`index.yml cannot be parsed: ${document.errors[0].message}`);
+  if (!document.hasIn(['collections', name])) return null;
+  if (ignore.length) document.setIn(['collections', name, 'ignore'], document.createNode(ignore));
+  else document.deleteIn(['collections', name, 'ignore']);
+  return document.toString();
 }
 
 async function main(action, argument) {

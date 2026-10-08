@@ -1,11 +1,12 @@
 // shared/qmd/qmd-daemon.mjs — keeps QMD's models loaded for fast searches; exits when idle.
 import { execFileSync } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MASK, collectionName, idleMinutes, importQmd, qmdConfigPath, qmdDbPath, readJson, runQmdCli, stateDir, writePrivateJson } from './qmd-lib.mjs';
+import { setCollectionIgnore } from './qmd-config.mjs';
+import { MASK, collectionName, idleMinutes, importQmd, qmdConfigPath, qmdDbPath, readJson, runQmdCli, stateDir, writePrivateJson, writeTextAtomic } from './qmd-lib.mjs';
 
 const MAX_BODY = 64 * 1024;
 
@@ -27,6 +28,20 @@ export function gitFingerprint(repo) {
   }
 }
 
+// git ls-files -z --directory output: ignored directories end with '/' and become 'dir/**'; escape quotes glob syntax in names.
+export function ignoreGlobs(output, escape) {
+  return output.split('\0').filter(Boolean).map((path) => (path.endsWith('/') ? `${escape(path.slice(0, -1))}/**` : escape(path)));
+}
+
+export function gitIgnored(repo, escape) {
+  try {
+    return ignoreGlobs(execFileSync('git', ['-C', repo, 'ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'],
+      { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, windowsHide: true }), escape);
+  } catch {
+    return [];
+  }
+}
+
 // QMD 2.8.3 createStore unloads models after 5 idle minutes (store.internal.llm); the daemon's own idle exit replaces that.
 export function keepModelsLoaded(store) {
   const llm = store.internal?.llm;
@@ -44,11 +59,12 @@ function tokenMatches(given, expected) {
 }
 
 export function createServer({ store, token, idleMs, now = Date.now, onIdle, extractSnippet, git = gitFingerprint,
-  excludeCollection, recordCollection }) {
+  excludeCollection, recordCollection, ignored, persistIgnore }) {
   let lastRequest = now();
   let active = 0;
   const known = new Set();
   const fingerprints = new Map();
+  const ignoreKeys = new Map();
 
   const inFlight = new Map();
 
@@ -59,9 +75,14 @@ export function createServer({ store, token, idleMs, now = Date.now, onIdle, ext
   }
 
   async function doRefresh(repo, name) {
+    const fingerprint = git(repo);
+    let ignore;
     if (!known.has(name)) {
       const existing = (await store.listCollections()).some((c) => c.name === name);
-      if (!existing) await store.addCollection(name, { path: resolve(repo), pattern: MASK });
+      if (!existing) {
+        ignore = ignored(repo);
+        await store.addCollection(name, { path: resolve(repo), pattern: MASK, ignore });
+      }
       try {
         await excludeCollection(name);
         recordCollection(name);
@@ -70,8 +91,17 @@ export function createServer({ store, token, idleMs, now = Date.now, onIdle, ext
         console.error(`qmd-daemon: could not exclude ${name} from default search: ${error.message}`);
       }
     }
-    const fingerprint = git(repo);
     if (fingerprints.get(name) === fingerprint) return { collection: name, updated: false };
+    ignore ??= ignored(repo);
+    const ignoreKey = JSON.stringify(ignore);
+    if (ignoreKeys.get(name) !== ignoreKey) {
+      try {
+        await persistIgnore(name, ignore);
+        ignoreKeys.set(name, ignoreKey);
+      } catch (error) {
+        console.error(`qmd-daemon: could not save the git ignore list of ${name}: ${error.message}`);
+      }
+    }
     await store.update({ collections: [name] });
     await store.embed({ collection: name, chunkStrategy: 'auto' });
     fingerprints.set(name, fingerprint);
@@ -145,6 +175,12 @@ async function main() {
   const { createStore, extractSnippet } = await importQmd();
   const store = await createStore({ dbPath: qmdDbPath(), configPath: qmdConfigPath() });
   keepModelsLoaded(store);
+  // QMD keeps index.yml authoritative: createStore and the CLI re-sync it into SQLite, and its addCollection
+  // write-through drops `ignore`, so the list is written into index.yml and re-synced the way QMD does it.
+  const fastGlob = (await importQmd(join('node_modules', 'fast-glob', 'out', 'index.js'))).default;
+  const YAML = await importQmd(join('node_modules', 'yaml', 'dist', 'index.js'));
+  const { loadConfig } = await importQmd(join('dist', 'collections.js'));
+  const { syncConfigToDb } = await importQmd(join('dist', 'store.js'));
   const collectionsFile = join(dir, 'collections.json');
   const token = randomBytes(32).toString('hex');
   let stopping = false;
@@ -160,6 +196,15 @@ async function main() {
   };
   const daemon = createServer({
     store, token, idleMs: idleMinutes() * 60_000, onIdle: stop, extractSnippet,
+    ignored: (repo) => gitIgnored(repo, fastGlob.escapePath),
+    persistIgnore: async (name, ignore) => {
+      const path = qmdConfigPath();
+      const text = existsSync(path) ? readFileSync(path, 'utf8') : '';
+      const next = setCollectionIgnore(text, YAML, name, ignore);
+      if (next === null) return; // never re-sync without the collection: the sync would delete it from SQLite
+      if (next !== text) writeTextAtomic(path, next);
+      syncConfigToDb(store.internal.db, loadConfig());
+    },
     excludeCollection: async (name) => { runQmdCli(['collection', 'exclude', name], { windowsHide: true, stdio: 'ignore' }); },
     recordCollection: (name) => {
       const names = new Set(readJson(collectionsFile, []));

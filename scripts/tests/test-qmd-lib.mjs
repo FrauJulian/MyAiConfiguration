@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as YAML from './fixtures/yaml-shim.mjs';
 import { collectionName, deviceEnv, idleMinutes, qmdConfigPath, writePrivateJson, writeTextAtomic, readJson, runQmdCli, MODELS } from '../../shared/qmd/qmd-lib.mjs';
-import { setModels, unsetModels, previousModels, restoreModels } from '../../shared/qmd/qmd-config.mjs';
+import { setModels, unsetModels, previousModels, restoreModels, setCollectionIgnore } from '../../shared/qmd/qmd-config.mjs';
 
 test('collection name is stable, prefixed, and path-safe', () => {
   const a = collectionName('/tmp/My Repo/ü');
@@ -101,4 +101,15 @@ test('writeTextAtomic replaces the file through a temp file in the same director
   writeTextAtomic(file, 'b: 2\n');
   assert.equal(readFileSync(file, 'utf8'), 'b: 2\n');
   assert.deepEqual(readdirSync(dir), ['index.yml']);
+});
+
+test('setCollectionIgnore writes the ignore list of one collection and keeps the rest', () => {
+  const original = '# mine\ncollections:\n  notes:\n    path: /n # keep\n  repo-aaaaaaaaaaaa:\n    path: /r\n    includeByDefault: false\n';
+  const withIgnore = setCollectionIgnore(original, YAML, 'repo-aaaaaaaaaaaa', ['dist/**', 'a.ts']);
+  assert.match(withIgnore, /# mine/);
+  assert.match(withIgnore, /path: \/n # keep/);
+  assert.deepEqual(YAML.default.parse(withIgnore).collections['repo-aaaaaaaaaaaa'], { path: '/r', includeByDefault: false, ignore: ['dist/**', 'a.ts'] });
+  const cleared = setCollectionIgnore(withIgnore, YAML, 'repo-aaaaaaaaaaaa', []);
+  assert.deepEqual(YAML.default.parse(cleared).collections['repo-aaaaaaaaaaaa'], { path: '/r', includeByDefault: false });
+  assert.equal(setCollectionIgnore(original, YAML, 'repo-bbbbbbbbbbbb', ['x']), null, 'an unknown collection is not created');
 });
