@@ -15,3 +15,5 @@ credentials.json
 secrets.json
 !.env.example
 .idea
+__pycache__/
+*.pyc
