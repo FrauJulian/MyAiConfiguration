@@ -1,4 +1,5 @@
 {
+  "category": "small change",
   "prompt": "Make read_upload() safe against path traversal. Legitimate names in nested folders must keep working.",
   "workflow": {
     "kind": "security hardening"

@@ -1,4 +1,5 @@
 {
+  "category": "small change",
   "prompt": "Back-to-back bookings, where one ends exactly when the next starts, are wrongly reported as overlapping. Fix overlaps() without breaking real overlaps.",
   "check": [
     "node",

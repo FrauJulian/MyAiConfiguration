@@ -1,4 +1,5 @@
 {
+  "category": "search",
   "prompt": "Customers whose free trial has ended can still download their monthly statements. Block that by raising PermissionError, and keep it working for paying customers and for customers whose trial is still running.",
   "generate": {
     "filler_modules": 250
