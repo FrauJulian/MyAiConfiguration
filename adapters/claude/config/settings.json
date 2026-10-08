@@ -16,7 +16,10 @@
   },
   "hooks": {
     "PreCompact": [{"hooks": [{"type": "command", "command": "__HOOK_COMMAND__ \"__AI_CONFIG_ROOT__/hooks/scripts/__COMPACT_SCRIPT__\"", "timeout": 4}]}],
-    "SessionStart": [{"hooks": [{"type": "command", "command": "__HOOK_COMMAND__ \"__AI_CONFIG_ROOT__/hooks/scripts/__SESSION_POINTER_SCRIPT__\"", "timeout": 4}]}],
+    "SessionStart": [
+      {"hooks": [{"type": "command", "command": "__HOOK_COMMAND__ \"__AI_CONFIG_ROOT__/hooks/scripts/__SESSION_POINTER_SCRIPT__\"", "timeout": 4}]},
+      {"hooks": [{"type": "command", "command": "__HOOK_COMMAND__ \"__AI_CONFIG_ROOT__/hooks/scripts/__QMD_WARM_SCRIPT__\"", "timeout": 4}]}
+    ],
     "Stop": [
       {
         "hooks": [

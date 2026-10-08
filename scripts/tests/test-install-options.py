@@ -73,6 +73,31 @@ class InstallOptionsTests(unittest.TestCase):
             subprocess.run([sys.executable, script, 'merge-toml', '--current', str(current), '--managed', str(managed_path), '--output', str(output)], check=True)
             self.assertIn('# Größe', output.read_text(encoding='utf-8'))
 
+    def test_semantic_retrieval_disabled_removes_qmd_session_hook(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = Path(directory) / 'settings.json'
+            settings.write_text(json.dumps({'hooks': {'SessionStart': [
+                {'hooks': [{'type': 'command', 'command': 'bash "/c/hooks/scripts/show-session-state-pointer.sh"'}]},
+                {'hooks': [{'type': 'command', 'command': 'bash "/c/hooks/scripts/qmd-warm.sh"'}]}]}}), encoding='utf-8')
+            result = json.loads(OPTIONS.filter_options(settings, semantic_retrieval_enabled=False))
+            commands = [hook['command'] for group in result['hooks']['SessionStart'] for hook in group['hooks']]
+            self.assertEqual(commands, ['bash "/c/hooks/scripts/show-session-state-pointer.sh"'])
+
+    def test_semantic_retrieval_disabled_removes_codex_session_hook(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'config.toml'
+            config.write_text('[features]\nhooks = true\n\n[[hooks.SessionStart]]\n[[hooks.SessionStart.hooks]]\ntype = "command"\n'
+                              'command = \'bash "/c/hooks/scripts/qmd-warm.sh"\'\ncommand_windows = \'pwsh "/c/hooks/scripts/Start-QmdWarm.ps1"\'\ntimeout = 4\n',
+                              encoding='utf-8')
+            result = OPTIONS.filter_options(config, semantic_retrieval_enabled=False)
+            self.assertNotIn('qmd-warm', result)
+            self.assertNotIn('hooks.SessionStart', result)
+
+    def test_instruction_line_only_with_semantic_search(self):
+        text = 'Line one.\nWhen `semantic-search` is installed, run it first.\nLine three.\n'
+        self.assertEqual(OPTIONS.filter_instructions(text, False), 'Line one.\nLine three.\n')
+        self.assertEqual(OPTIONS.filter_instructions(text, True), text)
+
     def test_filter_preserves_other_claude_hooks_and_status(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'settings.json'

@@ -4,7 +4,7 @@ sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
 network_access = true
-writable_roots = ['__AI_CONFIG_ROOT__/../.my-ai-configuration/semantic-retrieval/data']
+writable_roots = ['__AI_CONFIG_ROOT__/../.my-ai-configuration/qmd', '__AI_CONFIG_ROOT__/../.cache/qmd']
 
 [windows]
 sandbox = "unelevated"
@@ -26,3 +26,10 @@ type = "command"
 command = '__HOOK_COMMAND__ "__AI_CONFIG_ROOT__/hooks/__HOOK_SCRIPT__"'
 command_windows = '__POWERSHELL_HOOK_COMMAND__ "__AI_CONFIG_ROOT__/hooks/__POWERSHELL_HOOK_SCRIPT__"'
 timeout = 8
+
+[[hooks.SessionStart]]
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = '__HOOK_COMMAND__ "__AI_CONFIG_ROOT__/hooks/scripts/__QMD_WARM_SCRIPT__"'
+command_windows = '__POWERSHELL_HOOK_COMMAND__ "__AI_CONFIG_ROOT__/hooks/scripts/__QMD_WARM_SCRIPT__"'
+timeout = 4

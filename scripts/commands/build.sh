@@ -195,12 +195,14 @@ for client in codex claude; do
   statusline_script=statusline.sh
   compact_script=record-compact.sh
   pointer_script=show-session-state-pointer.sh
+  qmd_warm_script=qmd-warm.sh
   if [ "$shell" = powershell ]; then
     command='__POWERSHELL_COMMAND__'
     script=flashbang.ps1
     statusline_script=statusline.ps1
     compact_script=Record-Compact.ps1
     pointer_script=Show-SessionStatePointer.ps1
+    qmd_warm_script=Start-QmdWarm.ps1
   fi
   path="$output/$client-$shell/$file"
   content=$(<"$path")
@@ -217,6 +219,7 @@ for client in codex claude; do
   content=${content//__POWERSHELL_HOOK_SCRIPT__/$script}
   content=${content//__COMPACT_SCRIPT__/$compact_script}
   content=${content//__SESSION_POINTER_SCRIPT__/$pointer_script}
+  content=${content//__QMD_WARM_SCRIPT__/$qmd_warm_script}
   content=${content//__STATUSLINE_COMMAND__/$command}
   content=${content//__STATUSLINE_SCRIPT__/$statusline_script}
   content=${content//__CLAUDE_SANDBOX__/$sandbox}

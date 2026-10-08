@@ -11,7 +11,27 @@ def is_flashbang(hook):
                for key in ('command', 'command_windows'))
 
 
-def filter_options(path, flashbang_enabled=True, statusline_enabled=True):
+def is_qmd_warm(hook):
+    return any(re.search(r'(?:qmd-warm\.sh|Start-QmdWarm\.ps1)', str(hook.get(key, '')), re.I)
+               for key in ('command', 'command_windows'))
+
+
+def without_hooks(groups, predicate):
+    remaining = []
+    for group in groups:
+        hooks = [hook for hook in group.get('hooks', []) if not predicate(hook)]
+        if hooks:
+            remaining.append(dict(group, hooks=hooks))
+    return remaining
+
+
+def filter_instructions(text, semantic_retrieval_enabled):
+    if semantic_retrieval_enabled:
+        return text
+    return ''.join(line for line in text.splitlines(keepends=True) if '`semantic-search`' not in line)
+
+
+def filter_options(path, flashbang_enabled=True, statusline_enabled=True, semantic_retrieval_enabled=True):
     content = path.read_text(encoding='utf-8-sig')
     if path.name == 'settings.json':
         settings = json.loads(content)
@@ -26,6 +46,12 @@ def filter_options(path, flashbang_enabled=True, statusline_enabled=True):
                 settings['hooks']['Stop'] = remaining
             elif 'Stop' in settings.get('hooks', {}):
                 del settings['hooks']['Stop']
+        if not semantic_retrieval_enabled:
+            remaining = without_hooks(settings.get('hooks', {}).get('SessionStart', []), is_qmd_warm)
+            if remaining:
+                settings['hooks']['SessionStart'] = remaining
+            else:
+                settings.get('hooks', {}).pop('SessionStart', None)
         if not statusline_enabled:
             settings.pop('statusLine', None)
         return json.dumps(settings, indent=2, ensure_ascii=False) + '\n'
@@ -44,6 +70,17 @@ def filter_options(path, flashbang_enabled=True, statusline_enabled=True):
             filtered.append(section)
         result = ''.join(filtered)
         result = re.sub(r'(?m)^\[\[hooks\.Stop\]\][ \t]*\r?\n\s*(?=\[|\Z)(?!\[\[hooks\.Stop\.hooks\]\])', '', result)
+    if not semantic_retrieval_enabled:
+        sections = re.split(r'(?m)(?=^\s*\[\[?[^\r\n]+\]\]?\s*$)', result)
+        kept = []
+        for section in sections:
+            if re.match(r'\s*\[\[hooks\.SessionStart\.hooks\]\]', section):
+                hook = tomllib.loads(section)['hooks']['SessionStart']['hooks'][0]
+                if is_qmd_warm(hook):
+                    continue
+            kept.append(section)
+        result = ''.join(kept)
+        result = re.sub(r'(?m)^\[\[hooks\.SessionStart\]\][ \t]*\r?\n\s*(?=\[|\Z)(?!\[\[hooks\.SessionStart\.hooks\]\])', '', result)
     if not statusline_enabled:
         sections = re.split(r'(?m)(?=^\s*\[\[?[^\r\n]+\]\]?\s*$)', result)
         for index, section in enumerate(sections):
@@ -69,7 +106,7 @@ def merge_json(current, managed):
     for key, value in managed.items():
         if key == 'hooks' and isinstance(value, dict) and isinstance(result.get(key), dict):
             hooks = dict(result[key])
-            for event in set(value) | {'Stop'}:
+            for event in set(value) | {'Stop', 'SessionStart'}:
                 groups = value.get(event, [])
                 old_groups = hooks.get(event, [])
                 if isinstance(groups, list) and isinstance(old_groups, list):
@@ -79,7 +116,7 @@ def merge_json(current, managed):
                             retained.append(group)
                             continue
                         foreign = [hook for hook in group['hooks'] if not (isinstance(hook, dict) and re.search(
-                            r'(?:flashbang|statusline|record-compact|session-state-pointer)\.(?:ps1|sh)',
+                            r'(?:flashbang|statusline|record-compact|session-state-pointer|qmd-warm|Start-QmdWarm)\.(?:ps1|sh)',
                             str(hook.get('command', '')) + str(hook.get('command_windows', '')), re.I))]
                         if foreign:
                             retained.append(dict(group, hooks=foreign))
@@ -131,7 +168,7 @@ def merge_toml(current_text, managed_text, statusline_enabled=True):
     for header, block in current_sections:
         plugin_table = re.match(r'^\[(?:plugins|marketplaces)(?:\.|\])', header)
         array_table = header.startswith('[[')
-        owned_hook = any(re.search(r'(?:flashbang|statusline|record-compact|session-state-pointer)\.(?:ps1|sh)', line, re.I) for line in block)
+        owned_hook = any(re.search(r'(?:flashbang|statusline|record-compact|session-state-pointer|qmd-warm|Start-QmdWarm)\.(?:ps1|sh)', line, re.I) for line in block)
         if plugin_table and header in managed_headers:
             raise ValueError('Cannot merge conflicting managed plugin tables.')
         if (header not in managed_headers and not array_table) or (array_table and not owned_hook):
@@ -173,17 +210,20 @@ def merge_toml(current_text, managed_text, statusline_enabled=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=('filter', 'merge-json', 'merge-toml'))
+    parser.add_argument('action', choices=('filter', 'filter-instructions', 'merge-json', 'merge-toml'))
     parser.add_argument('--path', type=Path)
     parser.add_argument('--current', type=Path)
     parser.add_argument('--flashbang', choices=('true', 'false'))
     parser.add_argument('--statusline', choices=('true', 'false'), default='true')
+    parser.add_argument('--semantic-retrieval', choices=('true', 'false'), default='true')
     parser.add_argument('--managed', type=Path)
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     try:
         if args.action == 'filter':
-            result = filter_options(args.path, args.flashbang == 'true', args.statusline == 'true')
+            result = filter_options(args.path, args.flashbang == 'true', args.statusline == 'true', args.semantic_retrieval == 'true')
+        elif args.action == 'filter-instructions':
+            result = filter_instructions(args.path.read_text(encoding='utf-8-sig'), args.semantic_retrieval == 'true')
         else:
             managed = args.managed.read_text(encoding='utf-8-sig') if args.managed else sys.stdin.buffer.read().decode('utf-8-sig')
             current = args.current.read_text(encoding='utf-8-sig')

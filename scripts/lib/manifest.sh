@@ -210,8 +210,13 @@ sys.stdout.buffer.write(("\n".join(lines) + "\n").encode("utf-8"))
     content=$(cat -- "$source_file" && printf '\034') || return
     content=${content%$'\034'}
     needs_sub=false
-    if { [ "$flashbang_enabled" = false ] || [ "$statusline_enabled" = false ]; } && [[ "$relative" = settings.json || "$relative" = config.toml ]]; then
-      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter --path "$source_file" --flashbang "$flashbang_enabled" --statusline "$statusline_enabled" && printf '\034') || return
+    if { [ "$flashbang_enabled" = false ] || [ "$statusline_enabled" = false ] || [ "$semantic_retrieval_enabled" = false ]; } && [[ "$relative" = settings.json || "$relative" = config.toml ]]; then
+      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter --path "$source_file" --flashbang "$flashbang_enabled" --statusline "$statusline_enabled" --semantic-retrieval "$semantic_retrieval_enabled" && printf '\034') || return
+      content=${content%$'\034'}
+      needs_sub=true
+    fi
+    if [ "$semantic_retrieval_enabled" = false ] && [[ "$relative" = CLAUDE.md || "$relative" = AGENTS.md || "$relative" = rules/general.md ]]; then
+      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter-instructions --path "$source_file" --semantic-retrieval false && printf '\034') || return
       content=${content%$'\034'}
       needs_sub=true
     fi

@@ -227,13 +227,17 @@ function Invoke-ManagedSync {
         if (-not $SemanticRetrievalEnabled -and $relative -match '(^|/)semantic-search/') { return }
         $target = Resolve-ManagedPath -Destination $Destination -Relative $relative
         $rawContent = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
-        $filterOptions = ((-not $FlashbangEnabled) -or (-not $StatusLineEnabled)) -and $relative -in @('settings.json', 'config.toml')
+        $filterOptions = ((-not $FlashbangEnabled) -or (-not $StatusLineEnabled) -or (-not $SemanticRetrievalEnabled)) -and $relative -in @('settings.json', 'config.toml')
         if ($filterOptions) {
             $flashbangOption = if ($FlashbangEnabled) { 'true' } else { 'false' }
             $statusLineOption = if ($StatusLineEnabled) { 'true' } else { 'false' }
-            $rawContent = Invoke-InstallOptions -Arguments @('filter', '--path', $_.FullName, '--flashbang', $flashbangOption, '--statusline', $statusLineOption) -ErrorMessage 'Could not configure install options.'
+            $rawContent = Invoke-InstallOptions -Arguments @('filter', '--path', $_.FullName, '--flashbang', $flashbangOption, '--statusline', $statusLineOption, '--semantic-retrieval', $(if ($SemanticRetrievalEnabled) { 'true' } else { 'false' })) -ErrorMessage 'Could not configure install options.'
         }
-        $needsSubstitution = $filterOptions -or $rawContent.Contains('__AI_CONFIG_ROOT__') -or $rawContent.Contains('__HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_COMMAND__') -or $rawContent.Contains('__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__')
+        $filterInstructions = (-not $SemanticRetrievalEnabled) -and $relative -in @('CLAUDE.md', 'AGENTS.md', 'rules/general.md')
+        if ($filterInstructions) {
+            $rawContent = Invoke-InstallOptions -Arguments @('filter-instructions', '--path', $_.FullName, '--semantic-retrieval', 'false') -ErrorMessage 'Could not configure install options.'
+        }
+        $needsSubstitution = $filterOptions -or $filterInstructions -or $rawContent.Contains('__AI_CONFIG_ROOT__') -or $rawContent.Contains('__HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_COMMAND__') -or $rawContent.Contains('__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__')
         if ($needsSubstitution) {
             $finalContent = $rawContent.Replace('__AI_CONFIG_ROOT__', $AiConfigRoot).Replace('__HOOK_COMMAND__', $ShellCommand).Replace('__POWERSHELL_HOOK_COMMAND__', $PowerShellCommand).Replace('__POWERSHELL_COMMAND__', $PowerShellCommand).Replace('__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__', $ClaudeConcurrency).Replace('__HOOK_SCRIPT__', 'flashbang.ps1').Replace('__POWERSHELL_HOOK_SCRIPT__', 'flashbang.ps1')
             $newBytes = [System.Text.Encoding]::UTF8.GetBytes($finalContent)
