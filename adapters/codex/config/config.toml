@@ -7,7 +7,7 @@ network_access = true
 writable_roots = ['__AI_CONFIG_ROOT__/../.my-ai-configuration/qmd', '__AI_CONFIG_ROOT__/../.cache/qmd']
 
 [windows]
-sandbox = "unelevated"
+sandbox = "elevated"
 
 [tui]
 status_line = ["model", "reasoning", "approval-mode", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]
