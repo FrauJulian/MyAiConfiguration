@@ -64,23 +64,23 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Check PowerShell runtime
+      - name: Install PowerShell runtime
         shell: bash
         run: |
-          if command -v pwsh >/dev/null 2>&1; then
-            echo 'POWERSHELL_AVAILABLE=true' >> "$GITHUB_ENV"
-            exit 0
+          set -euo pipefail
+          if ! command -v pwsh >/dev/null 2>&1; then
+            # Microsoft's signed apt repository; the job fails when PowerShell cannot be installed.
+            . /etc/os-release
+            wget -q -O "$RUNNER_TEMP/packages-microsoft-prod.deb" "https://packages.microsoft.com/config/$ID/$VERSION_ID/packages-microsoft-prod.deb"
+            sudo dpkg -i "$RUNNER_TEMP/packages-microsoft-prod.deb"
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends powershell
           fi
-          if sudo apt-get update && sudo apt-get install --yes --no-install-recommends powershell; then
-            echo 'POWERSHELL_AVAILABLE=true' >> "$GITHUB_ENV"
-          else
-            echo 'POWERSHELL_AVAILABLE=false' >> "$GITHUB_ENV"
-            echo '::warning::PowerShell is unavailable; PowerShell checks skipped for this runner.'
-          fi
+          pwsh -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
       - name: Run PowerShell tests
         shell: bash
         run: |
-          if [ "${POWERSHELL_AVAILABLE:-false}" != true ]; then exit 0; fi
+          set -euo pipefail
           pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/commands/check-capabilities.ps1
           pwsh -NoLogo -NoProfile -NonInteractive -File ./scripts/commands/build.ps1 -Summary
           for file in scripts/tests/test-*.ps1; do
