@@ -23,7 +23,7 @@ Run scripts from the repository root. PowerShell and Bash commands have equivale
 | `commands/doctor.ps1`, `commands/doctor.sh` | Check generated output and installed configuration. |
 | `commands/prompt-budget.ps1`, `commands/prompt-budget.sh` | Track permanent context, skill metadata, the rule catalog, and agent metadata; warn above 10,000 permanent-context tokens, fail when any token estimate exceeds its baseline by 10%, or permanent context exceeds 15,000 tokens. |
 | `commands/context-report.ps1`, `commands/context-report.sh` | Report the context installed Claude and Codex actually load, from Claude `/context`, `/skill-doctor`, and its init event, and Codex `debug prompt-input`: categories, active plugins, listed skills, installed skills missing from the listing, and skills listed without description context. `--check` fails on missing or description-less skills. No model request is made. |
-| `commands/benchmark.ps1`, `commands/benchmark.sh` | Run the Python, C#/ASP.NET, and TypeScript tasks under `scripts/benchmarks/tasks/` with and without the installed setup. Both arms of a client use one pinned model and reasoning effort; a preflight records what each arm actually loads in `provenance.json` and stops when the arms are not comparable; `--arms setup setup-no-search --tasks 11-* 12-* 13-* --warm-index` compares Claude with and without semantic search on concept-search tasks in a large generated repository, and compare pass rate, rework turns, duration, tokens, tool calls, cost, and workflow checks per task category (`category` in `task.json`: small change, larger implementation, search) (no planning ceremony for a small change, targeted verification for a bugfix, bounded delegation for a larger change). Starts real model sessions; use `--dry-run` to list runs. The Codex baseline needs one `codex login` with `CODEX_HOME` set to `--codex-baseline-home`. |
+| `commands/benchmark.ps1`, `commands/benchmark.sh` | Compare real Claude/Codex sessions with and without the setup. See [Session benchmarks](#session-benchmarks) for isolation, costs, and the search comparison. |
 | `commands/repository-context.ps1`, `commands/repository-context.sh` | Refresh the local repository-context cache. |
 | `commands/session-state.ps1`, `commands/session-state.sh` | Read or update the local agent session state. |
 | `commands/telemetry.ps1`, `commands/telemetry.sh` | Append a local telemetry event. |
@@ -32,7 +32,14 @@ Run scripts from the repository root. PowerShell and Bash commands have equivale
 | `commands/add-credentials.ps1`, `commands/add-credentials.sh` | Store a client-scoped tool credential in the operating-system credential store. |
 | `commands/remove-credentials.ps1`, `commands/remove-credentials.sh` | Delete a selected client-scoped credential from the operating-system credential store. |
 
-Prompt KPIs estimate tokens as UTF-8 bytes divided by four, using the larger shell package per client. Skill metadata counts `SKILL.md` frontmatter outside rule skills; the rule catalog counts all generated rule entry files but excludes references, so it measures the available catalog size rather than rules loaded in a typical session; agent metadata counts frontmatter for Claude and `name`/`description` for Codex. All metrics fail CI above baseline +10%; permanent context also warns above 10,000 tokens and fails above 15,000 tokens. The baseline covers the retained skill catalog. Project-specific instructions, external plugin prompt bodies, and live MCP/tool schemas are not measured.
+Prompt KPIs estimate tokens as UTF-8 bytes divided by four, using the larger shell package per client.
+Skill metadata counts every `SKILL.md` frontmatter, including Claude's generated rule skills. Permanent context
+combines global instructions, skill and agent metadata, and the security baseline loaded for development tasks.
+The rule catalog counts Codex rule files outside `references/` and Claude's generated `rules-*/SKILL.md` entries;
+it measures available guidance, not all rules loaded in a typical session. Agent metadata counts Claude frontmatter
+and Codex `name`/`description` fields. All metrics fail above baseline +10%; permanent context also warns above
+10,000 tokens and fails above 15,000. Project instructions, external plugin bodies, and live MCP/tool schemas
+are excluded. `context-report` complements this estimate with installed-client discovery.
 
 Custom instructions remain under `~/.my-ai-configuration/instructions/`; installation and update scripts never reset their contents. Only clients with a nonempty instruction file receive a startup rule in their installed `AGENTS.md` or `CLAUDE.md`. That rule requires immediate loading before any response or task work and keeps the instructions active throughout the session, including after compaction. Adding or removing instructions refreshes the rule in an existing installation; empty or missing instruction files leave no rule. Generated packages contain no personal instruction rule. Changes apply when the client next loads its global instructions.
 To undo an added instruction, pass the same text to `remove-instruction` with `-Client`/`--client` and `-Instruction`/`--instruction`. It removes the last exact matching block per selected client and preserves other text. A missing match leaves the file unchanged.
@@ -63,7 +70,8 @@ Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
 | `tests/test-quick-update.py` | Validate saved Quickupdate choices. |
 | `tests/test-remove-customizations.py` | Validate targeted instruction and credential removal without accessing the real credential store. |
 | `tests/test-quick-update.ps1`, `tests/test-quick-update.sh` | Run the Quickupdate test through the relevant shell. |
-| `tests/test-qmd-*.mjs` | Validate the QMD library, search, daemon, warm-up, and benchmark scripts. |
+| `tests/test-qmd-lib.mjs`, `test-qmd-daemon.mjs`, `test-qmd-search.mjs`, `test-qmd-warm.mjs`, `test-qmd-benchmark.mjs` | Model-free QMD unit tests; require the YAML dependency. |
+| `tests/test-qmd-integration.mjs` | Manual integration test using real QMD and downloaded models; excluded from CI. |
 | `tests/test-qmd-setup.py` | Validate QMD installation, migration, and removal. |
 | `tests/test-session-state.py` | Validate session-state helpers. |
 | `tests/test-shell-packages.ps1`, `tests/test-shell-packages.sh` | Validate generated package contents and client settings. |
@@ -71,7 +79,54 @@ Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
 | `tests/test-install-selections.ps1`, `tests/test-install-selections.sh` | Validate dry-run shell and client selections. |
 | `tests/test-command-summaries.ps1`, `tests/test-command-summaries.sh` | Validate doctor, install, and update summary output. |
 | `tests/test-telemetry.py` | Validate telemetry output. |
+| `tests/test-personal-instructions.py` | Validate startup instruction pointers and preservation of personal instruction files. |
 | `tests/test-user-customizations.py` | Validate user instruction overlays and credential helpers. |
+
+## QMD tests
+
+The CI `qmd` job installs only `yaml@2.9.0` into an isolated directory, sets `QMD_PACKAGE_DIR` to that directory,
+and runs these five files. It does not install QMD or download models. With a complete global QMD installation,
+the same tests resolve YAML from QMD automatically:
+
+```text
+node --test scripts/tests/test-qmd-lib.mjs scripts/tests/test-qmd-daemon.mjs scripts/tests/test-qmd-search.mjs scripts/tests/test-qmd-warm.mjs scripts/tests/test-qmd-benchmark.mjs
+```
+
+Without QMD installed, use the dependency setup from [the CI workflow](../.gitea/workflows/ci.yml).
+`QMD_PACKAGE_DIR` must point to the directory containing the test dependency's `node_modules` directory.
+A missing YAML dependency fails `test-qmd-lib.mjs` before its tests load.
+
+Run the integration test separately, only with a complete QMD installation and resources for model downloads.
+Unset `QMD_CONFIG_DIR` first so the test uses its temporary configuration rather than an inherited user path.
+Clear a unit-test-only `QMD_PACKAGE_DIR` override as well:
+
+```text
+node --test scripts/tests/test-qmd-integration.mjs
+```
+
+The integration test creates a temporary home and repository, downloads models, searches through the daemon,
+and stops it after successful assertions.
+Its temporary data is not automatically removed. `QMD_TEST_CACHE` can select an existing QMD cache parent;
+the test uses its `qmd/` subdirectory, so avoid pointing it at a cache containing unrelated data.
+
+## Session benchmarks
+
+The A/B benchmark runs Python, C#/ASP.NET, and TypeScript tasks under `scripts/benchmarks/tasks/`.
+These are real model sessions and can incur usage charges; `--dry-run` lists planned runs.
+Both arms use the same model and reasoning effort for each client. Preflight records loaded configuration in
+`provenance.json` and normally stops when the arms are not comparable. Reports compare pass rate, rework turns,
+time, tokens, tool calls, cost, and workflow checks per task category.
+
+For Claude's semantic-search comparison, pass these arguments to the shell's benchmark command:
+
+```text
+--clients claude --arms setup setup-no-search --tasks 11-* 12-* 13-* --warm-index
+```
+
+`setup-no-search` is Claude-only. Warm-up starts QMD and indexes the fixture before timing setup-arm sessions.
+The Codex baseline requires a separate login under `--codex-baseline-home`; set `CODEX_HOME` to that path for
+`codex login`. Supply `--codex-model` if the installed configuration does not select a model.
+Benchmark fixture READMEs describe the starting task state and are retained as test inputs.
 
 ## Internal helpers
 
@@ -90,4 +145,4 @@ Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
 | `lib/selection-state.py` | Read and write Quickupdate state. |
 | `lib/qmd.sh`, `lib/qmd.ps1` | Invoke local QMD search from the installation flow. |
 | `lib/qmd.py` | Install, migrate, benchmark, and remove local QMD search. |
-| `shared/qmd/*.mjs` | Installed QMD scripts: search CLI, daemon, warm-up, benchmark, and shared library. |
+| [`shared/qmd/`](../shared/qmd/) (repository root) | Installed QMD scripts: search CLI, daemon, warm-up, benchmark, and shared library. |

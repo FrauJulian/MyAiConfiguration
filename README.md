@@ -107,8 +107,7 @@ Install and update also rebuild internally; the explicit build above lets you ch
 - Bash 4.3 or newer, with standard utilities such as `awk`, `sed`, and `sha256sum`.
 - Python 3.11 or newer for configuration validation and task-state hooks/helpers (`python` for PowerShell scripts, `python3` for Bash scripts).
 - `jq` for Claude's Bash status line; without it, that status line produces no output.
-- Node.js 22 or newer and `npm` when local QMD search is enabled.
-- Node.js 22 or newer and `npm` when MCPorter is selected.
+- Node.js 22 or newer and `npm` when local QMD search or MCPorter is selected.
 
 Core Bash setup scripts do not require PowerShell. The credential commands use Windows Credential Manager and require
 PowerShell, including when invoked through their Bash wrappers. The PowerShell scripts remain compatible with
@@ -128,6 +127,11 @@ shared definitions -> client adapters -> generated packages -> user installation
 | [`scripts/`](docs/scripts.md) | Build, installation, update, diagnosis, and validation scripts. |
 | `docs/` | Focused documentation about the configuration design. |
 
+Client settings start in `adapters/codex/config/config.toml` and
+`adapters/claude/config/settings.json`. Shared Markdown and metadata define behavior;
+adapters supply client-specific formats and placeholders resolved during build or installation.
+Generated output is not a source to edit.
+
 The build creates:
 
 ```text
@@ -142,16 +146,13 @@ generated/
 
 | Document | Contents |
 | --- | --- |
-| [Architecture](docs/architecture.md) | Shared sources, adapters, generated packages, and installation. |
 | [Scripts](docs/scripts.md) | Commands, checks, tests, and internal script layout. |
-| [Configuration](docs/configuration.md) | Client settings, permission defaults, status displays, and verification. |
+| [Configuration](docs/configuration.md) | Client settings, permissions, status displays, local QMD search, and verification. |
 | [Extending the configuration](docs/extending-configuration.md) | Add shared rules, skills, and agents. |
 | [Plugins](docs/plugins.md) | Plugin sources, selection, installation, updates, and removal. |
 | [Hooks](docs/hooks.md) | Registered events, session-state helpers, notifications, and optional utilities. |
 | [Agents](docs/agents.md) | Agent roles and when delegation is useful. |
 | [Skills](docs/skills.md) | Skill categories and conditional rule loading. |
-| [Codex adapter](adapters/codex/README.md) | Codex-specific configuration files. |
-| [Claude Code adapter](adapters/claude/README.md) | Claude-specific configuration files. |
 | [Hook package](shared/hooks/README.md) | Overview shipped with the hook scripts. |
 | [Repository instructions](AI-Instructions.md) | Rules for maintaining this repository. |
 
@@ -233,9 +234,9 @@ Selecting Codex also installs shared skills to `.agents/skills`. An interactive 
 Codex skills; unchecked extensions are skipped on installation. Normal install and update ask whether to enable
 Flashbang, apply the custom status line, and enable local QMD search. Choices are saved for Quickupdate.
 The shared skill catalog includes development skills and focused writing, image, site structure, psychology, and
-conversion skills. All retained skills are included in both generated clients.
+conversion skills. All retained skills are included in both generated clients; installation includes `semantic-search` only when local QMD search is enabled.
 The status line defaults to enabled to preserve existing behavior. Disabling it removes the custom client setting and,
-for Claude, the setup-owned status line script. Disabling local QMD search on update removes only its setup-owned package, models, and repository collections.
+for Claude, the setup-owned status line script. Disabling local QMD search removes its setup-owned package, models, and repository collections once no client still uses it. See [Local QMD search](docs/configuration.md#local-qmd-search) for storage and removal details.
 Dry runs preview changes without updating extensions or retrieval. See [Plugins](docs/plugins.md) for client-specific behavior.
 
 ## Update Script
@@ -288,8 +289,8 @@ touched. Codex skill backups are kept under `.agents/.ai-config-skill-backups/`.
 deleted once it is fully empty; backups already on disk are always kept.
 Extensions and skills recorded in the ledger are removed the same way `update` removes a deselected extension:
 pre-existing or manually installed ones outside the ledger are left alone, and a skill file modified since it was
-installed is kept with a warning. An enabled local QMD search setup is disabled and its setup-owned runtime and
-index removed for the selected client(s). The saved Quickupdate selection (`~/.my-ai-configuration/selection.json`)
+installed is kept with a warning. Local QMD search is disabled for the selected client(s). Its shared runtime,
+owned models, and recorded repository collections are removed only when no client still uses it; the shared QMD database and foreign collections are retained. The saved Quickupdate selection (`~/.my-ai-configuration/selection.json`)
 is only removed once uninstalling leaves no client installed at all, so uninstalling just one client out of a
 `Both` installation keeps the saved choices for the client that remains.
 
