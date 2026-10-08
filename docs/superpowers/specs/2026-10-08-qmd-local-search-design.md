@@ -67,7 +67,7 @@ Motivation from the 2026-10-08 Claude A/B benchmark: the Python search was never
 
 ### Configuration and state
 
-- `~/.config/qmd/index.yml` (or `QMD_CONFIG_DIR`): the setup writes only the `models:` block; other keys and collections are preserved. An unparsable file aborts without writing.
+- `~/.config/qmd/index.yml` (or `QMD_CONFIG_DIR`): the setup writes only the `models:` block; other keys and collections are preserved. An unparsable file aborts without writing. The daemon also writes the `ignore` list (the repository's git-ignored paths) of its own `repo-*` collections, because QMD re-syncs SQLite from this file and its `addCollection` write-through drops `ignore`.
 - `~/.my-ai-configuration/qmd.json`: `{version, device: "gpu" | "cpu", owned_package: bool, owned_models: [...]}`.
 - Device mapping when starting QMD: `gpu` sets `QMD_LLAMA_GPU=auto` (llama.cpp uses all detected GPUs); `cpu` sets `QMD_FORCE_CPU=1`.
 
