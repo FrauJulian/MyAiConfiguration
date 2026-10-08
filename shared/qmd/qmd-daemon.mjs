@@ -1,38 +1,66 @@
 // shared/qmd/qmd-daemon.mjs — keeps QMD's models loaded for fast searches; exits when idle.
 import { execFileSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { statSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { MASK, collectionName, idleMinutes, importQmd, qmdConfigPath, qmdDbPath, readJson, runQmdCli, stateDir, writePrivateJson } from './qmd-lib.mjs';
 
 const MAX_BODY = 64 * 1024;
 
-function gitFingerprint(repo) {
+// Dirty files keep the same porcelain line when edited again, so mtime and size of each listed path are part of the fingerprint.
+export function gitFingerprint(repo) {
   try {
-    return execFileSync('git', ['-C', repo, 'status', '--porcelain=v1', '-uall'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, windowsHide: true })
-      + execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true });
+    const status = execFileSync('git', ['-C', repo, 'status', '--porcelain=v1', '-uall', '-z'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, windowsHide: true });
+    const stats = status.split('\0').filter((entry) => entry.length > 3).map((entry) => {
+      try {
+        const stat = statSync(join(repo, entry.slice(3)));
+        return `${entry}|${stat.mtimeMs}:${stat.size}`;
+      } catch {
+        return `${entry}|deleted`;
+      }
+    });
+    return `${stats.join('\n')}\n` + execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true });
   } catch {
     return String(Date.now());
   }
 }
 
+const REPO_COLLECTION = /^repo-[0-9a-f]{12}$/;
+
+function tokenMatches(given, expected) {
+  const a = Buffer.from(String(given ?? ''));
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export function createServer({ store, token, idleMs, now = Date.now, onIdle, extractSnippet, git = gitFingerprint,
   excludeCollection, recordCollection }) {
   let lastRequest = now();
+  let active = 0;
   const known = new Set();
   const fingerprints = new Map();
 
-  async function refresh(repo) {
+  const inFlight = new Map();
+
+  function refresh(repo) {
     const name = collectionName(repo);
+    if (!inFlight.has(name)) inFlight.set(name, doRefresh(repo, name).finally(() => inFlight.delete(name)));
+    return inFlight.get(name);
+  }
+
+  async function doRefresh(repo, name) {
     if (!known.has(name)) {
       const existing = (await store.listCollections()).some((c) => c.name === name);
-      if (!existing) {
-        await store.addCollection(name, { path: repo, pattern: MASK });
+      if (!existing) await store.addCollection(name, { path: resolve(repo), pattern: MASK });
+      try {
         await excludeCollection(name);
         recordCollection(name);
+        known.add(name);
+      } catch (error) {
+        console.error(`qmd-daemon: could not exclude ${name} from default search: ${error.message}`);
       }
-      known.add(name);
     }
     const fingerprint = git(repo);
     if (fingerprints.get(name) === fingerprint) return { collection: name, updated: false };
@@ -44,8 +72,8 @@ export function createServer({ store, token, idleMs, now = Date.now, onIdle, ext
 
   async function search({ repo, query, limit }) {
     const { collection } = await refresh(repo);
-    const defaults = (await store.getDefaultCollectionNames()).filter((n) => !n.startsWith('repo-'));
-    const results = await store.search({ query, collections: [collection, ...defaults], limit: limit || 5, chunkStrategy: 'auto' });
+    const defaults = (await store.getDefaultCollectionNames()).filter((n) => !REPO_COLLECTION.test(n));
+    const results = await store.search({ query, collections: [collection, ...defaults], limit: Number.isInteger(limit) ? Math.min(20, Math.max(1, limit)) : 5, chunkStrategy: 'auto' });
     return results.map((r) => {
       const { line, snippet } = extractSnippet(r.body, query, 300, r.bestChunkPos, r.bestChunk.length);
       // displayPath is <collection>/<path>: repo hits become repo-relative, others stay addressable as qmd:// URIs.
@@ -59,16 +87,20 @@ export function createServer({ store, token, idleMs, now = Date.now, onIdle, ext
       response.writeHead(status, { 'content-type': 'application/json' });
       response.end(JSON.stringify(value));
     };
-    if (request.headers['x-qmd-token'] !== token) return reply(403, { error: 'forbidden' });
+    if (!tokenMatches(request.headers['x-qmd-token'], token)) return reply(403, { error: 'forbidden' });
+    active++;
     lastRequest = now();
     try {
       if (request.method === 'GET' && request.url === '/health') return reply(200, { status: 'ok', service: 'ai-config-qmd', pid: process.pid });
+      request.setEncoding('utf8');
       let raw = '';
       for await (const chunk of request) {
         raw += chunk;
         if (raw.length > MAX_BODY) return reply(413, { error: 'body too large' });
       }
-      const body = raw ? JSON.parse(raw) : {};
+      let body;
+      try { body = raw ? JSON.parse(raw) : {}; } catch { return reply(400, { error: 'invalid JSON' }); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(400, { error: 'body must be an object' });
       if (request.method === 'POST' && request.url === '/stop') {
         reply(200, { stopping: true });
         return onIdle();
@@ -83,11 +115,12 @@ export function createServer({ store, token, idleMs, now = Date.now, onIdle, ext
     } catch (error) {
       return reply(500, { error: String(error?.message || error) });
     } finally {
+      active--;
       lastRequest = now();
     }
   });
 
-  const checkIdle = () => { if (now() - lastRequest >= idleMs) onIdle(); };
+  const checkIdle = () => { if (active === 0 && now() - lastRequest >= idleMs) onIdle(); };
   return { server, refresh, search, checkIdle };
 }
 
@@ -111,14 +144,14 @@ async function main() {
     stopping = true;
     const latest = readJson(daemonFile, null);
     if (latest?.pid === process.pid) writePrivateJson(daemonFile, { stopped: true });
+    daemon.server.close();
+    daemon.server.closeIdleConnections();
     await store.close();
     process.exit(0);
   };
   const daemon = createServer({
     store, token, idleMs: idleMinutes() * 60_000, onIdle: stop, extractSnippet,
-    excludeCollection: async (name) => {
-      try { runQmdCli(['collection', 'exclude', name], { windowsHide: true, stdio: 'ignore' }); } catch { /* indexing still works without the exclusion */ }
-    },
+    excludeCollection: async (name) => { runQmdCli(['collection', 'exclude', name], { windowsHide: true, stdio: 'ignore' }); },
     recordCollection: (name) => {
       const names = new Set(readJson(collectionsFile, []));
       names.add(name);
