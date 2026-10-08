@@ -54,12 +54,17 @@ export function readJson(path, fallback) {
   }
 }
 
-// The state directory lives in the user profile; mode 0600 restricts the token on POSIX.
-export function writePrivateJson(path, value) {
+// Readers never see a half-written file: write a temp file next to the target, then rename it.
+export function writeTextAtomic(path, text, options = {}) {
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporary, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
+  writeFileSync(temporary, text, options);
   renameSync(temporary, path);
+}
+
+// The state directory lives in the user profile; mode 0600 restricts the token on POSIX.
+export function writePrivateJson(path, value) {
+  writeTextAtomic(path, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
 }
 
 let cachedPackageDir;

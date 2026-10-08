@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as YAML from './fixtures/yaml-shim.mjs';
-import { collectionName, deviceEnv, idleMinutes, qmdConfigPath, writePrivateJson, readJson, runQmdCli, MODELS } from '../../shared/qmd/qmd-lib.mjs';
+import { collectionName, deviceEnv, idleMinutes, qmdConfigPath, writePrivateJson, writeTextAtomic, readJson, runQmdCli, MODELS } from '../../shared/qmd/qmd-lib.mjs';
 import { setModels, unsetModels, previousModels, restoreModels } from '../../shared/qmd/qmd-config.mjs';
 
 test('collection name is stable, prefixed, and path-safe', () => {
@@ -92,4 +92,13 @@ test('restoreModels writes the previous block back and keeps comments and other 
   assert.match(restored, /embed: mine/);
   assert.match(restored, /collections:/);
   assert.doesNotMatch(restored, /Qwen/);
+});
+
+test('writeTextAtomic replaces the file through a temp file in the same directory', () => {
+  const dir = join(mkdtempSync(join(tmpdir(), 'qmd-lib-')), 'cfg');
+  const file = join(dir, 'index.yml');
+  writeTextAtomic(file, 'a: 1\n');
+  writeTextAtomic(file, 'b: 2\n');
+  assert.equal(readFileSync(file, 'utf8'), 'b: 2\n');
+  assert.deepEqual(readdirSync(dir), ['index.yml']);
 });

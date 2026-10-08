@@ -1,8 +1,8 @@
 // shared/qmd/qmd-config.mjs — edits only the models: block of QMD's index.yml.
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MODELS, qmdConfigPath, qmdPackageDir } from './qmd-lib.mjs';
+import { MODELS, qmdConfigPath, qmdPackageDir, writeTextAtomic } from './qmd-lib.mjs';
 
 export function setModels(text, YAML) {
   const document = YAML.parseDocument(text || '');
@@ -49,8 +49,7 @@ async function main(action, argument) {
     if (mapping === undefined) throw new Error('restore-models needs a JSON value');
     next = restoreModels(current, YAML, mapping);
   } else next = unsetModels(current, YAML);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, next);
+  writeTextAtomic(path, next);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
