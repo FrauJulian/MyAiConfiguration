@@ -77,7 +77,7 @@ class Setup:
         self.base = self.home / '.my-ai-configuration'
         self.state_path = self.base / 'qmd.json'
         self.scripts = self.base / 'qmd'
-        self.models = self.home / '.cache' / 'qmd' / 'models'
+        self.models = Path(os.environ.get('XDG_CACHE_HOME') or self.home / '.cache') / 'qmd' / 'models'
 
     def say(self, text):
         if not self.summary:

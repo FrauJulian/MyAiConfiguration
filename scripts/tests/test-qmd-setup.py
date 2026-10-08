@@ -351,6 +351,12 @@ class SetupTest(unittest.TestCase):
         self.assertFalse(self.scripts_dir().exists())
         self.assertFalse((self.home / '.my-ai-configuration/qmd.json').exists())
 
+    def test_models_dir_honors_xdg_cache_home(self):
+        os.environ['XDG_CACHE_HOME'] = str(self.home / 'xdg')
+        self.assertEqual(self.setup(FakeRunner()).models, self.home / 'xdg' / 'qmd' / 'models')
+        os.environ['XDG_CACHE_HOME'] = ''
+        self.assertEqual(self.setup(FakeRunner()).models, self.home / '.cache' / 'qmd' / 'models')
+
 
 if __name__ == '__main__':
     unittest.main()
