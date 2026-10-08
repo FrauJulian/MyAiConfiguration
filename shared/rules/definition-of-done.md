@@ -14,6 +14,7 @@ A task is only considered done when all applicable requirements below are fulfil
 * Verification is sufficient for the change's risk and scope, following `general.md`'s Verification rules. A build, test run, new test, or independent review is not required for every change.
 * Checks selected on that basis, and checks explicitly required by the user or project, have passed. Material gaps and pre-existing failures are reported without claiming unverified success.
 * Any delegated research, review, or verification is complete and its relevant findings are resolved or reported.
+* External technology claims MUST pass the verification checkpoint in `technical-research`. Required unsupported assumptions or missing execution evidence leave affected criteria unverified; a Context7 call alone does not establish completion.
 
 ## Code
 

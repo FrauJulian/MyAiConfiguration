@@ -12,7 +12,7 @@ Use before a change when its consumers, compatibility effects, or blast radius a
 1. Define the proposed change and the behavior or contract it affects.
 2. Locate direct callers, related implementations, shared helpers, configuration, generated output, and relevant tests. Start with exact-path and symbol searches; broaden only when the flow is unclear.
 3. Trace likely impact through runtime paths, persisted data, client integrations, deployment, and documentation as applicable.
-4. Identify compatibility concerns, failure modes, security or data-loss risks, and dependencies on version or environment.
+4. Identify compatibility concerns, failure modes, security or data-loss risks, and dependencies on version or environment. Before confirming external compatibility or recommending an approach, MUST apply the planning checkpoint in `technical-research` and attach matching evidence or mark the assumption unresolved.
 5. Separate confirmed impacts from assumptions and unknowns. Do not treat a possible downstream effect as a fact without evidence.
 6. Recommend proportionate verification tied to the risks found.
 

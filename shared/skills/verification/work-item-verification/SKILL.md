@@ -10,7 +10,7 @@ Use when deciding whether a completed change satisfies a defined work item or re
 ## Workflow
 
 1. Read the objective, scope boundaries, acceptance criteria, and material constraints.
-2. Map each criterion to direct evidence: changed files, observable behavior, command output, test result, or user-confirmed outcome.
+2. Map each criterion to direct evidence: changed files, observable behavior, command output, test result, or user-confirmed outcome. For criteria relying on external technology behavior, MUST apply the verification checkpoint in `technical-research`; check the actual supporting sources and version against the implementation, not merely whether a lookup occurred.
 3. Mark each criterion as met, unmet, or unverified. Do not treat a successful build as proof of unrelated behavioral criteria.
 4. Confirm the implementation stayed within scope and did not leave generated output, documentation, or consumers inconsistent.
 5. Record known limitations, unresolved decisions, and checks that could not run.

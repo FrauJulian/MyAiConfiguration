@@ -10,7 +10,7 @@ Use when an answer, report, or implementation decision depends on claims that ne
 ## Workflow
 
 1. Break the statement into atomic claims that can be checked independently.
-2. Choose evidence suited to each claim: current source, executable output, authoritative documentation, primary research, or direct measurement.
+2. Choose evidence suited to each claim: current source, executable output, authoritative documentation, primary research, or direct measurement. For external technology claims, MUST apply the verification checkpoint in `technical-research`, inspecting matching evidence or resolving gaps through its Context7-first workflow.
 3. Prefer the source closest to the fact. Check dates, versions, and applicability when the claim can change over time.
 4. Compare conflicting evidence and explain any difference in scope or version rather than silently selecting one.
 5. Label the result as confirmed, contradicted, inferred, or unknown. Keep confidence proportional to evidence quality.

@@ -12,7 +12,7 @@ Use when a request lacks enough detail to estimate or verify the intended techni
 1. State the user or system outcome in concrete terms.
 2. Define what is in scope and what is explicitly out of scope based on the request and current behavior.
 3. Write observable acceptance criteria, including relevant failure or edge cases.
-4. Record constraints, dependencies, compatibility requirements, and assumptions separately.
+4. Record constraints, dependencies, compatibility requirements, and assumptions separately. Before accepting external technology constraints as established, MUST apply the planning checkpoint in `technical-research`; carry its evidence or unresolved gaps into the work item.
 5. Ask only questions whose answers would materially change behavior, contracts, permissions, or acceptance. Choose safe reversible defaults for minor implementation details.
 6. Identify unresolved risks and a proportionate verification approach.
 

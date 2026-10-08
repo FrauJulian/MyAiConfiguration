@@ -10,10 +10,10 @@ Use when adding or updating tests for one isolated function, component, or decis
 ## Workflow
 
 1. Read the requirement and implementation. Identify the observable result that defines success and the boundary conditions most likely to fail.
-2. Follow the repository's existing test framework, naming, setup, and assertion style. Avoid new dependencies or fixtures when a small test can express the behavior.
+2. Follow the repository's existing test framework, naming, setup, and assertion style. Avoid new dependencies or fixtures when a small test can express the behavior. If test APIs, mocks, or expected outcomes depend on external behavior, MUST apply the implementation checkpoint in `technical-research` before encoding that assumption.
 3. Cover the normal case and the smallest meaningful set of boundary or failure cases. Include a regression case for a reported defect.
 4. Assert public behavior and useful error outcomes rather than private call order, incidental wording, or internal data layout.
 5. Keep each test deterministic. Control time, randomness, filesystem state, and external services when they affect the result.
-6. Run the focused test and report its result. Broaden verification only when shared behavior or connected components are affected.
+6. Run the focused test and report its result. MUST apply the verification checkpoint in `technical-research` to any external claims the result relies on. Broaden verification only when shared behavior or connected components are affected.
 
 Do not add tests that duplicate existing coverage or require production code to expose test-only hooks without a clear reason.
