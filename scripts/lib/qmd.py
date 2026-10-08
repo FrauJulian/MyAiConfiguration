@@ -74,12 +74,14 @@ class Setup:
 
     def package_installed(self):
         # npm list exits non-zero on tree problems (ELSPROBLEMS) but still prints valid JSON.
-        output = self.run(['npm', 'list', '--global', '--depth=0', '--json'], check=False) or '{}'
+        output = self.run(['npm', 'list', '--global', '--depth=0', '--json'], check=False)
         try:
             listing = json.loads(output)
         except json.JSONDecodeError:
             raise ValueError('npm list did not return JSON.')
-        return PACKAGE in (listing.get('dependencies') or {})
+        if not isinstance(listing, dict) or not isinstance(listing.get('dependencies'), dict):
+            raise ValueError('npm list did not report the global packages.')
+        return PACKAGE in listing['dependencies']
 
     def require_node(self):
         if not node_version_ok(self.run(['node', '--version'])):
@@ -135,7 +137,7 @@ class Setup:
                 previous = json.loads(output.strip().splitlines()[-1])['previous']
             except (IndexError, KeyError, TypeError, json.JSONDecodeError):
                 raise ValueError('qmd-config set-models returned no previous models.')
-            state['previous_models'] = previous if isinstance(previous, dict) else None
+            state['previous_models'] = previous
             state['models_block'] = True
             atomic_json(self.state_path, state)
         before = {p.name for p in self.models.iterdir()} if self.models.is_dir() else set()

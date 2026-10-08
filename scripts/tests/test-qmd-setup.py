@@ -13,9 +13,9 @@ spec.loader.exec_module(qmd)
 
 
 class FakeRunner:
-    def __init__(self, installed=False, gpu='cuda', gpu_result=None, cpu_result=None, previous=None, fail_pull=False):
+    def __init__(self, installed=False, gpu='cuda', gpu_result=None, cpu_result=None, previous=None, fail_pull=False, list_output=None):
         self.calls, self.installed, self.gpu = [], installed, gpu
-        self.previous, self.fail_pull = previous, fail_pull
+        self.previous, self.fail_pull, self.list_output = previous, fail_pull, list_output
         self.results = {'gpu': gpu_result, 'cpu': cpu_result}
 
     def __call__(self, arguments, env=None, timeout=None, check=True):
@@ -27,6 +27,8 @@ class FakeRunner:
             return json.dumps({'previous': self.previous}) + chr(10)
         if self.fail_pull and arguments[:2] == ['qmd', 'pull']:
             raise ValueError('pull failed')
+        if 'npm list' in joined and self.list_output is not None:
+            return self.list_output
         if 'npm list' in joined:
             return json.dumps({'dependencies': {'@tobilu/qmd': {}} if self.installed else {}})
         if 'npm install' in joined:
@@ -197,6 +199,21 @@ class SetupTest(unittest.TestCase):
     def test_package_installed_parses_listing(self):
         self.assertTrue(self.setup(FakeRunner(installed=True)).package_installed())
         self.assertFalse(self.setup(FakeRunner()).package_installed())
+
+    def test_package_installed_rejects_unreliable_listings(self):
+        for output in ('', '  ', 'not json', '{"error": {"code": "ELSPROBLEMS"}}', '{}', '[]'):
+            with self.assertRaises(ValueError, msg=repr(output)):
+                self.setup(FakeRunner(list_output=output)).package_installed()
+        self.assertTrue(self.setup(FakeRunner(list_output='{"dependencies": {"@tobilu/qmd": {}}, "error": {}}')).package_installed())
+        self.assertFalse(self.setup(FakeRunner(list_output='{"dependencies": {}}')).package_installed())
+
+    def test_non_mapping_previous_models_are_restored_verbatim(self):
+        runner = FakeRunner(previous='custom.gguf')
+        setup = self.setup(runner)
+        setup.enable(['claude'])
+        self.assertEqual(self.state()['previous_models'], 'custom.gguf')
+        setup.disable(['claude'])
+        self.assertTrue(any(c[-2:] == ['restore-models', '"custom.gguf"'] for c in runner.calls))
 
     def test_dry_run_changes_nothing(self):
         runner = FakeRunner()

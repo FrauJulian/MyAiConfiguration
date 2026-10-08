@@ -46,7 +46,7 @@ async function main(action, argument) {
     next = setModels(current, YAML);
   } else if (action === 'restore-models') {
     const mapping = JSON.parse(argument ?? '');
-    if (mapping === null || typeof mapping !== 'object' || Array.isArray(mapping)) throw new Error('restore-models needs a JSON object');
+    if (mapping === undefined) throw new Error('restore-models needs a JSON value');
     next = restoreModels(current, YAML, mapping);
   } else next = unsetModels(current, YAML);
   mkdirSync(dirname(path), { recursive: true });

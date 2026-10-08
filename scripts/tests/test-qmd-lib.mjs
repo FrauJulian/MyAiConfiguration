@@ -78,6 +78,8 @@ test('runQmdCli runs the CLI entry of QMD_PACKAGE_DIR without a shell', () => {
 
 test('previousModels captures a user models block, null when absent', () => {
   assert.deepEqual(previousModels('models:\n  embed: mine\ncollections: {}\n', YAML), { embed: 'mine' });
+  assert.equal(previousModels('models: custom\n', YAML), 'custom');
+  assert.deepEqual(previousModels('models: [a, b]\n', YAML), ['a', 'b']);
   assert.equal(previousModels('collections: {}\n', YAML), null);
   assert.equal(previousModels('', YAML), null);
 });
