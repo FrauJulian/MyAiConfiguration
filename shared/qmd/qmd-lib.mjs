@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -80,6 +81,12 @@ export function qmdPackageDir() {
 
 export function importQmd(subpath = join('dist', 'index.js')) {
   return import(pathToFileURL(join(qmdPackageDir(), subpath)).href);
+}
+
+// Resolve from QMD so both nested and hoisted dependency installations work.
+export function importQmdDependency(name) {
+  const require = createRequire(pathToFileURL(join(qmdPackageDir(), 'package.json')));
+  return import(pathToFileURL(require.resolve(name)).href);
 }
 
 // Runs the QMD CLI through node without a shell, so free-text arguments are never re-parsed.

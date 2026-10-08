@@ -6,7 +6,7 @@ import { createServer as createHttpServer } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setCollectionIgnore } from './qmd-config.mjs';
-import { MASK, collectionName, idleMinutes, importQmd, qmdConfigPath, qmdDbPath, readJson, runQmdCli, stateDir, writePrivateJson, writeTextAtomic } from './qmd-lib.mjs';
+import { MASK, collectionName, idleMinutes, importQmd, importQmdDependency, qmdConfigPath, qmdDbPath, readJson, runQmdCli, stateDir, writePrivateJson, writeTextAtomic } from './qmd-lib.mjs';
 
 const MAX_BODY = 64 * 1024;
 
@@ -204,8 +204,8 @@ async function main() {
   keepModelsLoaded(store);
   // QMD keeps index.yml authoritative: createStore and the CLI re-sync it into SQLite, and its addCollection
   // write-through drops `ignore`, so the list is written into index.yml and re-synced the way QMD does it.
-  const fastGlob = (await importQmd(join('node_modules', 'fast-glob', 'out', 'index.js'))).default;
-  const YAML = await importQmd(join('node_modules', 'yaml', 'dist', 'index.js'));
+  const fastGlob = (await importQmdDependency('fast-glob')).default;
+  const YAML = await importQmdDependency('yaml');
   const { loadConfig } = await importQmd(join('dist', 'collections.js'));
   const { syncConfigToDb } = await importQmd(join('dist', 'store.js'));
   const collectionsFile = join(dir, 'collections.json');

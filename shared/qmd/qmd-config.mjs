@@ -1,8 +1,7 @@
 // shared/qmd/qmd-config.mjs — edits only the models: block and setup-owned collection ignore lists in QMD's index.yml.
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MODELS, qmdConfigPath, qmdPackageDir, writeTextAtomic } from './qmd-lib.mjs';
+import { MODELS, importQmdDependency, qmdConfigPath, writeTextAtomic } from './qmd-lib.mjs';
 
 export function setModels(text, YAML) {
   const document = YAML.parseDocument(text || '');
@@ -45,7 +44,7 @@ export function setCollectionIgnore(text, YAML, name, ignore) {
 
 async function main(action, argument) {
   if (!['set-models', 'unset-models', 'restore-models'].includes(action)) throw new Error('usage: qmd-config.mjs set-models|unset-models|restore-models <json>');
-  const YAML = await import(pathToFileURL(join(qmdPackageDir(), 'node_modules', 'yaml', 'dist', 'index.js')).href);
+  const YAML = await importQmdDependency('yaml');
   const path = qmdConfigPath();
   const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
   let next;

@@ -1,7 +1,5 @@
-// Loads QMD's bundled yaml package for tests.
-import { qmdPackageDir } from '../../../shared/qmd/qmd-lib.mjs';
-import { pathToFileURL } from 'node:url';
-import { join } from 'node:path';
-const YAML = await import(pathToFileURL(join(qmdPackageDir(), 'node_modules', 'yaml', 'dist', 'index.js')).href);
+// Loads QMD's yaml dependency for tests, including hoisted installations.
+import { importQmdDependency } from '../../../shared/qmd/qmd-lib.mjs';
+const YAML = await importQmdDependency('yaml');
 export const parseDocument = YAML.parseDocument;
 export default YAML;

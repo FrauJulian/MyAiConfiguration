@@ -1,11 +1,33 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as YAML from './fixtures/yaml-shim.mjs';
-import { collectionName, deviceEnv, idleMinutes, qmdConfigPath, writePrivateJson, writeTextAtomic, readJson, runQmdCli, MODELS } from '../../shared/qmd/qmd-lib.mjs';
+import { collectionName, deviceEnv, idleMinutes, qmdConfigPath, qmdPackageDir, writePrivateJson, writeTextAtomic, readJson, runQmdCli, MODELS } from '../../shared/qmd/qmd-lib.mjs';
 import { setModels, unsetModels, previousModels, restoreModels, setCollectionIgnore } from '../../shared/qmd/qmd-config.mjs';
+
+for (const layout of ['nested', 'hoisted']) {
+  test(`config CLI and YAML shim load ${layout} dependencies`, (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'qmd dependencies '));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const pkg = join(root, 'node_modules', '@tobilu', 'qmd');
+    mkdirSync(pkg, { recursive: true });
+    const require = createRequire(join(qmdPackageDir(), 'package.json'));
+    const source = dirname(require.resolve('yaml/package.json'));
+    cpSync(source, join(layout === 'nested' ? pkg : root, 'node_modules', 'yaml'), { recursive: true });
+    const env = { ...process.env, QMD_PACKAGE_DIR: pkg, QMD_CONFIG_DIR: join(root, 'config') };
+    const output = execFileSync(process.execPath, [fileURLToPath(new URL('../../shared/qmd/qmd-config.mjs', import.meta.url)), 'set-models'], { env, encoding: 'utf8' });
+    assert.deepEqual(JSON.parse(output), { previous: null });
+    assert.deepEqual(YAML.default.parse(readFileSync(join(env.QMD_CONFIG_DIR, 'index.yml'), 'utf8')).models, MODELS);
+    const shim = new URL('./fixtures/yaml-shim.mjs', import.meta.url).href;
+    const parsed = execFileSync(process.execPath, ['--input-type=module', '-e', `import YAML from ${JSON.stringify(shim)}; console.log(JSON.stringify(YAML.parse('answer: 42')));`], { env, encoding: 'utf8' });
+    assert.deepEqual(JSON.parse(parsed), { answer: 42 });
+  });
+}
 
 test('collection name is stable, prefixed, and path-safe', () => {
   const a = collectionName('/tmp/My Repo/ü');
