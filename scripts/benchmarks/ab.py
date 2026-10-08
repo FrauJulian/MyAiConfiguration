@@ -122,7 +122,8 @@ def codex_turn(prompt, cwd, arm, args, session):
     command = [shutil.which('codex'), 'exec']
     if session:
         command += ['resume', session]
-    command += ['--json', '--skip-git-repo-check', '--sandbox', 'workspace-write',
+    # `exec resume` rejects --sandbox; the config key works for both forms.
+    command += ['--json', '--skip-git-repo-check', '-c', 'sandbox_mode="workspace-write"',
                 '-m', args.codex_model, '-c', f'model_reasoning_effort="{args.codex_effort}"']
     command += ['-C', str(cwd)] if not session else []
     command.append('-')
@@ -140,7 +141,7 @@ def codex_turn(prompt, cwd, arm, args, session):
         'final': next((str(item.get('text', '')) for item in reversed(items) if item.get('type') == 'agent_message'), ''),
         'models': [args.codex_model],
         'error': next((str(event.get('message', event.get('error', '')))[:300] for event in events if event.get('type') in ('error', 'turn.failed')
-                       and not str(event.get('message', '')).startswith('Reconnecting')), '') if not usage else '',
+                       and not str(event.get('message', '')).startswith('Reconnecting')), 'no turn.completed event') if not usage else '',
     }
 
 
