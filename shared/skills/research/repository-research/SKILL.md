@@ -1,18 +1,18 @@
 ---
 name: repository-research
-description: Use for codebase-specific questions or before changing an unfamiliar area; trace existing files, callers, behavior, tests, and conventions. Do not use for general external technology research.
+description: MUST use before changing, reviewing, or answering questions about any repository area not yet read in this session; trace files, callers, behavior, tests, and conventions. Not for external technology questions (use technical-research).
 ---
 
 # Repository Research
 
-Use to understand an existing repository area before changing it or answering a codebase-specific question.
+Understand an existing repository area before changing it or answering a codebase-specific question. Do not edit or answer from memory of an area you have not read in this session.
 
 ## Workflow
 
-1. Start from known paths, symbols, exact strings, or configuration keys. Read relevant files directly and search callers with repository-native tools.
-2. Trace the flow from entry point through shared helpers to observable behavior. Check related implementations, tests, configuration, and documentation.
-3. Identify established conventions and note where they differ across clients, shells, or platforms.
-4. Use semantic search only when terminology is unclear, the flow spans components, or direct search has not found the relevant code. Confirm any retrieved result against current files.
+1. Locate the entry point. Known path, symbol, exact string, or configuration key: read it directly or search with `rg`. Unknown identifiers: run `semantic-search` first when it is installed.
+2. Trace the flow from entry point through shared helpers to observable behavior. Search callers and tests of every symbol you will change.
+3. Check related implementations, tests, configuration, and documentation. Note established conventions and where they differ across clients, shells, or platforms.
+4. When the change depends on an external library, API, tool version, or standard whose behavior you have not verified, continue with `technical-research` for that part.
 5. Report file paths and symbols as evidence. Separate confirmed behavior, inference, and unresolved questions.
 
-Return the relevant architecture, existing patterns, affected areas, and unknowns. Avoid changing implementation code during research unless asked.
+Return the relevant architecture, existing patterns, affected areas, and unknowns. Do not change implementation code during research unless asked.
