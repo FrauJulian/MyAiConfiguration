@@ -23,3 +23,19 @@ test('a stale lock older than 30 minutes is replaced', async () => {
   await withLock(lock, async () => { runs += 1; });
   assert.equal(runs, 1);
 });
+
+test('an empty or non-numeric lock counts as stale', async () => {
+  for (const content of ['', 'garbage']) {
+    const lock = join(mkdtempSync(join(tmpdir(), 'qmd-warm-')), 'repo.lock');
+    writeFileSync(lock, content);
+    let runs = 0;
+    await withLock(lock, async () => { runs += 1; });
+    assert.equal(runs, 1);
+  }
+});
+
+test('a run never removes a lock that another run took over', async () => {
+  const lock = join(mkdtempSync(join(tmpdir(), 'qmd-warm-')), 'repo.lock');
+  await withLock(lock, async () => { writeFileSync(lock, 'other-run'); });
+  assert.equal(existsSync(lock), true);
+});

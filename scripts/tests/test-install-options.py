@@ -98,6 +98,44 @@ class InstallOptionsTests(unittest.TestCase):
         self.assertEqual(OPTIONS.filter_instructions(text, False), 'Line one.\nLine three.\n')
         self.assertEqual(OPTIONS.filter_instructions(text, True), text)
 
+    def test_qmd_warm_match_is_anchored(self):
+        self.assertTrue(OPTIONS.is_qmd_warm({'command': 'bash "/c/hooks/scripts/qmd-warm.sh"'}))
+        self.assertTrue(OPTIONS.is_qmd_warm({'command_windows': 'pwsh "C:\hooks\Start-QmdWarm.ps1"'}))
+        self.assertFalse(OPTIONS.is_qmd_warm({'command': 'bash "/c/hooks/scripts/my-qmd-warm.sh"'}))
+
+    def test_merge_json_keeps_user_session_hook_and_drops_qmd_when_disabled(self):
+        user = {'type': 'command', 'command': 'bash "/home/me/my-start.sh"'}
+        pointer = {'type': 'command', 'command': 'bash "/c/hooks/scripts/show-session-state-pointer.sh"'}
+        qmd = {'type': 'command', 'command': 'bash "/c/hooks/scripts/qmd-warm.sh"'}
+        current = {'hooks': {'SessionStart': [{'hooks': [user]}]}}
+        managed = {'hooks': {'SessionStart': [{'hooks': [pointer]}, {'hooks': [qmd]}]}}
+        once = OPTIONS.merge_json(current, managed)
+        twice = OPTIONS.merge_json(once, managed)
+        self.assertEqual(twice['hooks']['SessionStart'], [{'hooks': [pointer]}, {'hooks': [qmd]}, {'hooks': [user]}])
+        disabled = OPTIONS.merge_json(twice, {'hooks': {'SessionStart': [{'hooks': [pointer]}]}})
+        commands = [hook['command'] for group in disabled['hooks']['SessionStart'] for hook in group['hooks']]
+        self.assertEqual(commands, [pointer['command'], user['command']])
+        removed = OPTIONS.merge_json(twice, {'hooks': {}})
+        self.assertEqual(removed['hooks']['SessionStart'], [{'hooks': [user]}])
+
+    def test_merge_toml_hook_groups_do_not_grow_and_user_hook_survives(self):
+        managed = ('[features]\nhooks = true\n\n[[hooks.SessionStart]]\n[[hooks.SessionStart.hooks]]\ntype = "command"\n'
+                   'command = \'bash "/c/hooks/scripts/qmd-warm.sh"\'\n\n[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ntype = "command"\n'
+                   'command = \'bash "/c/hooks/flashbang.sh"\'\n')
+        user = '\n[[hooks.SessionStart]]\n[[hooks.SessionStart.hooks]]\ntype = "command"\ncommand = \'bash "/home/me/my-start.sh"\'\n'
+        text = managed + user
+        for _ in range(3):
+            text = OPTIONS.merge_toml(text, managed)
+        hooks = tomllib.loads(text)['hooks']
+        self.assertEqual(len(hooks['Stop']), 1)
+        self.assertEqual(len(hooks['SessionStart']), 2)
+        commands = [hook['command'] for group in hooks['SessionStart'] for hook in group['hooks']]
+        self.assertEqual(sorted(commands), ['bash "/c/hooks/scripts/qmd-warm.sh"', 'bash "/home/me/my-start.sh"'])
+        disabled = OPTIONS.merge_toml(text, '[features]\nhooks = true\n')
+        hooks = tomllib.loads(disabled)['hooks']
+        self.assertNotIn('Stop', hooks)
+        self.assertEqual([hook['command'] for group in hooks['SessionStart'] for hook in group['hooks']], ['bash "/home/me/my-start.sh"'])
+
     def test_filter_preserves_other_claude_hooks_and_status(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'settings.json'

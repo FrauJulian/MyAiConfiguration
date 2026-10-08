@@ -12,7 +12,7 @@ def is_flashbang(hook):
 
 
 def is_qmd_warm(hook):
-    return any(re.search(r'(?:qmd-warm\.sh|Start-QmdWarm\.ps1)', str(hook.get(key, '')), re.I)
+    return any(re.search(r'(?:[/\\\s"\x27]|^)(?:qmd-warm\.sh|Start-QmdWarm\.ps1)(?:[\s"\x27]|$)', str(hook.get(key, '')), re.I)
                for key in ('command', 'command_windows'))
 
 
@@ -165,10 +165,21 @@ def merge_toml(current_text, managed_text, statusline_enabled=True):
     managed_headers = {header for header, _ in managed_sections}
     extras = []
     fields_by_header = {}
-    for header, block in current_sections:
+    owned_pattern = r'(?:flashbang|statusline|record-compact|session-state-pointer|qmd-warm|Start-QmdWarm)\.(?:ps1|sh)'
+    for index, (header, block) in enumerate(current_sections):
         plugin_table = re.match(r'^\[(?:plugins|marketplaces)(?:\.|\])', header)
         array_table = header.startswith('[[')
-        owned_hook = any(re.search(r'(?:flashbang|statusline|record-compact|session-state-pointer|qmd-warm|Start-QmdWarm)\.(?:ps1|sh)', line, re.I) for line in block)
+        owned_hook = any(re.search(owned_pattern, line, re.I) for line in block)
+        group = re.fullmatch(r'\[\[hooks\.(\w+)\]\]', header)
+        if group:
+            # A hook group header is owned when every hook table that follows it is owned (or none follows).
+            child = f'[[hooks.{group.group(1)}.hooks]]'
+            children = []
+            for name, lines in current_sections[index + 1:]:
+                if name != child:
+                    break
+                children.append(any(re.search(owned_pattern, line, re.I) for line in lines))
+            owned_hook = all(children)
         if plugin_table and header in managed_headers:
             raise ValueError('Cannot merge conflicting managed plugin tables.')
         if (header not in managed_headers and not array_table) or (array_table and not owned_hook):

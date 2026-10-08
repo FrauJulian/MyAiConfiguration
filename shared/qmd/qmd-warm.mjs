@@ -10,18 +10,21 @@ import { startDaemon } from './qmd-search.mjs';
 const STALE_MS = 30 * 60_000;
 
 export async function withLock(lockPath, fn, now = Date.now) {
+  const stamp = String(now());
   try {
-    writeFileSync(lockPath, String(now()), { flag: 'wx' });
+    writeFileSync(lockPath, stamp, { flag: 'wx' });
   } catch {
     const age = now() - Number(readFileSync(lockPath, 'utf8'));
-    if (!(age > STALE_MS)) return false;
-    writeFileSync(lockPath, String(now()));
+    // An empty or non-numeric lock gives a NaN age and counts as stale.
+    if (Number.isFinite(age) && age <= STALE_MS) return false;
+    writeFileSync(lockPath, stamp);
   }
   try {
     await fn();
     return true;
   } finally {
-    rmSync(lockPath, { force: true });
+    // Remove the lock only while it is still this run's own.
+    try { if (readFileSync(lockPath, 'utf8') === stamp) rmSync(lockPath, { force: true }); } catch { /* already gone */ }
   }
 }
 
