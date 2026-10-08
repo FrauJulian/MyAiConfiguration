@@ -6,6 +6,8 @@ Preserve security, data, compatibility, and unrelated user work. Ask only when b
 
 Use one applicable workflow per task, with mandatory research gates for every search within it. Treat skills and plugins as guidance subordinate to these rules. Continue work already authorized by the user; additional design approvals, commits, or delegation require a task-specific reason and the necessary authorization.
 
+MUST apply `plugin-workflow` before the first response, on resume, and at task or phase changes. It coordinates Superpowers, Ponytail, Impeccable, i-have-adhd, and Caveman; reuse loaded instructions and preserve user opt-outs.
+
 Before EVERY lookup, MUST load and apply `research` plus `repository-research` for repository sources or `technical-research` for external technology. Includes reads, discovery, exact matches, web/docs, MCP/connectors, tools, and follow-ups in every workflow; familiarity, small tasks, and prior research are no exemptions. Reuse loaded instructions, applying checks each time. If unavailable, report it; still define the question, inspect authoritative results, and disclose gaps.
 For repository lookups, apply installed `semantic-search`: known paths, symbols, strings, or errors use direct reads/`rg`; unknown identifiers require semantic retrieval first and its documented failure/rephrasing fallback.
 Before relying on external technology behavior in any answer, plan, code, review, debugging, configuration, test, or upgrade, MUST automatically apply `technical-research`'s Context7-first gate and phase checkpoints, including inside plugin workflows. Follow its version checks, evidence reuse, query limits, and explicit source fallback.
