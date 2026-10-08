@@ -1,6 +1,6 @@
 {
   "category": "search",
-  "prompt": "Uploads that fail with a temporary network error are never retried. Make at most three attempts in total before giving up with the last error; other errors must not be retried.",
+  "prompt": "Fix the upload code: uploads that fail with a temporary network error are never retried. They should make at most three attempts in total before giving up with the last error; other errors must not be retried.",
   "generate": {
     "filler_modules": 250
   },
