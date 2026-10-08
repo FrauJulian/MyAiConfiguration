@@ -5,7 +5,7 @@ Skills are reusable workflows. Rules are persistent constraints and agents are s
 The current structure is organized by purpose:
 
 - `planning/`: impact analysis and work-item definition
-- `research/`: technical and repository research, plus `semantic-search`, which is installed only while local QMD search is enabled
+- `research/`: mandatory `research` gate for every search, with technical and repository specialists, plus `semantic-search`, which is installed only while local QMD search is enabled
 - `reviews/`: security, performance, WPF, UI/UX, business, API, and EF Core reviews
 - `implementation/`: SQL, unit-test, and integration-test writing
 - `verification/`: facts and work-item verification
@@ -26,6 +26,8 @@ only when Claude invokes a matching skill instead of sitting permanently in cont
 files directly. Both clients embed the general rules in their global instructions.
 Language, framework, library, and security rules use directory indexes plus focused topic files. Their generated Claude skills expose each focused rule separately; the index skills also include the references for contextual lookup. See [Configuration](configuration.md).
 
-Skills guide a task when needed; their availability does not require a full review, build, or test suite after every
+Every search or lookup must use `research` and the applicable specialist, including direct reads, exact matches, familiar areas, and follow-up queries during implementation or verification. Loaded instructions can be reused; their checks apply to each search. Semantic retrieval runs first for unknown repository identifiers; known identifiers still use direct reads or `rg` within the research workflow. Disabling QMD does not disable the research requirement. These are agent instructions, not a runtime tool interceptor.
+
+Other skills guide a task when needed; their availability does not require a full review, build, or test suite after every
 change. The shared Verification rules govern proportional checking, including when generic skill workflows call
 for more work than the change needs.
