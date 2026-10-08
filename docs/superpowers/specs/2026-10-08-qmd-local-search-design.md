@@ -27,8 +27,8 @@ Motivation from the 2026-10-08 Claude A/B benchmark: the Python search was never
 1. Search scope: primarily the current Git repository; additionally user-registered QMD collections (`includeByDefault: true`), ranked together in one query.
 2. Index location: one global QMD index (`~/.cache/qmd`). Each repository is a collection named `repo-<short hash of the absolute repository path>` with `includeByDefault: false`. No files are written into repositories.
 3. Agent access: an own `semantic-search` skill for both clients that calls a Node wrapper. QMD's `qmd@qmd` plugin and MCP tools are not used.
-4. Warm-up: a SessionStart hook indexes in the background and starts QMD's HTTP daemon (`qmd mcp --http --daemon`) so models stay loaded.
-5. Daemon lifetime: a watcher stops the daemon after 30 idle minutes (`QMD_IDLE_MINUTES`).
+4. Warm-up: a SessionStart hook indexes in the background and starts an own search daemon built on the QMD SDK so all three models stay loaded. QMD's HTTP daemon (`qmd mcp --http`) is not used: its `POST /query` accepts only pre-typed `lex`/`vec`/`hyde` searches and never runs query expansion.
+5. Daemon lifetime: the daemon exits by itself after 30 idle minutes (`QMD_IDLE_MINUTES`).
 6. Auto mode: benchmark GPU first, then CPU; both thresholds must pass; if no device passes, remove what the setup installed and continue as No.
 
 ## Components
@@ -44,9 +44,9 @@ Motivation from the 2026-10-08 Claude A/B benchmark: the Python search was never
 
 ### Added under `shared/qmd/`
 
-- `qmd-search.mjs`: ensures the repository collection, refreshes it incrementally, queries the daemon with `POST /query` on `localhost:8181`, starts the daemon if it is not running, and falls back to `qmd query --json` when the daemon cannot be used. Collections searched: the repository collection plus every collection with `includeByDefault: true`. Output: JSON list of `{path, line, score, snippet}` with repository-relative paths, best first. Records the last-search timestamp for the watcher.
-- `qmd-warm.mjs`: started detached by the SessionStart hook. Ensures the collection, runs `qmd update` and `qmd embed` for that collection, starts the daemon with the stored device, and starts the watcher. A per-repository lock file prevents parallel indexing from concurrent sessions.
-- `qmd-watch.mjs`: checks every minute; after `QMD_IDLE_MINUTES` (default 30) without a search it runs `qmd mcp stop` and exits.
+- `qmd-daemon.mjs`: long-lived search process using the QMD SDK (`createStore({ dbPath, configPath })`, `store.search({ query, collections })` with expansion and reranking, `store.update()`, `store.embed()`). Listens on `127.0.0.1` only, on a port chosen at start; writes `{port, token, pid}` to `~/.my-ai-configuration/qmd/daemon.json` readable only by the user; rejects requests without the token header. Exits after `QMD_IDLE_MINUTES` (default 30) without a request. A second start while one is healthy is a no-op.
+- `qmd-search.mjs`: ensures the repository collection, refreshes it incrementally, sends the search to the daemon, starts the daemon if it is not running, and falls back to `qmd query --json` when the daemon cannot be used. Collections searched: the repository collection plus every collection with `includeByDefault: true`. Output: JSON list of `{path, line, score, snippet}` with repository-relative paths, best first. 
+- `qmd-warm.mjs`: started detached by the SessionStart hook. Starts the daemon with the stored device if it is not running and asks it to refresh and embed the repository collection. A per-repository lock file prevents parallel indexing from concurrent sessions.
 - `qmd-benchmark.mjs`: the Auto benchmark (see below).
 - Thin `.sh` and `.ps1` entry points for every script, as the repository requires.
 
@@ -99,7 +99,7 @@ Auto:
 
 No:
 
-- Remove skill, hook, scripts, instruction line, and watcher; stop a running daemon.
+- Remove skill, hook, scripts, and instruction line; stop a running daemon.
 - Remove the setup-owned QMD package and setup-owned models.
 - Never remove a QMD installation, model, or collection the setup did not create.
 
@@ -130,7 +130,7 @@ Search (`qmd-search.mjs`):
 
 1. Refresh the repository collection when files changed since the last refresh (`git status` and modification times), then `qmd embed` for it.
 2. Query the daemon; start it if it is not running; fall back to `qmd query --json` when the daemon cannot be reached or started.
-3. Print the JSON results and record the search timestamp.
+3. Print the JSON results.
 
 Strict skill:
 
@@ -145,12 +145,12 @@ Global instruction line (only when the skill is installed): "When `semantic-sear
 - Benchmark hang: per-device timeout of 10 minutes.
 - Hook: detached, logged, always exit code 0. `qmd embed` uses QMD's 30-minute session cap and resumes incrementally on the next start.
 - Wrapper failure: non-zero exit with a short message on stderr; the skill continues with `rg` and states the limitation.
-- Port 8181 owned by another process: detected through `GET /health` and the response signature; the wrapper uses the CLI fallback.
+- Stale `daemon.json` (process gone or token rejected): the wrapper deletes it and starts a new daemon; if that fails it uses the CLI fallback.
 - `index.yml` that cannot be parsed: abort without writing.
 
 ## Testing
 
-- Node unit tests (`node --test`): collection name and mask, benchmark decision (thresholds, GPU before CPU, unsuitable result), watcher timeout with an injected clock, wrapper fallback to the CLI, `index.yml` merge preserving foreign keys.
+- Node unit tests (`node --test`): collection name and mask, benchmark decision (thresholds, GPU before CPU, unsuitable result), daemon idle exit with an injected clock, token rejection, wrapper fallback to the CLI, `index.yml` merge preserving foreign keys.
 - Install guard tests in Bash and PowerShell with a mocked `qmd`: Yes, No, Auto pass and fail, dry run, ownership (a foreign QMD survives No), migration (Python installation removed), skill, hook, and instruction line present only when enabled.
 - Integration job replacing the `retrieval` CI job: install QMD, pull models (cached), index a small fixture, assert the wrapper returns the expected hit, start and stop the daemon.
 - `ab.py`: the `setup-no-search` arm and `--warm-index` use the QMD path.
@@ -158,7 +158,7 @@ Global instruction line (only when the skill is installed): "When `semantic-sear
 
 ## Risks to verify during implementation
 
-- Whether the Codex `workspace-write` sandbox can reach `localhost:8181` and read `~/.cache/qmd`. If not, the Codex skill needs an approval rule for the wrapper or must run it outside the sandbox.
+- Whether the Codex `workspace-write` sandbox can reach the daemon on `127.0.0.1` and read `~/.cache/qmd`. If not, the Codex skill needs an approval rule for the wrapper or must run it outside the sandbox.
 - Whether `qmd doctor`'s device probe is reliable enough to choose `gpu` for Yes without a benchmark.
 - Disk and VRAM use: about 2.4 GB of models; the daemon holds them in VRAM until the idle stop.
 
