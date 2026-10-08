@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { passes, fixtureDocuments, describeDevices } from '../../shared/qmd/qmd-benchmark.mjs';
+import { passes, fixtureDocuments, describeDevices, embedThroughput } from '../../shared/qmd/qmd-benchmark.mjs';
 
 test('both thresholds must pass', () => {
   assert.equal(passes({ querySeconds: 5, chunksPerSecond: 20 }, {}), true);
@@ -22,4 +22,10 @@ test('fixture is deterministic and large enough for throughput', () => {
   assert.equal(a.length, 100);
   assert.deepEqual(a, fixtureDocuments(100));
   assert.ok(a.every((d) => d.text.length > 2500));
+});
+
+test('embed throughput rejects errors and empty runs', () => {
+  assert.deepEqual(embedThroughput({ chunksEmbedded: 200, durationMs: 4000, errors: 0 }), { chunksPerSecond: 50, ok: true });
+  assert.equal(embedThroughput({ chunksEmbedded: 200, durationMs: 4000, errors: 1 }).ok, false);
+  assert.equal(embedThroughput({ chunksEmbedded: 0, durationMs: 4000, errors: 0 }).ok, false);
 });

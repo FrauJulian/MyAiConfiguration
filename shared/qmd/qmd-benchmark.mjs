@@ -24,6 +24,10 @@ export function fixtureDocuments(count) {
   });
 }
 
+export function embedThroughput({ chunksEmbedded, durationMs, errors }) {
+  return { chunksPerSecond: chunksEmbedded / Math.max(durationMs / 1000, 0.001), ok: !errors && chunksEmbedded > 0 };
+}
+
 export function describeDevices({ gpu, devices, threads }) {
   const gpus = gpu ? `${String(gpu).toUpperCase()}: ${devices.join(', ') || 'unnamed device'}` : 'no GPU';
   return `${gpus}; CPU threads: ${threads}`;
@@ -33,10 +37,13 @@ export function describeDevices({ gpu, devices, threads }) {
 async function detect() {
   const { getLlama } = await import(pathToFileURL(join(qmdPackageDir(), 'node_modules', 'node-llama-cpp', 'dist', 'index.js')).href);
   const llama = await getLlama({ gpu: 'auto' });
-  const gpu = llama.gpu;
-  const devices = gpu ? await llama.getGpuDeviceNames() : [];
-  await llama.dispose();
-  return { gpu, devices, threads: availableParallelism() };
+  try {
+    const gpu = llama.gpu;
+    const devices = gpu ? await llama.getGpuDeviceNames() : [];
+    return { gpu, devices, threads: availableParallelism() };
+  } finally {
+    await llama.dispose();
+  }
 }
 
 async function measure(device) {
@@ -52,9 +59,9 @@ async function measure(device) {
     const store = await createStore({ dbPath: join(work, 'index.sqlite'), config: { collections: { bench: { path: docs, pattern: '**/*.md' } } } });
     try {
       await store.update();
-      await store.searchVector('warm up the embedding model', { limit: 1 });
-      const embedded = await store.embed({ collection: 'bench' });
-      const chunksPerSecond = embedded.chunksEmbedded / Math.max(embedded.durationMs / 1000, 0.001);
+      await store.embed({ collection: 'bench' }); // warm-up: loads (and on a first run downloads) the model
+      const embedded = await store.embed({ collection: 'bench', force: true });
+      const { chunksPerSecond, ok } = embedThroughput(embedded);
       const question = 'Which part explains how upload retries behave during incidents?';
       await store.search({ query: question, collections: ['bench'], limit: 5 });
       const times = [];
@@ -64,8 +71,8 @@ async function measure(device) {
         times.push((performance.now() - started) / 1000);
       }
       const querySeconds = times.sort((a, b) => a - b)[1];
-      const result = { device, querySeconds: Number(querySeconds.toFixed(3)), chunksPerSecond: Number(chunksPerSecond.toFixed(1)) };
-      return { ...result, passed: passes(result) };
+      const result = { device, querySeconds: Number(querySeconds.toFixed(3)), chunksPerSecond: Number(chunksPerSecond.toFixed(1)), embedErrors: embedded.errors };
+      return { ...result, passed: ok && passes(result) };
     } finally {
       await store.close();
     }
