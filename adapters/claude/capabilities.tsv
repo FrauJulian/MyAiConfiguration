@@ -1,6 +1,6 @@
 role	tools
-architect	Read,Grep,Glob,WebFetch,WebSearch
-researcher	Read,Grep,Glob,WebFetch,WebSearch
+architect	Read,Grep,Glob,WebFetch,WebSearch,__SHELL__
+researcher	Read,Grep,Glob,WebFetch,WebSearch,__SHELL__
 reviewer	Read,Grep,Glob,__SHELL__
 verifier	Read,Grep,Glob,__SHELL__
 implementer	Read,Grep,Glob,Edit,Write,__SHELL__

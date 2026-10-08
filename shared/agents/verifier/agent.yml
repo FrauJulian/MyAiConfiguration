@@ -1,3 +1,3 @@
 name: verifier
-description: Focused verification of completed work
+description: Run focused tests, builds, and reproductions to verify acceptance criteria and report execution evidence
 role: verifier

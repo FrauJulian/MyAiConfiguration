@@ -2,13 +2,19 @@
 
 The five shared agents are logical roles, not mandatory steps.
 
-- `implementer` executes the smallest complete engineering change and performs self-review.
-- `researcher` investigates code, patterns, evidence, alternatives, and unknowns without modifying implementation code by default.
-- `architect` evaluates technical boundaries, dependencies, interfaces, constraints, and design options.
+- `implementer` implements scoped features and fixes with proportionate tests and self-review.
+- `researcher` answers questions about repository behavior, external documentation, and unknowns with source evidence, without modifying implementation code by default.
+- `architect` compares design options and recommends technical boundaries and interfaces before implementation; implementation changes require an explicit assignment.
 - `verifier` supplies execution evidence from relevant tests, builds, checks, generated output, and behavior reproduction. It inspects implementation only to choose checks and does not review the diff for general correctness.
 - `reviewer` starts with the actual diff and changed symbols, then examines necessary callers, dependencies, tests, and contracts for analytical correctness. It does not run tests, builds, or runtime checks; it reports missing execution evidence.
 
 Use only the roles that are likely to improve the outcome. Choose `researcher`, `reviewer`, and `verifier` based on the task's uncertainty, complexity, risk, blast radius, and verification value; none runs automatically. The agent may make evidence-based, reversible technical decisions. Ask the user when technical choices remain materially uncertain or when business behavior, user-visible behavior, UI, UX, APIs, database models, configuration formats, compatibility behavior, or other high-impact decisions are ambiguous or open to interpretation.
+
+## Research tools
+
+Claude's [capability manifest](../adapters/claude/capabilities.tsv) gives `architect` and `researcher` file inspection, web research, and the package's shell tool (`PowerShell` or `Bash`). Shell access supports mandatory semantic search and Context7 research through MCPorter. Their role instructions scope shell use to inspection and research; this is an instruction-level boundary, not a read-only shell sandbox.
+
+The `reviewer` may inspect Git diffs and run required research commands through its shell tool. Tests, builds, and behavior reproduction belong to the `verifier` or parent. Missing execution evidence remains an explicit review gap. Codex receives the same role instructions; the Claude tool manifest is client-specific.
 
 ## Coordination
 

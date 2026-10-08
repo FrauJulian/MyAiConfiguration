@@ -46,6 +46,11 @@ foreach ($shell in @('powershell','bash')) {
         if (@(Get-ChildItem "$package/agents" -File).Count -ne $sourceAgentCount) { throw "Missing agents in $package" }
         $expectedReviewerShellTool = if ($shell -eq 'powershell') { 'PowerShell' } else { 'Bash' }
         if ($client -eq 'claude' -and (Get-Content (Join-Path $package 'agents/reviewer.md') -Raw) -notmatch "(?m)^tools: Read,Grep,Glob,$expectedReviewerShellTool\r?`$") { throw "Reviewer capability profile is missing in $package" }
+        if ($client -eq 'claude') {
+            foreach ($role in @('architect','researcher')) {
+                if ((Get-Content (Join-Path $package "agents/$role.md") -Raw) -notmatch "(?m)^tools: Read,Grep,Glob,WebFetch,WebSearch,$expectedReviewerShellTool\r?`$") { throw "$role research shell capability is missing in $package" }
+            }
+        }
         $expectedSkillCount = if ($client -eq 'claude') { $sourceSkillCount + $ruleSkillCount } else { $sourceSkillCount }
         if (@(Get-ChildItem "$package/skills" -Filter SKILL.md -Recurse).Count -ne $expectedSkillCount) { throw "Missing skills in $package" }
         $securityReview = if ($client -eq 'claude') { 'skills/security-review/SKILL.md' } else { 'skills/reviews/security-review/SKILL.md' }
