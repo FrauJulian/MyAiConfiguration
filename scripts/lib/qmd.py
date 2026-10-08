@@ -17,10 +17,10 @@ DEVICE_TIMEOUT = 600
 WINDOWS = os.name == 'nt'
 
 
-def run(arguments, env=None, timeout=1800):
+def run(arguments, env=None, timeout=1800, check=True):
     result = subprocess.run(arguments, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace',
                             timeout=timeout, shell=WINDOWS and arguments[0] in ('npm', 'qmd'))
-    if result.returncode != 0:
+    if check and result.returncode != 0:
         raise ValueError(f'{" ".join(arguments[:3])} failed: {(result.stderr or result.stdout).strip()[-300:]}')
     return result.stdout
 
@@ -63,7 +63,7 @@ class Setup:
 
     def load(self):
         if not self.state_path.exists():
-            return {'version': 1, 'clients': [], 'device': None, 'owned_package': False, 'owned_models': [], 'models_block': False, 'files': {}}
+            return {'version': 1, 'clients': [], 'device': None, 'owned_package': False, 'owned_models': [], 'models_block': False, 'previous_models': None, 'files': {}}
         state = json.loads(self.state_path.read_text(encoding='utf-8'))
         if state.get('version') != 1 or state.get('device') not in (None, 'gpu', 'cpu'):
             raise ValueError('Invalid QMD setup state.')
@@ -73,7 +73,12 @@ class Setup:
         return self.run(['node', str(self.scripts / script), *arguments], env=env, timeout=timeout)
 
     def package_installed(self):
-        listing = json.loads(self.run(['npm', 'list', '--global', '--depth=0', '--json']) or '{}')
+        # npm list exits non-zero on tree problems (ELSPROBLEMS) but still prints valid JSON.
+        output = self.run(['npm', 'list', '--global', '--depth=0', '--json'], check=False) or '{}'
+        try:
+            listing = json.loads(output)
+        except json.JSONDecodeError:
+            raise ValueError('npm list did not return JSON.')
         return PACKAGE in (listing.get('dependencies') or {})
 
     def require_node(self):
@@ -87,7 +92,8 @@ class Setup:
         if legacy_state.exists() or legacy.exists():
             if legacy.is_symlink():
                 raise ValueError('Legacy semantic retrieval directory must not be a symbolic link.')
-            shutil.rmtree(legacy, ignore_errors=True)
+            if legacy.exists():
+                shutil.rmtree(legacy)
             legacy_state.unlink(missing_ok=True)
             self.say('Removed the previous Python semantic retrieval installation.')
         ledger_path = self.base / 'extensions.json'
@@ -95,14 +101,19 @@ class Setup:
             ledger = json.loads(ledger_path.read_text(encoding='utf-8'))
             owned = [r for r in ledger.get('resources', []) if r.get('kind') == 'qmd']
             if owned:
+                state['owned_package'] = True
+                atomic_json(self.state_path, state)  # record ownership before the ledger forgets it
                 ledger['resources'] = [r for r in ledger['resources'] if r.get('kind') != 'qmd']
                 atomic_json(ledger_path, ledger)
-                state['owned_package'] = True
 
     def install_scripts(self, state):
+        if self.scripts.is_symlink():
+            raise ValueError('QMD script directory must not be a symbolic link.')
         self.scripts.mkdir(parents=True, exist_ok=True)
         for name in SCRIPTS:
             target = self.scripts / name
+            if target.is_symlink():
+                raise ValueError(f'QMD script must not be a symbolic link: {name}')
             expected = state['files'].get(name)
             if target.exists() and expected and digest(target) != expected:
                 raise ValueError(f'Setup-owned QMD script changed: {name}')
@@ -119,7 +130,12 @@ class Setup:
         self.install_scripts(state)
         atomic_json(self.state_path, state)
         if not state['models_block']:
-            self.node('qmd-config.mjs', 'set-models')
+            output = self.node('qmd-config.mjs', 'set-models')
+            try:
+                previous = json.loads(output.strip().splitlines()[-1])['previous']
+            except (IndexError, KeyError, TypeError, json.JSONDecodeError):
+                raise ValueError('qmd-config set-models returned no previous models.')
+            state['previous_models'] = previous if isinstance(previous, dict) else None
             state['models_block'] = True
             atomic_json(self.state_path, state)
         before = {p.name for p in self.models.iterdir()} if self.models.is_dir() else set()
@@ -159,10 +175,14 @@ class Setup:
             if re.fullmatch(r'repo-[0-9a-f]{12}', name):
                 try:
                     self.run(['qmd', 'collection', 'remove', name])
-                except ValueError:
+                except (ValueError, subprocess.SubprocessError):
                     pass
         if state['models_block'] and self.scripts.joinpath('qmd-config.mjs').exists():
-            self.node('qmd-config.mjs', 'unset-models')
+            previous = state.get('previous_models')
+            if previous is not None:
+                self.node('qmd-config.mjs', 'restore-models', json.dumps(previous))
+            else:
+                self.node('qmd-config.mjs', 'unset-models')
         for name in state['owned_models']:
             path = self.models / name
             if name == Path(name).name and path.is_file() and not path.is_symlink():
@@ -178,6 +198,9 @@ class Setup:
         if not self.state_path.exists():
             if not self.dry_run:
                 self.migrate(state)
+                if state['owned_package']:
+                    self.run(['npm', 'uninstall', '--global', PACKAGE])
+                    self.state_path.unlink(missing_ok=True)
             return
         if self.dry_run:
             self.say('DRYRUN disable QMD local search')
@@ -203,7 +226,9 @@ class Setup:
             env['QMD_LLAMA_GPU' if device == 'gpu' else 'QMD_FORCE_CPU'] = 'auto' if device == 'gpu' else '1'
             try:
                 result = json.loads(self.node('qmd-benchmark.mjs', '--device', device, env=env, timeout=DEVICE_TIMEOUT))
-            except (ValueError, subprocess.TimeoutExpired) as error:
+                if not isinstance(result, dict):
+                    raise ValueError('benchmark returned a non-object result')
+            except (ValueError, subprocess.SubprocessError) as error:
                 result = {'device': device, 'passed': False, 'error': str(error)[:200]}
             results.append(result)
             print(f'QMD benchmark {device.upper()}: ' + ('passed' if result.get('passed') else 'failed')

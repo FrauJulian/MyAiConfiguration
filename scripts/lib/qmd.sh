@@ -1,4 +1,3 @@
-# scripts/lib/qmd.sh
 #!/usr/bin/env bash
 
 sync_qmd() {

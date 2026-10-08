@@ -1,4 +1,3 @@
-# scripts/lib/qmd.ps1
 function Sync-Qmd {
     param([Parameter(Mandatory=$true)][string]$RepositoryRoot,[Parameter(Mandatory=$true)][string]$HomePath,[ValidateSet('Codex','Claude','Both')][Parameter(Mandatory=$true)][string]$Client,[Parameter(Mandatory=$true)][bool]$Enabled,[switch]$DryRun,[switch]$Update,[switch]$Summary)
     $arguments = @((Join-Path $PSScriptRoot 'qmd.py'), 'sync', '--root', $RepositoryRoot, '--home', $HomePath, '--client', $Client.ToLowerInvariant(), '--enabled', $Enabled.ToString().ToLowerInvariant())

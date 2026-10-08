@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as YAML from './fixtures/yaml-shim.mjs';
 import { collectionName, deviceEnv, idleMinutes, qmdConfigPath, writePrivateJson, readJson, runQmdCli, MODELS } from '../../shared/qmd/qmd-lib.mjs';
-import { setModels, unsetModels } from '../../shared/qmd/qmd-config.mjs';
+import { setModels, unsetModels, previousModels, restoreModels } from '../../shared/qmd/qmd-config.mjs';
 
 test('collection name is stable, prefixed, and path-safe', () => {
   const a = collectionName('/tmp/My Repo/ü');
@@ -74,4 +74,20 @@ test('runQmdCli runs the CLI entry of QMD_PACKAGE_DIR without a shell', () => {
   } finally {
     if (previous === undefined) delete process.env.QMD_PACKAGE_DIR; else process.env.QMD_PACKAGE_DIR = previous;
   }
+});
+
+test('previousModels captures a user models block, null when absent', () => {
+  assert.deepEqual(previousModels('models:\n  embed: mine\ncollections: {}\n', YAML), { embed: 'mine' });
+  assert.equal(previousModels('collections: {}\n', YAML), null);
+  assert.equal(previousModels('', YAML), null);
+});
+
+test('restoreModels writes the previous block back and keeps comments and other keys', () => {
+  const original = '# keep\ncollections:\n  a: {}\nmodels:\n  embed: mine\n';
+  const replaced = setModels(original, YAML);
+  const restored = restoreModels(replaced, YAML, { embed: 'mine' });
+  assert.match(restored, /# keep/);
+  assert.match(restored, /embed: mine/);
+  assert.match(restored, /collections:/);
+  assert.doesNotMatch(restored, /Qwen/);
 });

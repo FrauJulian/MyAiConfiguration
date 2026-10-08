@@ -12,6 +12,20 @@ export function setModels(text, YAML) {
   return document.toString();
 }
 
+export function previousModels(text, YAML) {
+  const document = YAML.parseDocument(text || '');
+  if (document.errors.length) throw new Error(`index.yml cannot be parsed: ${document.errors[0].message}`);
+  return document.contents === null ? null : document.toJS().models ?? null;
+}
+
+export function restoreModels(text, YAML, mapping) {
+  const document = YAML.parseDocument(text || '');
+  if (document.errors.length) throw new Error(`index.yml cannot be parsed: ${document.errors[0].message}`);
+  if (document.contents === null) document.contents = document.createNode({});
+  document.set('models', document.createNode(mapping));
+  return document.toString();
+}
+
 export function unsetModels(text, YAML) {
   const document = YAML.parseDocument(text || '');
   if (document.errors.length) throw new Error(`index.yml cannot be parsed: ${document.errors[0].message}`);
@@ -19,16 +33,26 @@ export function unsetModels(text, YAML) {
   return document.contents === null || document.contents.items?.length === 0 ? '' : document.toString();
 }
 
-async function main(action) {
-  if (!['set-models', 'unset-models'].includes(action)) throw new Error('usage: qmd-config.mjs set-models|unset-models');
+async function main(action, argument) {
+  if (!['set-models', 'unset-models', 'restore-models'].includes(action)) throw new Error('usage: qmd-config.mjs set-models|unset-models|restore-models <json>');
   const YAML = await import(pathToFileURL(join(qmdPackageDir(), 'node_modules', 'yaml', 'dist', 'index.js')).href);
   const path = qmdConfigPath();
   const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
-  const next = action === 'set-models' ? setModels(current, YAML) : unsetModels(current, YAML);
+  let next;
+  if (action === 'set-models') {
+    const previous = previousModels(current, YAML);
+    // A block equal to ours is a leftover of an interrupted run, not the user's own.
+    console.log(JSON.stringify({ previous: JSON.stringify(previous) === JSON.stringify(MODELS) ? null : previous }));
+    next = setModels(current, YAML);
+  } else if (action === 'restore-models') {
+    const mapping = JSON.parse(argument ?? '');
+    if (mapping === null || typeof mapping !== 'object' || Array.isArray(mapping)) throw new Error('restore-models needs a JSON object');
+    next = restoreModels(current, YAML, mapping);
+  } else next = unsetModels(current, YAML);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, next);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
-  main(process.argv[2]).catch((error) => { console.error(`qmd-config: ${error.message}`); process.exit(1); });
+  main(process.argv[2], process.argv[3]).catch((error) => { console.error(`qmd-config: ${error.message}`); process.exit(1); });
 }

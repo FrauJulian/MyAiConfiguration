@@ -1,10 +1,10 @@
-# scripts/tests/test-qmd-setup.py
 import importlib.util
 import json
 from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('qmd_setup', ROOT / 'scripts/lib/qmd.py')
@@ -13,15 +13,20 @@ spec.loader.exec_module(qmd)
 
 
 class FakeRunner:
-    def __init__(self, installed=False, gpu='cuda', gpu_result=None, cpu_result=None):
+    def __init__(self, installed=False, gpu='cuda', gpu_result=None, cpu_result=None, previous=None, fail_pull=False):
         self.calls, self.installed, self.gpu = [], installed, gpu
+        self.previous, self.fail_pull = previous, fail_pull
         self.results = {'gpu': gpu_result, 'cpu': cpu_result}
 
-    def __call__(self, arguments, env=None, timeout=None):
+    def __call__(self, arguments, env=None, timeout=None, check=True):
         self.calls.append(list(arguments))
         joined = ' '.join(arguments)
         if arguments[:2] == ['node', '--version']:
             return 'v22.4.0'
+        if arguments[-1:] == ['set-models']:
+            return json.dumps({'previous': self.previous}) + chr(10)
+        if self.fail_pull and arguments[:2] == ['qmd', 'pull']:
+            raise ValueError('pull failed')
         if 'npm list' in joined:
             return json.dumps({'dependencies': {'@tobilu/qmd': {}} if self.installed else {}})
         if 'npm install' in joined:
@@ -125,6 +130,73 @@ class SetupTest(unittest.TestCase):
         ledger = json.loads((base / 'extensions.json').read_text())
         self.assertEqual([r['kind'] for r in ledger['resources']], ['plugin'], 'plugin record stays so reconcile uninstalls qmd@qmd')
         self.assertTrue(self.state()['owned_package'], 'ledger-owned package is adopted')
+
+    def test_previous_models_are_restored_on_disable(self):
+        runner = FakeRunner(previous={'embed': 'mine'})
+        setup = self.setup(runner)
+        setup.enable(['claude'])
+        self.assertEqual(self.state()['previous_models'], {'embed': 'mine'})
+        setup.disable(['claude'])
+        self.assertIn(['node', str(self.home / '.my-ai-configuration/qmd/qmd-config.mjs'), 'restore-models', '{"embed": "mine"}'], runner.calls)
+        self.assertFalse(any(c[-1:] == ['unset-models'] for c in runner.calls))
+
+    def test_models_block_removed_when_none_existed(self):
+        runner = FakeRunner()
+        setup = self.setup(runner)
+        setup.enable(['claude'])
+        self.assertIsNone(self.state()['previous_models'])
+        setup.disable(['claude'])
+        self.assertTrue(any(c[-1:] == ['unset-models'] for c in runner.calls))
+        self.assertFalse(any('restore-models' in c for c in runner.calls))
+
+    def ledger(self, base):
+        base.mkdir(parents=True, exist_ok=True)
+        (base / 'extensions.json').write_text(json.dumps({'version': 1, 'resources': [
+            {'client': 'shared', 'name': 'QMD', 'kind': 'qmd', 'package': '@tobilu/qmd', 'clients': ['codex']}]}))
+
+    def test_disable_without_state_uninstalls_adopted_package(self):
+        base = self.home / '.my-ai-configuration'
+        self.ledger(base)
+        runner = FakeRunner(installed=True)
+        self.setup(runner).disable(['claude'])
+        self.assertIn(['npm', 'uninstall', '--global', '@tobilu/qmd'], runner.calls)
+        self.assertFalse((base / 'qmd.json').exists())
+
+    def test_ownership_is_persisted_before_ledger_rewrite(self):
+        base = self.home / '.my-ai-configuration'
+        self.ledger(base)
+        real = qmd.atomic_json
+
+        def failing(path, value):
+            if path.name == 'extensions.json':
+                raise OSError('disk full')
+            real(path, value)
+        with mock.patch.object(qmd, 'atomic_json', failing):
+            with self.assertRaises(OSError):
+                self.setup(FakeRunner(installed=True)).enable(['claude'])
+        self.assertTrue(self.state()['owned_package'])
+        self.assertEqual(len(json.loads((base / 'extensions.json').read_text())['resources']), 1)
+
+    def test_symlinked_script_directory_is_refused(self):
+        base = self.home / '.my-ai-configuration'
+        base.mkdir(parents=True)
+        target = self.home / 'elsewhere'
+        target.mkdir()
+        try:
+            (base / 'qmd').symlink_to(target, target_is_directory=True)
+        except OSError:
+            self.skipTest('symlinks unavailable')
+        with self.assertRaises(ValueError):
+            self.setup(FakeRunner()).enable(['claude'])
+        self.assertEqual(list(target.iterdir()), [])
+
+    def test_non_dict_benchmark_result_counts_as_failure(self):
+        runner = FakeRunner(gpu=False, cpu_result=['unexpected'])
+        self.assertFalse(self.setup(runner).benchmark())
+
+    def test_package_installed_parses_listing(self):
+        self.assertTrue(self.setup(FakeRunner(installed=True)).package_installed())
+        self.assertFalse(self.setup(FakeRunner()).package_installed())
 
     def test_dry_run_changes_nothing(self):
         runner = FakeRunner()
