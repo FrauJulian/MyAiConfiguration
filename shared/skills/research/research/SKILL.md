@@ -16,7 +16,7 @@ Load this skill before the first search; retain and apply it to every subsequent
 1. Identify the question, the scope to search, and the evidence that would answer it. Keep this brief; no separate document is required.
 2. Apply the matching specialist before executing the lookup:
    - Repository code, files, configuration, history, or local documentation: `repository-research`, including known paths and exact matches.
-   - External technologies, APIs, tools, packages, standards, or technical documentation: `technical-research`, including familiar technologies and previously researched versions.
+   - External technologies, APIs, tools, packages, standards, or technical documentation: `technical-research` and its mandatory Context7 gate, including familiar technologies and previously researched versions. Apply that specialist before relying on external behavior in answers, code, reviews, debugging, or configuration, even when no search was explicitly requested.
    - Other web, filesystem, MCP, connector, or discovery searches: apply this workflow directly and select the authoritative source for the question.
 3. Select the smallest query that can answer the question. Batch independent lookups; let dependent queries follow verified results.
 

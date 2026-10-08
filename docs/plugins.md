@@ -6,6 +6,27 @@ The current baseline includes Ponytail, i-have-adhd, Superpowers, Context7, Cave
 
 Selecting Context7 with MCPorter registers the server in MCPorter. Selecting Context7 without MCPorter installs its native client plugin; that explicit selection permits the native MCP route under the global instructions.
 
+Both clients receive a mandatory Context7-first research gate through the shared general rules and `technical-research` skill. It triggers whenever answers, planning, coding, reviews, debugging, tests, configuration, or upgrades rely on external technology behavior, without requiring the user to mention Context7. The agent checks project versions, resolves the library, queries the relevant behavior, and verifies the original source. Matching evidence from the same task can be reused across phases and handoffs; repository-only facts need no external call. Missing coverage, version mismatches, and service failures require an explicit fallback to authoritative sources. [Phase checkpoints](skills.md) apply inside plugin workflows as well as the focused shared skills. These are agent instructions, not a runtime enforcement hook.
+
+### Optional Context7 health check
+
+For a configured MCPorter route, run these commands in PowerShell or Bash. They make live requests using a public Angular question; they do not install or change configuration. Routine builds and doctor runs do not run this check.
+
+```text
+mcporter list context7 --schema
+mcporter call context7.resolve-library-id 'libraryName=Angular' 'query=How do Angular computed signals track dependencies?' --timeout 30000
+```
+
+Check that discovery lists `resolve-library-id` and `query-docs` and resolution returns the official Angular documentation. Then query the returned ID (the example assumes `/websites/angular_dev` was returned):
+
+```text
+mcporter call context7.query-docs 'libraryId=/websites/angular_dev' 'query=How do Angular computed signals track dependencies?' --timeout 30000
+```
+
+The check passes only if documentation retrieval returns relevant content with an original Angular source link. Empty results, error text, or merely a zero process exit code are insufficient. This checks connectivity and one library, not general coverage or agent compliance. For a native plugin installation, run the equivalent discovery and tool calls inside that client; do not add an MCPorter registration just for this check.
+
+### Installation and updates
+
 `install.ps1`/`install.sh` starts every plugin checked by default; unchecking one skips it. It refuses to run against an already-installed destination (`Already installed, use the update script.`).
 
 `update.ps1`/`update.sh` lets you revise the saved extension selection. Checking an extension installs it if missing or updates it if owned; existing foreign installations are preserved. Deselection removes only extensions that this setup installed and recorded as owned. Pre-existing or manually installed plugins and skills are retained. Extensions removed from the manifest are also removed when recorded as owned; unrelated installations are retained. Update refuses to run if any selected destination lacks an installation manifest (`Not installed, use the install script.`).
