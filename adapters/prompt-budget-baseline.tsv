@@ -9,5 +9,5 @@ auto_loaded_rule_tokens	claude	678
 auto_loaded_rule_tokens	codex	678
 rule_catalog_tokens	claude	28818
 rule_catalog_tokens	codex	8510
-agent_metadata_tokens	claude	126
-agent_metadata_tokens	codex	52
+agent_metadata_tokens	claude	204
+agent_metadata_tokens	codex	124
