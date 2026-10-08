@@ -172,29 +172,28 @@ jobs:
           AI_CONFIG_REQUIRE_CLIENTS: '1'
         run: timeout 900 python scripts/tests/test-client-smoke.py -v
 
-  retrieval:
-    name: Qwen retrieval integration
+  qmd:
+    name: QMD local search integration
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [python]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v22.16.0
         with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: shared/retrieval/requirements.txt
-      - name: Install retrieval dependencies
-        run: python -m pip install -r shared/retrieval/requirements.txt
+          node-version: '24'
+      - name: Install QMD
+        run: npm install --global @tobilu/qmd@2.8.3
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .cache/huggingface
-          key: qwen-retrieval-${{ runner.os }}-${{ hashFiles('shared/retrieval/requirements.txt') }}
-      - name: Run retrieval tests with real models
+          path: .cache/qmd-models
+          key: qmd-models-${{ runner.os }}-2.8.3-qwen3
+      - name: Run QMD unit tests
+        run: node --test scripts/tests/test-qmd-lib.mjs scripts/tests/test-qmd-daemon.mjs scripts/tests/test-qmd-search.mjs scripts/tests/test-qmd-warm.mjs scripts/tests/test-qmd-benchmark.mjs
+      - name: Run QMD integration test with real models
         env:
-          QWEN_TEST_MODEL_CACHE: ${{ github.workspace }}/.cache/huggingface
-          HF_HUB_DISABLE_XET: '1'
-        run: python scripts/tests/test-retrieval-server.py
+          QMD_TEST_CACHE: ${{ github.workspace }}/.cache/qmd-models
+        run: node --test scripts/tests/test-qmd-integration.mjs
 
   security:
     name: CI configuration security checks

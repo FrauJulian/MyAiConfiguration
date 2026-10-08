@@ -84,8 +84,8 @@ def claude_flags(arm, args):
     if arm == 'baseline':
         flags += ['--setting-sources', '', '--strict-mcp-config']
     if arm == 'setup-no-search':
-        flags += ['--disallowedTools', 'Skill(semantic-search)', 'Bash(*semantic-retrieval*)', 'PowerShell(*semantic-retrieval*)',
-                  '--append-system-prompt', 'The semantic-search skill and the semantic retrieval CLI are unavailable in this session.']
+        flags += ['--disallowedTools', 'Skill(semantic-search)', 'Bash(*qmd-search*)', 'PowerShell(*qmd-search*)',
+                  '--append-system-prompt', 'The semantic-search skill and the QMD search wrapper are unavailable in this session.']
     return flags
 
 
@@ -276,7 +276,7 @@ def preflight(args, clients, arms):
     return provenance, problems
 
 
-RETRIEVAL = Path.home() / '.my-ai-configuration/semantic-retrieval'
+QMD_SCRIPTS = Path.home() / '.my-ai-configuration/qmd'
 FILLER_TOPICS = [
     ('statement', 'download', 'Render a statement download for the export queue.'),
     ('trial', 'banner', 'Show the trial banner text in the marketing header.'),
@@ -303,11 +303,10 @@ def generate_filler(work, count):
 
 
 def warm_index(work):
-    """Build the semantic index before the session, as in a repository that was searched before."""
-    server = RETRIEVAL / 'server.py'
-    if server.is_file():
-        subprocess.run([sys.executable, str(server), 'rebuild', '--root', str(work), '--data-dir', str(RETRIEVAL / 'data'),
-                        '--model-cache', str(RETRIEVAL / 'model-cache')], capture_output=True, timeout=1800)
+    """Index the fixture and start the QMD daemon before the session, as in a repository that was searched before."""
+    script = QMD_SCRIPTS / 'qmd-warm.mjs'
+    if script.is_file():
+        subprocess.run(['node', str(script), '--root', str(work)], capture_output=True, timeout=1800)
 
 
 def check(work, task):
@@ -377,7 +376,7 @@ def run_one(job, args):
         'agents': sum(turn['agents'] for turn in turns), 'skills': [skill for turn in turns for skill in turn['skills']],
         'commands': [command for turn in turns for command in turn['commands']],
         'models': sorted({model for turn in turns for model in turn['models']}),
-        'searches': sum('semantic-retrieval' in command for turn in turns for command in turn['commands'])
+        'searches': sum('qmd-search' in command for turn in turns for command in turn['commands'])
                     + sum(skill == 'semantic-search' for turn in turns for skill in turn['skills']),
         'timed_out': any(turn['timed_out'] for turn in turns), 'workflow_kind': spec['workflow'].get('kind'),
         'workflow_violations': workflow_violations(spec['workflow'], turns), 'check_output': '' if passed else output,
@@ -414,7 +413,7 @@ def main():
     parser.add_argument('--clients', nargs='+', choices=('claude', 'codex'), default=['claude', 'codex'])
     parser.add_argument('--arms', nargs='+', choices=('setup', 'baseline', 'setup-no-search'), default=['setup', 'baseline'],
                         help='setup-no-search is the setup with the semantic-search skill and CLI blocked (Claude only)')
-    parser.add_argument('--warm-index', action='store_true', help='build the semantic index before setup-arm sessions, outside the timing')
+    parser.add_argument('--warm-index', action='store_true', help='start the QMD daemon and index the fixture before setup-arm sessions, outside the timing')
     parser.add_argument('--tasks', nargs='+', help='task directory names or patterns such as 11-* (default: all)')
     parser.add_argument('--repetitions', type=int, default=3)
     parser.add_argument('--first-repetition', type=int, default=1, help='number of the first repetition, to rerun selected repetitions')
