@@ -777,8 +777,8 @@ import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from '
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { collectionName, stateDir } from './qmd-lib.mjs';
-import { runSearch } from './qmd-search.mjs';
+import { collectionName, readJson, stateDir } from './qmd-lib.mjs';
+import { startDaemon } from './qmd-search.mjs';
 
 const STALE_MS = 30 * 60_000;
 
@@ -798,53 +798,40 @@ export async function withLock(lockPath, fn, now = Date.now) {
   }
 }
 
+async function refresh(root) {
+  const info = readJson(join(stateDir(), 'daemon.json'), null);
+  if (!info?.port) throw new Error('daemon not running');
+  const response = await fetch(`http://127.0.0.1:${info.port}/refresh`, { method: 'POST',
+    headers: { 'x-qmd-token': info.token, 'content-type': 'application/json' }, body: JSON.stringify({ repo: root }),
+    signal: AbortSignal.timeout(35 * 60_000) });
+  if (!response.ok) throw new Error(`refresh answered ${response.status}`);
+}
+
 async function main() {
   const { values } = parseArgs({ options: { root: { type: 'string' } } });
   const root = resolve(values.root || execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim());
   const dir = stateDir();
   mkdirSync(dir, { recursive: true });
+  // A refresh through the daemon indexes the repository incrementally; start the daemon first if needed.
   await withLock(join(dir, `${collectionName(root)}.lock`), async () => {
-    // A refresh through the daemon starts it if needed and indexes the repository incrementally.
-    await runSearchRefresh(root);
+    try {
+      await refresh(root);
+    } catch {
+      await startDaemon();
+      await refresh(root);
+    }
   });
-}
-
-async function runSearchRefresh(root) {
-  const { readJson } = await import('./qmd-lib.mjs');
-  const call = async () => {
-    const info = readJson(join(stateDir(), 'daemon.json'), null);
-    if (!info?.port) throw new Error('daemon not running');
-    const response = await fetch(`http://127.0.0.1:${info.port}/refresh`, { method: 'POST',
-      headers: { 'x-qmd-token': info.token, 'content-type': 'application/json' }, body: JSON.stringify({ repo: root }),
-      signal: AbortSignal.timeout(35 * 60_000) });
-    if (!response.ok) throw new Error(`refresh answered ${response.status}`);
-  };
-  try {
-    await call();
-  } catch {
-    await runSearch.startDaemon?.();
-    const { startDaemonForWarm } = await import('./qmd-search.mjs');
-    await startDaemonForWarm();
-    await call();
-  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   main().catch((error) => {
-    try { appendFileSync(join(stateDir(), 'warm.log'), `${new Date().toISOString()} ${error.message}\n`); } catch { /* ignore */ }
+    try { appendFileSync(join(stateDir(), 'warm.log'), `${new Date().toISOString()} ${error.message}
+`); } catch { /* ignore */ }
   }).finally(() => process.exit(0));
 }
 ```
 
-Then export the daemon starter from Task 3's module for reuse (one source of truth): in `shared/qmd/qmd-search.mjs` add `export { startDaemon as startDaemonForWarm };` below the `startDaemon` function, and in `qmd-warm.mjs` delete the line `await runSearch.startDaemon?.();` (it exists only to keep the import used; remove the `runSearch` import too). The final `runSearchRefresh` catch block is:
-
-```js
-  } catch {
-    const { startDaemonForWarm } = await import('./qmd-search.mjs');
-    await startDaemonForWarm();
-    await call();
-  }
-```
+In `shared/qmd/qmd-search.mjs` (Task 3), change `async function startDaemon()` to `export async function startDaemon()` so the warm-up reuses the same starter.
 
 - [ ] **Step 4: Add the hook entry points**
 
