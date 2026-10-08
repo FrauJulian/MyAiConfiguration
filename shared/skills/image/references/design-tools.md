@@ -1,32 +1,13 @@
 # Design Tools
 
-For templated, brand-consistent work where AI generation is overkill or too unpredictable.
+Prefer the team's existing tools and editable assets. Choose by task rather than introducing a new subscription or integration.
 
-## Canva
+| Task | Practical route |
+| --- | --- |
+| Product UI or documentation screenshot | Browser screenshot tooling or the existing capture tool; show the real UI. |
+| Asset tied to a design system | Existing Figma components and export workflow; use the applicable Figma skill when interacting with Figma. |
+| Repeated banners or social graphics | Existing Canva or Figma template; verify current export and resize capabilities before relying on them. |
+| Dynamic link-preview images | Existing framework or build-time template renderer. |
+| Resize, crop, or compression | Installed image pipeline or utility; preserve source files. |
 
-Best for non-designers who need polished output fast.
-
-- **Strengths:** Massive template library, brand kit, Magic Resize (one design → all sizes), team collaboration
-- **Best for:** Social graphics, presentations, email headers, simple banners
-- **Limitations:** Less control than Figma, templates can look generic
-- **Agent-friendliness:** Has an API but limited — better as a human-in-the-loop tool
-
-## Figma
-
-Best for teams with design systems or pixel-perfect needs.
-
-- **Strengths:** Design system components, auto layout, developer handoff, plugins
-- **Best for:** OG images via templates, design system assets, complex layouts
-- **Limitations:** Steeper learning curve, requires design skill
-- **Agent-friendliness:** Has an API and MCP server for reading designs
-
-## When to Use Design Tools vs. AI Generation
-
-| Scenario | Design Tool | AI Generation |
-|----------|:-:|:-:|
-| Exact brand guidelines must be followed | Yes | Maybe (with strong ref images) |
-| Need 20 size variants of one design | Yes (Canva Magic Resize) | No |
-| Unique hero image for a blog post | No | Yes |
-| Recurring social media template | Yes | No |
-| Product mockup with real UI | No (use screenshots) | No (hallucinated UI) |
-| Abstract/creative visual | No | Yes |
+Keep editable originals, export only needed variants, and inspect font rendering, transparency, cropping, and file size. Use `technical-research` before depending on a tool API or version-specific feature.

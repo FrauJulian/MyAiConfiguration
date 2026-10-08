@@ -1,39 +1,11 @@
-# Image Optimization
+# Image Optimization and SEO
 
-Every image on your site affects page speed, which affects SEO and conversions.
+- Start with measured transfer size, rendered dimensions, and the page's LCP element. Keep originals; compare optimized output at its actual display size.
+- Use SVG for suitable vector assets, lossless formats for sharp UI text, and compare WebP/AVIF with existing raster formats for photographs. Choose against target-client support, transparency, quality, and measured size; avoid fixed quality or byte targets for every asset.
+- Match `srcset` and `sizes` to the layout, or use the framework's existing image component. Set intrinsic `width` and `height` to reserve the correct aspect ratio.
+- Lazy-load offscreen images. Keep the LCP image discoverable in initial HTML and eagerly loaded; consider `fetchpriority="high"` for that image, not every image.
+- Use descriptive filenames, relevant surrounding text, and useful `alt` text without keyword stuffing. Decorative images need empty alternative text.
+- For images intended for search, verify crawlable image URLs and standard image markup with a usable `src`. CSS backgrounds are not a substitute for indexable content images.
+- Reuse existing transformation and caching infrastructure. Measure transferred bytes, rendering quality, LCP, and layout shifts after the change; distinguish lab results from real-user data.
 
-## Format Guide
-
-| Format | Best For | Compression | Browser Support |
-|--------|----------|-------------|:---:|
-| **WebP** | Photos, graphics — default choice | Lossy + lossless | ~96% |
-| **AVIF** | Highest compression, newest | Better than WebP | ~94% |
-| **JPEG** | Fallback for older browsers | Lossy only | Universal |
-| **PNG** | Transparency, screenshots | Lossless | Universal |
-| **SVG** | Logos, icons, illustrations | Vector (scales) | Universal |
-
-## Optimization Checklist
-
-- [ ] **Serve WebP** with JPEG/PNG fallback (`<picture>` element or CDN auto-format)
-- [ ] **Resize to display size** — don't serve 4000px images in 800px containers
-- [ ] **Compress** — target quality 75-85% for photos, near-lossless for screenshots
-- [ ] **Lazy load** below-the-fold images (`loading="lazy"`)
-- [ ] **Set explicit dimensions** — `width` and `height` attributes prevent layout shift (CLS)
-- [ ] **Use a CDN** with auto-optimization (Cloudflare, Vercel, Imgix, Cloudinary)
-- [ ] **Add alt text** — descriptive, keyword-relevant, not stuffed
-
-## Quick Optimization Commands
-
-```bash
-# Convert to WebP (using cwebp)
-cwebp -q 80 input.png -o output.webp
-
-# Batch convert with ImageMagick
-mogrify -format webp -quality 80 *.png
-
-# Optimize JPEG (using jpegoptim)
-jpegoptim --max=80 --strip-all *.jpg
-
-# Check image sizes on a page
-curl -s https://yoursite.com | grep -oP 'src="[^"]+\.(jpg|png|webp)"' | head -20
-```
+References: [HTML images](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/img), [LCP optimization](https://web.dev/articles/optimize-lcp), [Google image SEO](https://developers.google.com/search/docs/appearance/google-images).

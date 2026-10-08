@@ -11,14 +11,15 @@ The current structure is organized by purpose:
 - `verification/`: facts and work-item verification
 - `git/`: pull request reviews
 - `content-strategy/`, `copy-editing/`, `copywriting/`: planning, editing, and writing text
-- `image/`, `site-architecture/`: visuals and website structure
+- `image/`: image assets, screenshots, SEO and performance, social-preview metadata, practical marketing workflows, design tools, and common mistakes
+- `site-architecture/`: website structure
 - `marketing-psychology/`, `offers/`, `product-marketing/`, `cro/`: audience understanding, value framing, and conversion
 
 General planning, debugging, code review, and completion verification workflows come from Superpowers, so the catalog does not duplicate their triggers. The remaining skills cover focused domains Superpowers does not.
 
 Each skill defines a focused workflow with the investigation, decision points, and output expected for that task. Keep guidance specific to the skill; shared repository constraints belong in the rules.
 
-The single catalog in `shared/skills/` includes development skills and focused skills for writing, images, content and site structure, positioning, psychology, and conversion. Builds include every retained skill for both clients. Updating a managed installation backs up and removes unchanged setup-owned skills deleted from the catalog; local changes are backed up and retained.
+The single catalog in `shared/skills/` includes development skills and focused skills for writing, image assets, content and site structure, positioning, psychology, and conversion. The image skill has a short core and five focused references loaded only when relevant: optimization, OG metadata, marketing workflows, design tools, and common mistakes. AI-generation guides, model comparisons, prompting recipes, and fixed social-platform size catalogs are omitted. Builds include every retained skill for both clients. Updating a managed installation backs up and removes unchanged setup-owned skills deleted from the catalog; local changes are backed up and retained.
 
 Claude discovers only `skills/<name>/SKILL.md`, so its generated package flattens the categorized catalog to one directory per skill name, together with the skill's `references/`; the build fails on duplicate names or a `name` that differs from its directory. Claude's package additionally has a `rules-*` skill for each focused rule file or directory in
 `shared/rules/`. The rule-to-skill loading conditions live in `shared/global-instructions.md`, so full rule text loads

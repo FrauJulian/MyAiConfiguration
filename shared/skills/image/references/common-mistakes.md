@@ -1,10 +1,12 @@
 # Common Mistakes
 
-1. **Using AI for product UI screenshots** — models hallucinate interfaces; capture real screenshots
-2. **Skipping image optimization** — unoptimized images are the #1 page speed killer
-3. **No OG image** — shared links look broken without a preview image
-4. **Wrong aspect ratio** — always check platform specs before generating
-5. **Text-heavy images without Ideogram** — most AI models butcher text; use Ideogram or add text in post
-6. **Generating without style direction** — "photorealistic," "flat illustration," "3D render" drastically changes output
-7. **Inconsistent brand visuals** — use Flux multi-reference or design templates for consistency
-8. **Huge images on landing pages** — compress, resize, lazy load
+Check only issues relevant to the change:
+
+- Oversized downloads or incorrect responsive candidates: inspect the resource actually selected at each target viewport.
+- Lazy-loaded LCP image, excessive high-priority images, or late discovery: inspect the loading waterfall.
+- Missing dimensions or wrong aspect ratio: check layout shifts and cropping.
+- Blurry screenshot text, compression artifacts, or lost transparency: compare at final display size.
+- Missing or keyword-stuffed alternative text; essential information available only inside an image: check accessibility.
+- Broken, authenticated, blocked, or expired preview URLs; duplicate metadata or stale cached previews: inspect responses and the target preview.
+- Sensitive data in screenshots, untrusted SVG markup, or overwritten originals: use sanitized inputs and preserve editable sources.
+- Stale platform dimensions, unreadable banner text, or stretched variants: verify current requirements and inspect each export.
