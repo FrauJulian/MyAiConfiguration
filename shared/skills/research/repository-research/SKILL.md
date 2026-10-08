@@ -1,18 +1,20 @@
 ---
 name: repository-research
-description: MUST use before changing, reviewing, or answering questions about any repository area not yet read in this session; trace files, callers, behavior, tests, and conventions. Not for external technology questions (use technical-research).
+description: MUST use before EVERY repository search or lookup, including direct reads, file discovery, exact strings, known symbols, familiar areas, and follow-up searches in any workflow; also before repository changes, reviews, or answers.
 ---
 
 # Repository Research
 
-Understand an existing repository area before changing it or answering a codebase-specific question. Do not edit or answer from memory of an area you have not read in this session.
+Apply `research` and this skill to every repository lookup. Earlier inspection and known identifiers do not waive the workflow. Reuse loaded instructions, but check the question, scope, and evidence for each lookup. Ground changes and answers in current files.
 
 ## Workflow
 
-1. Locate the entry point. Known path, symbol, exact string, or configuration key: read it directly or search with `rg`. Unknown identifiers: run `semantic-search` first when it is installed.
+1. Identify the question and search scope, then locate the entry point. Apply `semantic-search` when installed to select the route. Known path, symbol, exact string, or configuration key: read it directly or search with `rg`. Unknown identifiers: run semantic retrieval first.
 2. Trace the flow from entry point through shared helpers to observable behavior. Search callers and tests of every symbol you will change.
 3. Check related implementations, tests, configuration, and documentation. Note established conventions and where they differ across clients, shells, or platforms.
-4. When the change depends on an external library, API, tool version, or standard whose behavior you have not verified, continue with `technical-research` for that part.
+4. Apply `technical-research` before every external technology lookup. Verify the version used by the repository before relying on external behavior.
 5. Report file paths and symbols as evidence. Separate confirmed behavior, inference, and unresolved questions.
 
-Return the relevant architecture, existing patterns, affected areas, and unknowns. Do not change implementation code during research unless asked.
+Before concluding, inspect matching files in context and account for relevant callers, tests, configuration, and documentation. For absence claims, check search scope, ignored files, and truncation; an empty or partial result is not proof of absence.
+
+Return relevant paths and symbols, affected areas, and unknowns. Scale investigation to the question without skipping the gate. Continue authorized implementation once its research questions are answered.
