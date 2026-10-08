@@ -19,6 +19,7 @@ max_depth = 1
 
 [features]
 hooks = true
+api_key_model_discovery = true
 
 [[hooks.Stop]]
 [[hooks.Stop.hooks]]
