@@ -43,7 +43,8 @@ def skill_names(root):
 
 
 def tokens(text):
-    text = text.strip().lstrip('~')
+    # Claude prints "< 20" for small nonzero counts; count it as its upper bound.
+    text = text.strip().lstrip('~<').strip()
     if text in ('', '-'):
         return 0
     return round(float(text[:-1]) * 1000) if text.endswith('k') else round(float(text))
