@@ -1,4 +1,4 @@
-// Real QMD, real models; run only in the qmd CI job or manually.
+// Real QMD, real models; run manually on a machine capable of downloading and running the models.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
