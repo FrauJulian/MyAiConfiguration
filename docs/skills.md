@@ -17,6 +17,8 @@ The current structure is organized by purpose:
 
 General planning, debugging, code review, and completion verification workflows come from Superpowers, so the catalog does not duplicate their triggers. The remaining skills cover focused domains Superpowers does not.
 
+The shared `plugin-workflow` skill coordinates automatic plugin use: Superpowers for process, Ponytail for implementation and review, Impeccable for UI, and i-have-adhd with Caveman for responses. Global instructions require it at session start/resume and task or phase changes. It routes to installed skills, preserves explicit opt-outs, and handles missing or manual-only plugins without replacing upstream workflows.
+
 Each skill defines a focused workflow with the investigation, decision points, and output expected for that task. Keep guidance specific to the skill; shared repository constraints belong in the rules.
 
 The single catalog in `shared/skills/` includes development skills and focused skills for writing, image assets, content and site structure, positioning, psychology, and conversion. The image skill has a short core and five focused references loaded only when relevant: optimization, OG metadata, marketing workflows, design tools, and common mistakes. AI-generation guides, model comparisons, prompting recipes, and fixed social-platform size catalogs are omitted. Builds include every retained skill for both clients. Updating a managed installation backs up and removes unchanged setup-owned skills deleted from the catalog; local changes are backed up and retained.

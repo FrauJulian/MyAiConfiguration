@@ -4,6 +4,14 @@ The user-level plugin manifest is `adapters/plugins.tsv`. It maps each logical e
 
 The current baseline includes Ponytail, i-have-adhd, Superpowers, Context7, Caveman, MCPorter, Humanizer, Impeccable, and Anthropic Frontend Design. Both scripts operate at user scope and show an extension selector unless running a dry run. Selections are collected before configuration changes. Both rebuild generated packages first.
 
+### Automatic workflow integration
+
+The always-loaded general rules route both clients to the shared `plugin-workflow` skill at session start/resume and task or phase changes. The policy requires Superpowers at development phase boundaries, Ponytail for implementation and review, Impeccable for UI planning through verification, and i-have-adhd response structure with Caveman's concise style when available. Superpowers owns process; Ponytail constrains implementation to the smallest complete, verified change; Impeccable owns UI decisions; Frontend Design supplements uncovered needs without starting another workflow. User authorization, research gates, and proportionate checks retain precedence.
+
+The installed i-have-adhd 0.4.1 skill declares `disable-model-invocation: true`. The shared policy therefore supplies automatic response guidance without forcing a manual-only skill invocation or relying on its optional hook. It does not diagnose the user. Style stop commands persist through task changes and resume; `normal mode` disables i-have-adhd, Caveman, and Ponytail for the session. Explicit mode levels override defaults. Missing plugins are reported once and do not trigger installation. These are instruction-level requirements, not runtime interception or a guarantee of model compliance. Existing installations receive them through the normal configuration update; builds do not modify local plugin caches or hook trust.
+
+### Context7 routing
+
 Selecting Context7 with MCPorter registers the server in MCPorter. Selecting Context7 without MCPorter installs its native client plugin; that explicit selection permits the native MCP route under the global instructions.
 
 Both clients receive a mandatory Context7-first research gate through the shared general rules and `technical-research` skill. It triggers whenever answers, planning, coding, reviews, debugging, tests, configuration, or upgrades rely on external technology behavior, without requiring the user to mention Context7. The agent checks project versions, resolves the library, queries the relevant behavior, and verifies the original source. Matching evidence from the same task can be reused across phases and handoffs; repository-only facts need no external call. Missing coverage, version mismatches, and service failures require an explicit fallback to authoritative sources. [Phase checkpoints](skills.md) apply inside plugin workflows as well as the focused shared skills. These are agent instructions, not a runtime enforcement hook.
