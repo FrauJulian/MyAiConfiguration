@@ -260,27 +260,15 @@ class ManagedExtensionTests(unittest.TestCase):
             self.manager(dry_run=True, summary=True).sync([plugin(), skill()], ['codex'], {'Example', 'Humanizer'})
         self.assertEqual('EXTENSIONS: reconciliation complete (dry run)\n', output.getvalue())
 
-    def test_qmd_installs_once_as_a_cli_without_registering_mcp(self):
-        entry = dict(name='QMD', codex_method='qmd', codex_source='@tobilu/qmd', codex_skill='qmd', codex_plugin='-', codex_marketplace='-', claude_plugin='qmd@qmd', claude_marketplace='tobi/qmd')
-        self.manager().sync([entry], ['codex'], {'QMD'})
-        self.assertEqual([['npm', 'install', '--global', '@tobilu/qmd']], self.commands)
-        self.manager().sync([], ['codex'], set())
-        self.assertEqual(['npm', 'uninstall', '--global', '@tobilu/qmd'], self.commands[-1])
+    def test_manifest_has_no_qmd_extension(self):
+        rows = (root / 'adapters/plugins.tsv').read_text(encoding='utf-8').splitlines()
+        self.assertFalse(any(row.split('	')[0] == 'QMD' for row in rows[1:]))
 
-    def test_qmd_installs_once_for_both_clients(self):
-        entry = dict(name='QMD', codex_method='qmd', codex_source='@tobilu/qmd', codex_skill='qmd', codex_plugin='-', codex_marketplace='-', claude_plugin='qmd@qmd', claude_marketplace='tobi/qmd')
-        self.manager().sync([entry], ['claude', 'codex'], {'QMD'})
-        self.assertEqual(1, self.commands.count(['npm', 'install', '--global', '@tobilu/qmd']))
-        self.assertIn(['claude', 'plugin', 'install', 'qmd@qmd', '--scope', 'user'], self.commands)
-        self.assertNotIn(['codex', 'mcp', 'add', 'qmd', '--', 'qmd', 'mcp'], self.commands)
-
-    def test_owned_qmd_uses_npm_update_instead_of_reinstalling(self):
-        entry = dict(name='QMD', codex_method='qmd', codex_source='@tobilu/qmd', codex_skill='qmd', codex_plugin='-', codex_marketplace='-', claude_plugin='qmd@qmd', claude_marketplace='tobi/qmd')
-        self.manager().sync([entry], ['codex'], {'QMD'})
-        self.commands.clear()
-        with patch.object(extensions.Manager, 'global_packages', return_value={'@tobilu/qmd'}):
-            self.manager(update=True).sync([entry], ['codex'], {'QMD'})
-        self.assertEqual([['npm', 'update', '--global', '@tobilu/qmd']], self.commands)
+    def test_legacy_qmd_record_still_validates(self):
+        (self.home / '.my-ai-configuration').mkdir()
+        (self.home / '.my-ai-configuration/extensions.json').write_text(json.dumps({'version': 1, 'resources': [
+            {'client': 'shared', 'name': 'QMD', 'kind': 'qmd', 'package': '@tobilu/qmd', 'clients': ['codex']}]}))
+        self.manager()  # must not raise
 
     def test_managed_mcporter_updates_when_requested(self):
         self.manager().sync([mcporter()], ['codex'], {'MCPorter'})

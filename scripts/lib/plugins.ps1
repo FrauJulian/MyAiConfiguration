@@ -125,9 +125,7 @@ function Select-ConfiguredPlugins {
         } else { $false }
         foreach ($referenceClient in $referenceClients) {
             $selector = if ($referenceClient -eq 'Claude') { $entry.claude_plugin } else { $entry.codex_plugin }
-            if ($referenceClient -eq 'Codex' -and $entry.codex_method -eq 'qmd') {
-                $found = $found -or ($null -ne (Get-Command qmd -ErrorAction SilentlyContinue))
-            } elseif ($referenceClient -eq 'Codex' -and $entry.codex_method -ne 'plugin') {
+            if ($referenceClient -eq 'Codex' -and $entry.codex_method -ne 'plugin') {
                 $found = $found -or (Test-Path -LiteralPath (Join-Path $HomePath ('.agents/skills/' + $entry.codex_skill))) -or (Test-Path -LiteralPath (Join-Path $HomePath ('.codex/skills/' + $entry.codex_skill)))
             } else {
                 $idField = if ($referenceClient -eq 'Claude') { 'id' } else { 'pluginId' }

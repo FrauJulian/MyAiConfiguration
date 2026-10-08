@@ -304,9 +304,6 @@ class Manager:
         if entry['codex_method'] == 'cli':
             self.ensure_cli(client, entry)
             return
-        if entry['codex_method'] == 'qmd':
-            self.ensure_qmd(client, entry)
-            return
         skill = client == 'codex' and entry['codex_method'] != 'plugin'
         kind = 'skill' if skill else 'plugin'
         record = next((r for r in self.state['resources'] if r['client'] == client and r['name'] == entry['name']), None)
@@ -416,28 +413,6 @@ class Manager:
         if changed:
             atomic_write(path, (json.dumps(content, indent=2) + '\n').encode('utf-8'))
             print('Repaired Caveman Windows hook commands; review the changed hooks in Codex /hooks.')
-
-    def ensure_qmd(self, client, entry):
-        package = entry['codex_source']
-        if package != '@tobilu/qmd':
-            raise ValueError('Invalid QMD package.')
-        record = next((r for r in self.state['resources'] if r['client'] == 'shared' and r['name'] == entry['name']), None)
-        installed = package in self.global_packages()
-        if record is not None:
-            record['clients'] = sorted(set(record.get('clients', ['claude', 'codex'])) | {client})
-            self.save()
-        if record is None and installed and not self.summary:
-            print(f'PASS Preserving pre-existing global package: {package}')
-        if (record is not None or not installed) and (not installed or (self.update and package not in self.updated_packages)):
-            self.command(['npm', 'update' if installed else 'install', '--global', package])
-            self.global_packages().add(package)
-            self.updated_packages.add(package)
-            if record is None:
-                self.state['resources'].append(dict(client='shared', name=entry['name'], kind='qmd', package=package, clients=[client]))
-                self.save()
-        if client == 'claude':
-            entry = dict(entry, codex_method='plugin')
-            self.ensure(client, entry)
 
     def ensure_mcporter(self, entry, clients):
         server, url = entry['mcporter_name'], entry['mcporter_url']

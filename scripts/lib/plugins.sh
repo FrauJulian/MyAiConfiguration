@@ -161,9 +161,7 @@ select_configured_plugins() {
     fi
     for reference_client in "${reference_clients[@]}"; do
       if [ "$reference_client" = claude ]; then selector=$(plugin_field "$root" "$name" claude_plugin); else selector=$(plugin_field "$root" "$name" codex_plugin); fi
-      if [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" = qmd ]; then
-        command -v qmd >/dev/null 2>&1 && found=true
-      elif [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" != plugin ]; then
+      if [ "$reference_client" = codex ] && [ "$(plugin_field "$root" "$name" codex_method)" != plugin ]; then
         local skill_name
         skill_name=$(plugin_field "$root" "$name" codex_skill)
         { [ -d "$HOME/.agents/skills/$skill_name" ] || [ -d "$HOME/.codex/skills/$skill_name" ]; } && found=true
