@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 PACKAGE = '@tobilu/qmd'
 VERSION = '2.8.3'
@@ -23,6 +24,27 @@ def run(arguments, env=None, timeout=1800, check=True):
     if check and result.returncode != 0:
         raise ValueError(f'{" ".join(arguments[:3])} failed: {(result.stderr or result.stdout).strip()[-300:]}')
     return result.stdout
+
+
+def process_alive(pid):
+    if WINDOWS:  # os.kill(pid, 0) would send CTRL_C_EVENT on Windows
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        try:
+            return bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 def decide(results):
@@ -182,11 +204,20 @@ class Setup:
         self.say(f'QMD local search enabled on {state["device"].upper()}.')
 
     def remove_all(self, state):
+        daemon = self.scripts / 'daemon.json'
+        try:
+            pid = json.loads(daemon.read_text(encoding='utf-8')).get('pid') if daemon.is_file() else None
+        except (OSError, ValueError, AttributeError):
+            pid = None
         try:
             if self.scripts.joinpath('qmd-search.mjs').exists():
                 self.node('qmd-search.mjs', '--stop', timeout=60)
-        except (ValueError, subprocess.SubprocessError):
+        except (ValueError, OSError, subprocess.SubprocessError):
             pass
+        if isinstance(pid, int) and pid > 0:
+            deadline = time.monotonic() + 10  # the daemon must release the model files and the package
+            while process_alive(pid) and time.monotonic() < deadline:
+                time.sleep(0.2)
         collections = self.scripts / 'collections.json'
         names = json.loads(collections.read_text(encoding='utf-8')) if collections.exists() else []
         for name in names:
@@ -197,19 +228,31 @@ class Setup:
                     pass
         if state['models_block'] and self.scripts.joinpath('qmd-config.mjs').exists():
             previous = state.get('previous_models')
-            if previous is not None:
-                self.node('qmd-config.mjs', 'restore-models', json.dumps(previous))
-            else:
-                self.node('qmd-config.mjs', 'unset-models')
+            try:
+                if previous is not None:
+                    self.node('qmd-config.mjs', 'restore-models', json.dumps(previous))
+                else:
+                    self.node('qmd-config.mjs', 'unset-models')
+            except (ValueError, OSError, subprocess.SubprocessError) as error:
+                print(f'QMD local search: could not restore the models block in index.yml: {error}', file=sys.stderr)
+        kept = []
         for name in state['owned_models']:
             path = self.models / name
             if name == Path(name).name and path.is_file() and not path.is_symlink():
-                path.unlink()
+                try:
+                    path.unlink()
+                except OSError as error:
+                    print(f'QMD local search: could not delete model {name}; the next removal retries it: {error}', file=sys.stderr)
+                    kept.append(name)
         if state['owned_package']:
             self.run(['npm', 'uninstall', '--global', PACKAGE])
         if self.scripts.exists() and not self.scripts.is_symlink():
             shutil.rmtree(self.scripts)
-        self.state_path.unlink(missing_ok=True)
+        if kept:
+            state.update(clients=[], owned_models=kept, owned_package=False, models_block=False, previous_models=None, files={})
+            atomic_json(self.state_path, state)
+        else:
+            self.state_path.unlink(missing_ok=True)
 
     def disable(self, clients):
         state = self.load()

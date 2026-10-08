@@ -290,6 +290,67 @@ class SetupTest(unittest.TestCase):
         self.setup(FakeRunner(installed=True, fail=('server.py',))).enable(['claude'])
         self.assertFalse(legacy.exists())
 
+    def test_removal_waits_for_the_daemon_to_exit_before_deleting_models(self):
+        runner = FakeRunner()
+        setup = self.setup(runner)
+        setup.enable(['claude'])
+        (self.scripts_dir() / 'daemon.json').write_text(json.dumps({'port': 1, 'token': 't', 'pid': 4242}))
+        checks = []
+
+        def alive(pid):
+            checks.append((pid, any('--stop' in c for c in runner.calls), any('npm uninstall' in ' '.join(c) for c in runner.calls)))
+            return len(checks) < 3
+        with mock.patch.object(qmd, 'process_alive', alive):
+            setup.disable(['claude'])
+        self.assertEqual(checks, [(4242, True, False)] * 3, 'the PID is polled after --stop and before the uninstall')
+        self.assertIn(['npm', 'uninstall', '--global', '@tobilu/qmd'], runner.calls)
+
+    def test_process_alive(self):
+        self.assertTrue(qmd.process_alive(os.getpid()))
+        child = subprocess.Popen([sys.executable, '-c', 'pass'])
+        child.wait()
+        self.assertFalse(qmd.process_alive(child.pid))
+
+    def test_undeletable_model_keeps_state_for_a_retry(self):
+        runner = FakeRunner()
+        setup = self.setup(runner)
+        setup.enable(['claude'])
+        state = self.state()
+        models = self.home / '.cache/qmd/models'
+        (models / 'locked.gguf').write_text('x')
+        (models / 'free.gguf').write_text('x')
+        state['owned_models'] = ['free.gguf', 'locked.gguf']
+        (self.home / '.my-ai-configuration/qmd.json').write_text(json.dumps(state))
+        real = Path.unlink
+
+        def unlink(path, missing_ok=False):
+            if path.name == 'locked.gguf':
+                raise PermissionError('in use')
+            real(path, missing_ok=missing_ok)
+        with mock.patch.object(qmd.Path, 'unlink', unlink):
+            setup.disable(['claude'])
+        state = self.state()
+        self.assertEqual(state['owned_models'], ['locked.gguf'])
+        self.assertFalse(state['owned_package'])
+        self.assertFalse(state['models_block'])
+        self.assertFalse((models / 'free.gguf').exists())
+        self.assertIn(['npm', 'uninstall', '--global', '@tobilu/qmd'], runner.calls)
+        self.assertFalse(self.scripts_dir().exists())
+        runner.calls.clear()
+        setup.disable(['claude'])
+        self.assertFalse((models / 'locked.gguf').exists())
+        self.assertFalse((self.home / '.my-ai-configuration/qmd.json').exists())
+        self.assertFalse(any('npm uninstall' in ' '.join(c) for c in runner.calls), 'a retry never uninstalls a later foreign package')
+
+    def test_failing_models_block_restore_does_not_stop_removal(self):
+        runner = FakeRunner(fail=('unset-models',))
+        setup = self.setup(runner)
+        setup.enable(['claude'])
+        setup.disable(['claude'])
+        self.assertIn(['npm', 'uninstall', '--global', '@tobilu/qmd'], runner.calls)
+        self.assertFalse(self.scripts_dir().exists())
+        self.assertFalse((self.home / '.my-ai-configuration/qmd.json').exists())
+
 
 if __name__ == '__main__':
     unittest.main()
