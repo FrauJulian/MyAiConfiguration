@@ -66,27 +66,27 @@ $nativeSource = @'
 if (-not ('Flashbang.Native' -as [type])) {
     # Keyed by host runtime: an assembly emitted by Windows PowerShell (.NET
     # Framework) is not guaranteed to load under pwsh (.NET), and vice versa.
-    $cacheDir = Join-Path $env:LOCALAPPDATA 'claude-flashbang'
-    $runtimeTag = '{0}{1}' -f $PSVersionTable.PSEdition, $PSVersionTable.PSVersion.Major
-    $cacheDll = Join-Path $cacheDir "Flashbang.Native.$runtimeTag.dll"
-    $loaded = $false
+    try {
+        $cacheDir = Join-Path $env:LOCALAPPDATA 'claude-flashbang'
+        $runtimeTag = '{0}{1}' -f $PSVersionTable.PSEdition, $PSVersionTable.PSVersion.Major
+        $cacheDll = Join-Path $cacheDir "Flashbang.Native.$runtimeTag.dll"
+        $loaded = $false
 
-    if (Test-Path -LiteralPath $cacheDll) {
-        try { Add-Type -Path $cacheDll; $loaded = $true } catch { $loaded = $false }
-    }
+        if (Test-Path -LiteralPath $cacheDll) {
+            try { Add-Type -Path $cacheDll; $loaded = $true } catch { $loaded = $false }
+        }
 
-    if (-not $loaded) {
-        try {
+        if (-not $loaded) {
             if (-not (Test-Path -LiteralPath $cacheDir)) {
                 New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
             }
             Add-Type -Namespace 'Flashbang' -Name 'Native' -MemberDefinition $nativeSource `
                      -OutputAssembly $cacheDll
             Add-Type -Path $cacheDll
-        } catch {
-            # Cache unavailable (locked file, no write access) - compile in-process.
-            Add-Type -Namespace 'Flashbang' -Name 'Native' -MemberDefinition $nativeSource
         }
+    } catch {
+        # Missing profile environment or unusable cache must not suppress the flash.
+        Add-Type -Namespace 'Flashbang' -Name 'Native' -MemberDefinition $nativeSource
     }
 }
 

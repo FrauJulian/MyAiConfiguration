@@ -207,14 +207,44 @@ class SessionStateHookTests(unittest.TestCase):
             with self.subTest(shell=shell):
                 environment = dict(os.environ)
                 if shell == 'powershell':
-                    environment['LOCALAPPDATA'] = ''
-                    command = [executable, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-                               str(ROOT / 'shared/hooks/flashbang.ps1')]
+                    environment['FLASHBANG_TEST_SCRIPT'] = str(ROOT / 'shared/hooks/flashbang.ps1')
+                    command = [executable, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+                               "function Add-Type { throw 'GUI runtime unavailable' }; & $env:FLASHBANG_TEST_SCRIPT"]
                 else:
                     environment['PATH'] = ''
                     command = [executable, str(ROOT / 'shared/hooks/flashbang.sh')]
                 result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=20)
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows GUI runtime required')
+    def test_flashbang_cache_is_optional(self):
+        executable = shutil.which('powershell') or shutil.which('pwsh')
+        if not executable:
+            self.skipTest('PowerShell unavailable')
+        # Exercise native initialization, stopping at the UI boundary without flashing the screen.
+        probe = """
+function New-Object {
+    param([string]$TypeName)
+    if ($TypeName -eq 'System.Windows.Forms.Form' -and ('Flashbang.Native' -as [type])) {
+        [Console]::WriteLine('OVERLAY_READY')
+    }
+    throw 'Stop at UI boundary'
+}
+& $env:FLASHBANG_TEST_SCRIPT
+"""
+        with tempfile.TemporaryDirectory(prefix='.flashbang-test-', dir=ROOT) as directory:
+            blocked = Path(directory) / 'not-a-directory'
+            blocked.write_text('keep')
+            for cache in ('', str(blocked), directory):
+                with self.subTest(cache=cache):
+                    environment = dict(os.environ, LOCALAPPDATA=cache,
+                                       FLASHBANG_TEST_SCRIPT=str(ROOT / 'shared/hooks/flashbang.ps1'))
+                    result = subprocess.run([executable, '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                                             '-Command', probe], env=environment, capture_output=True,
+                                            text=True, timeout=20)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn('OVERLAY_READY', result.stdout, 'Flashbang exited before creating the overlay')
+            self.assertEqual(blocked.read_text(), 'keep')
 
 
 if __name__ == '__main__':
