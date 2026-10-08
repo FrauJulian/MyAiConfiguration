@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { runSearch, startDaemon, toCliResults } from '../../shared/qmd/qmd-search.mjs';
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { callDaemon, runSearch, startDaemon, toCliResults } from '../../shared/qmd/qmd-search.mjs';
 import { collectionName } from '../../shared/qmd/qmd-lib.mjs';
 
 const hit = [{ path: 'src/a.ts', line: 3, score: 0.9, snippet: 's' }];
@@ -75,4 +78,34 @@ test('startDaemon rejects when the child cannot be spawned', async () => {
     setImmediate(() => child.emit('error', new Error('spawn failed')));
     return child;
   } }), /spawn failed/);
+});
+
+function tempDaemonFile(t, value) {
+  const dir = mkdtempSync(join(tmpdir(), 'qmd-search-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const file = join(dir, 'daemon.json');
+  if (value) writeFileSync(file, JSON.stringify(value));
+  return file;
+}
+
+test('startDaemon resolves when its child loses the start race to a running daemon', async (t) => {
+  const file = tempDaemonFile(t, { port: 4000, token: 'other', pid: 999 });
+  await startDaemon({ file, spawnChild: () => {
+    const child = new EventEmitter(); child.unref = () => {}; child.pid = 1;
+    setImmediate(() => child.emit('exit', 0));
+    return child;
+  } });
+});
+
+test('a 403 means a stale token: daemon.json is deleted and one new daemon is started', async (t) => {
+  const file = tempDaemonFile(t, { port: 4000, token: 'stale', pid: 999 });
+  const fetchImpl = async (url, options) => (options.headers['x-qmd-token'] === 'fresh'
+    ? { ok: true, status: 200, json: async () => ({ results: hit }) } : { ok: false, status: 403 });
+  let started = 0;
+  const results = await runSearch({ root: '/r', query: 'q', topK: 5,
+    daemon: (path, body) => callDaemon(path, body, { file, fetchImpl }),
+    startDaemon: async () => { started += 1; assert.equal(existsSync(file), false); writeFileSync(file, JSON.stringify({ port: 4001, token: 'fresh', pid: 998 })); },
+    cli: async () => assert.fail('must not fall back') });
+  assert.deepEqual(results, hit);
+  assert.equal(started, 1);
 });

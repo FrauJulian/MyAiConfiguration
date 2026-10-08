@@ -1,5 +1,6 @@
 // shared/qmd/qmd-search.mjs — search the current repository through the QMD daemon, with a CLI fallback.
 import { execFileSync, spawn } from 'node:child_process';
+import { rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -18,12 +19,12 @@ export function toCliResults(items, collection) {
 
 const notRunning = (message, cause) => Object.assign(new Error(message, { cause }), { notRunning: true });
 
-async function callDaemon(path, body) {
-  const info = readJson(daemonFile(), null);
+export async function callDaemon(path, body, { file = daemonFile(), fetchImpl = fetch } = {}) {
+  const info = readJson(file, null);
   if (!info?.port || !info?.token) throw notRunning('daemon not running');
   let response;
   try {
-    response = await fetch(`http://127.0.0.1:${info.port}${path}`, {
+    response = await fetchImpl(`http://127.0.0.1:${info.port}${path}`, {
       method: 'POST', headers: { 'x-qmd-token': info.token, 'content-type': 'application/json' },
       body: JSON.stringify(body), signal: AbortSignal.timeout(600_000) });
   } catch (error) {
@@ -31,23 +32,32 @@ async function callDaemon(path, body) {
     if (error instanceof TypeError) throw notRunning('daemon not reachable', error);
     throw error;
   }
+  if (response.status === 403) {
+    // Whatever listens there does not know this token, so daemon.json is stale.
+    rmSync(file, { force: true });
+    throw notRunning('daemon rejected the token');
+  }
   if (!response.ok) throw new Error(`daemon answered ${response.status}`);
   return response.json();
 }
 
-export async function startDaemon({ spawnChild = spawn } = {}) {
+export async function startDaemon({ spawnChild = spawn, file = daemonFile() } = {}) {
   const device = readJson(setupStatePath(), {}).device || 'cpu';
   const child = spawnChild(process.execPath, [join(here, 'qmd-daemon.mjs')], { detached: true, stdio: 'ignore', windowsHide: true, env: deviceEnv(device) });
   let failure = null;
+  let lostRace = false; // exit code 0: another launch holds the start lock or a daemon already runs
   child.once('error', (error) => { failure = error; });
-  child.once('exit', (code) => { failure ||= new Error(`daemon exited with code ${code}`); });
+  child.once('exit', (code) => {
+    if (code === 0) lostRace = true;
+    else failure ||= new Error(`daemon exited with code ${code}`);
+  });
   child.unref();
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     await new Promise((done) => setTimeout(done, 500));
     if (failure) throw failure;
-    const info = readJson(daemonFile(), null);
-    if (info?.port && info?.token && info.pid === child.pid) return;
+    const info = readJson(file, null);
+    if (info?.port && info?.token && (lostRace || info.pid === child.pid)) return;
   }
   throw new Error('daemon did not start within 120 s');
 }
