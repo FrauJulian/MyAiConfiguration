@@ -215,8 +215,8 @@ sys.stdout.buffer.write(("\n".join(lines) + "\n").encode("utf-8"))
       content=${content%$'\034'}
       needs_sub=true
     fi
-    if [ "$semantic_retrieval_enabled" = false ] && [[ "$relative" = CLAUDE.md || "$relative" = AGENTS.md || "$relative" = rules/general.md ]]; then
-      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter-instructions --path "$source_file" --semantic-retrieval false && printf '\034') || return
+    if [[ "$relative" = CLAUDE.md || "$relative" = AGENTS.md ]] || { [ "$semantic_retrieval_enabled" = false ] && [ "$relative" = rules/general.md ]; }; then
+      content=$(python3 "$(dirname -- "${BASH_SOURCE[0]}")/install-options.py" filter-instructions --path "$source_file" --destination "$destination" --semantic-retrieval "$semantic_retrieval_enabled" && printf '\034') || return
       content=${content%$'\034'}
       needs_sub=true
     fi

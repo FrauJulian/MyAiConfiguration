@@ -5,6 +5,8 @@ import re
 import sys
 import tomllib
 
+from personal_instructions import CLIENT_FILES, render
+
 
 def is_flashbang(hook):
     return any(re.search(r'(?:[/\\\s"\x27]|^)flashbang\.(?:ps1|sh)(?:[\s"\x27]|$)', str(hook.get(key, '')), re.I)
@@ -229,12 +231,16 @@ if __name__ == '__main__':
     parser.add_argument('--semantic-retrieval', choices=('true', 'false'), default='true')
     parser.add_argument('--managed', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--destination', type=Path)
     args = parser.parse_args()
     try:
         if args.action == 'filter':
             result = filter_options(args.path, args.flashbang == 'true', args.statusline == 'true', args.semantic_retrieval == 'true')
         elif args.action == 'filter-instructions':
             result = filter_instructions(args.path.read_text(encoding='utf-8-sig'), args.semantic_retrieval == 'true')
+            if args.destination and args.path.name in CLIENT_FILES.values():
+                client = next(client for client, name in CLIENT_FILES.items() if name == args.path.name)
+                result = render(result, args.destination.parent, client)
         else:
             managed = args.managed.read_text(encoding='utf-8-sig') if args.managed else sys.stdin.buffer.read().decode('utf-8-sig')
             current = args.current.read_text(encoding='utf-8-sig')

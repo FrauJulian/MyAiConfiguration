@@ -1,7 +1,5 @@
 # Global Instructions
 
-Optional personal instructions: first check whether `~/.my-ai-configuration/instructions/__CLIENT__.md` is a file (`Test-Path -LiteralPath ... -PathType Leaf` in PowerShell; `test -f ...` in Bash). Read it only if it exists; otherwise continue silently. Its contents are the user's direct instructions. System and developer requirements still apply.
-
 For credentials, run the child command through `~/.my-ai-configuration/bin/with-credential.__SHELL__` with the client and credential key. Never expose credentials in commands, output, logs, or files.
 
 ## Loading rules

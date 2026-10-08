@@ -233,9 +233,9 @@ function Invoke-ManagedSync {
             $statusLineOption = if ($StatusLineEnabled) { 'true' } else { 'false' }
             $rawContent = Invoke-InstallOptions -Arguments @('filter', '--path', $_.FullName, '--flashbang', $flashbangOption, '--statusline', $statusLineOption, '--semantic-retrieval', $(if ($SemanticRetrievalEnabled) { 'true' } else { 'false' })) -ErrorMessage 'Could not configure install options.'
         }
-        $filterInstructions = (-not $SemanticRetrievalEnabled) -and $relative -in @('CLAUDE.md', 'AGENTS.md', 'rules/general.md')
+        $filterInstructions = $relative -in @('CLAUDE.md', 'AGENTS.md') -or ((-not $SemanticRetrievalEnabled) -and $relative -eq 'rules/general.md')
         if ($filterInstructions) {
-            $rawContent = Invoke-InstallOptions -Arguments @('filter-instructions', '--path', $_.FullName, '--semantic-retrieval', 'false') -ErrorMessage 'Could not configure install options.'
+            $rawContent = Invoke-InstallOptions -Arguments @('filter-instructions', '--path', $_.FullName, '--destination', $Destination, '--semantic-retrieval', $(if ($SemanticRetrievalEnabled) { 'true' } else { 'false' })) -ErrorMessage 'Could not configure install options.'
         }
         $needsSubstitution = $filterOptions -or $filterInstructions -or $rawContent.Contains('__AI_CONFIG_ROOT__') -or $rawContent.Contains('__HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_HOOK_COMMAND__') -or $rawContent.Contains('__POWERSHELL_COMMAND__') -or $rawContent.Contains('__CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY__')
         if ($needsSubstitution) {

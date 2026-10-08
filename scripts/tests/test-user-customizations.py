@@ -21,6 +21,10 @@ class UserCustomizationTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn('with-credential.ps1', (ROOT / 'generated/codex-powershell/AGENTS.md').read_text())
         self.assertIn('with-credential.sh', (ROOT / 'generated/claude-bash/CLAUDE.md').read_text())
+        for client, name in (('codex', 'AGENTS.md'), ('claude', 'CLAUDE.md')):
+            for shell in ('powershell', 'bash'):
+                self.assertNotIn('.my-ai-configuration/instructions/',
+                                 (ROOT / 'generated' / f'{client}-{shell}' / name).read_text())
 
     def test_add_instruction_creates_client_overlays_outside_managed_configuration(self):
         powershell = shutil.which('powershell') or shutil.which('pwsh')
