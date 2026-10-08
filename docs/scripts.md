@@ -53,6 +53,10 @@ The A/B benchmark measures whole sessions. Auto selection of local QMD search us
 
 Gitea Actions runs the repository checks from `.gitea/workflows/ci.yml`.
 
+Doctor captures native-command diagnostics and checks exit codes. A warning on stderr does not abort the
+PowerShell 5.1 script; failed version or configuration checks contribute to the final failure summary.
+On Windows, an unavailable profile-folder lookup falls back to PowerShell's home path.
+
 | Script | Purpose |
 | --- | --- |
 | `checks/validate-config.py` | Validate generated Codex TOML and Claude JSON. |

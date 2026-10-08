@@ -6,7 +6,7 @@ Installation targets `~/.codex` and `~/.claude`; Codex skills go to `~/.agents/s
 Choose the PowerShell or Bash package independently of the client.
 
 Codex receives a generated global `AGENTS.md`, agent TOML files, skills, rule files, and a `config.toml` adapter.
-It sets workspace sandboxing with shell network access, automatic approval review, `agents.enabled = true`,
+It sets full access for commands, automatic approval review, `agents.enabled = true`,
 `agents.max_concurrent_threads_per_session = 5`, and `agents.max_depth = 1`.
 
 Claude Code receives a generated global `CLAUDE.md`, agent Markdown files, skills, and `settings.json` with
@@ -25,9 +25,26 @@ Client settings remain thin adapters. Shared semantics remain in `shared/`. User
 
 ## Permission defaults
 
-Codex sets `approval_policy = "on-request"`, `approvals_reviewer = "auto_review"`, and `sandbox_mode = "workspace-write"`. Eligible approval requests go through automatic review. Claude sets `permissions.defaultMode = "auto"` and shell-specific deny rules. Its sandbox is enabled on supported macOS, Linux, and WSL2 environments and disabled where unavailable, including native Windows. These are generated defaults, not a guarantee that a running session, account policy, or explicit launch override uses the same mode.
+Codex sets `sandbox_mode = "danger-full-access"`, `approval_policy = "on-request"`, and
+`approvals_reviewer = "auto_review"`. All Codex commands run without Codex filesystem or network sandbox
+restrictions, under the account that launches Codex. Launch Codex as the repository owner to use that identity;
+this configuration does not impersonate another user or change filesystem ownership. OS permissions, firewalls,
+and managed organization policies still apply. Eligible approval requests retain automatic review, which does
+not restore a filesystem boundary. See the [official OpenAI security documentation](https://learn.chatgpt.com/docs/agent-approvals-security).
 
-On native Windows, the Codex adapter selects `windows.sandbox = "elevated"`, the [recommended Windows sandbox](https://learn.chatgpt.com/docs/windows/windows-sandbox). Its setup may require administrator approval; sandboxed commands run as dedicated lower-privilege users. The previous `unelevated` default reproduced `spawnSync git EPERM` when QMD's Node wrapper captured child-process output through pipes. The configuration change preserves workspace boundaries, network settings, and automatic approval review. Apply the generated configuration through the normal update process, complete Codex's sandbox setup if prompted, and start a new session. Verify semantic search there; package validation cannot establish runtime pipe compatibility. Use `unelevated` only as an explicit local fallback when elevated setup is unavailable, with that compatibility limitation in mind.
+The adapter no longer selects the Windows sandbox or workspace writable roots. This avoids using the dedicated
+`CodexSandboxOnline` account, whose identity differs from the repository owner and can trigger Git's ownership
+check. Old `[windows]` and `[sandbox_workspace_write]` tables may survive an update as preserved local settings;
+they do not activate sandboxing while `sandbox_mode` is `danger-full-access`.
+
+Apply the generated configuration through the normal update process, then start a new Codex session under the
+repository owner's account. Existing sessions keep their active permissions. Check `whoami` and
+`git rev-parse --show-toplevel` there; package validation cannot prove the identity or network access of a future
+session. Launch overrides and managed policies may restrict or reject the configured mode.
+
+Claude retains `permissions.defaultMode = "auto"` and shell-specific deny rules. Its sandbox is enabled on
+supported macOS, Linux, and WSL2 environments and disabled where unavailable, including native Windows.
+These are generated defaults; active session or account policy may differ.
 
 ## Status displays
 
@@ -97,10 +114,10 @@ reports the limitation and continues with `rg`.
 | `$XDG_CACHE_HOME/qmd/` (default `~/.cache/qmd/`) | Shared `index.sqlite` and model cache. |
 | `$QMD_CONFIG_DIR/index.yml` | Configuration when `QMD_CONFIG_DIR` is set; otherwise `$XDG_CONFIG_HOME/qmd/index.yml`, defaulting to `~/.config/qmd/index.yml`. |
 
-Codex's adapter grants writable roots for `~/.my-ai-configuration/qmd` and `~/.cache/qmd`.
-A custom cache location needs a matching writable root. QMD also writes its configuration when registering
-collections and persisting ignore lists; the resolved configuration directory must be writable under the
-active sandbox. These adapter roots do not themselves grant access to `~/.config/qmd`.
+With the default Codex full-access configuration, QMD uses the launching account's filesystem and network
+permissions, including custom cache and configuration paths. If a session overrides this with a sandbox,
+permit writes to the runtime directory, resolved cache, and QMD configuration directory. QMD writes configuration
+when registering collections and persisting ignore lists.
 
 Disabling search or uninstalling one client keeps the shared runtime while another client remains enabled.
 After the last client disables it, cleanup stops the daemon, removes recorded repository collections and
@@ -112,8 +129,9 @@ old setup-owned Python retrieval directory and QMD extension ownership records.
 ### Verification and troubleshooting
 
 Check `~/.my-ai-configuration/qmd/warm.log` for background warm-up errors. First startup or changed repositories
-can take longer than a warm query. Windows sandbox setup and child-process pipe restrictions can prevent
-repository discovery or daemon startup; see [Permission defaults](#permission-defaults).
+can take longer than a warm query. An older session still using the Windows sandbox can fail Git ownership
+checks or child-process pipe operations. Apply the configuration and start a new session as described in
+[Permission defaults](#permission-defaults).
 
 Model-free unit tests do not verify downloads, GPU support, sandbox access, or real search quality.
 See [QMD tests](scripts.md#qmd-tests) for the separate test commands and dependency setup.

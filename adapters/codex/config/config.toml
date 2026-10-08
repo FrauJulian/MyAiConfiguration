@@ -1,13 +1,6 @@
 approval_policy = "on-request"
 approvals_reviewer = "auto_review"
-sandbox_mode = "workspace-write"
-
-[sandbox_workspace_write]
-network_access = true
-writable_roots = ['__AI_CONFIG_ROOT__/../.my-ai-configuration/qmd', '__AI_CONFIG_ROOT__/../.cache/qmd']
-
-[windows]
-sandbox = "elevated"
+sandbox_mode = "danger-full-access"
 
 [tui]
 status_line = ["model", "reasoning", "fast-mode", "approval-mode", "five-hour-limit", "weekly-limit", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"]

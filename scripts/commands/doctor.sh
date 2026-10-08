@@ -24,7 +24,13 @@ result() {
 }
 
 for tool in codex claude; do
-  if command -v "$tool" >/dev/null; then result PASS "$tool available ($($tool --version 2>&1 | head -n 1))"; else result WARN "$tool unavailable"; fi
+  if command -v "$tool" >/dev/null; then
+    if version=$("$tool" --version 2>&1); then result PASS "$tool available ($version)"
+    else
+      status=$?
+      result FAIL "$tool --version failed (exit $status): $version"
+    fi
+  else result WARN "$tool unavailable"; fi
 done
 command -v jq >/dev/null && result PASS 'jq available for Claude Bash status line' || result WARN 'jq unavailable; Claude Bash status line is disabled'
 

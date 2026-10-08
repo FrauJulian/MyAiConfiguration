@@ -63,6 +63,7 @@ foreach ($shell in @('powershell','bash')) {
             $events = @([regex]::Matches($content, '(?m)^\[\[hooks\.([^.\]]+)\]\]\s*$') | ForEach-Object { $_.Groups[1].Value })
             if ((($events | Sort-Object) -join ',') -ne 'SessionStart,Stop' -or $content -match 'flashbang-if-input' -or $content -match '(?m)^async\s*=\s*true\s*$') { throw "Codex finish hook is incorrect in $package" }
             if ($content -notmatch 'approvals_reviewer\s*=\s*"auto_review"') { throw "Codex auto review is missing in $package" }
+            if ($content -notmatch '(?m)^sandbox_mode\s*=\s*"danger-full-access"\s*$') { throw "Codex full access is missing in $package" }
             if ($content -notmatch '(?m)^max_depth\s*=\s*1\s*$') { throw "Codex agent depth limit is missing in $package" }
             if ($content -notmatch 'status_line\s*=\s*\["model", "reasoning", "fast-mode", "approval-mode", "five-hour-limit", "weekly-limit", "project-name", "git-branch", "context-window-size", "context-used", "used-tokens"\]') { throw "Codex status line is incorrect in $package" }
         } elseif ((($settings.hooks.PSObject.Properties.Name | Sort-Object) -join ',') -ne 'PreCompact,SessionStart,Stop' -or $content -match 'flashbang-if-input' -or $settings.hooks.Stop[0].hooks[0].async) {

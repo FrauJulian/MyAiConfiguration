@@ -18,6 +18,21 @@ SPEC.loader.exec_module(OPTIONS)
 
 
 class InstallOptionsTests(unittest.TestCase):
+    def test_codex_update_replaces_old_sandbox_mode_and_preserves_user_settings(self):
+        current = ('sandbox_mode = "workspace-write"\nmodel = "custom-model"\n'
+                   '[windows]\nsandbox = "elevated"\n'
+                   '[sandbox_workspace_write]\nnetwork_access = false\n'
+                   '[mcp_servers.demo]\ncommand = "demo"\n')
+        managed = (ROOT / 'adapters/codex/config/config.toml').read_text(encoding='utf-8')
+
+        result = tomllib.loads(OPTIONS.merge_toml(current, managed))
+
+        self.assertEqual(result['sandbox_mode'], 'danger-full-access')
+        self.assertEqual(result['approval_policy'], 'on-request')
+        self.assertEqual(result['approvals_reviewer'], 'auto_review')
+        self.assertEqual(result['model'], 'custom-model')
+        self.assertEqual(result['mcp_servers']['demo'], {'command': 'demo'})
+
     def test_merge_toml_preserves_local_plugin_table_indentation(self):
         plugin_state = ('  [marketplaces.ponytail]\n'
                         '    source_type = "git"\n'

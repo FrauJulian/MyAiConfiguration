@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . (Join-Path $root 'scripts/lib/manifest.ps1')
 $homePath = [Environment]::GetFolderPath('UserProfile')
+if ([string]::IsNullOrWhiteSpace($homePath)) { $homePath = $HOME }
 $script:fail = $false
 $script:checkCount = 0
 function Result($state, $message) {
@@ -14,7 +15,27 @@ function Result($state, $message) {
     }
 }
 
-foreach ($tool in @('codex','claude')) { if (Get-Command $tool -ErrorAction SilentlyContinue) { $version = & $tool --version 2>&1 | Select-Object -First 1; Result 'PASS' "$tool available ($version)" } else { Result 'WARN' "$tool unavailable" } }
+function Invoke-DoctorCommand {
+    param([string]$Command, [string[]]$Arguments)
+    # PowerShell 5.1 turns native stderr into error records, even when the process succeeds.
+    $ErrorActionPreference = 'Continue'
+    $PSNativeCommandUseErrorActionPreference = $false
+    try {
+        $executable = Get-Command $Command -ErrorAction Stop
+        $output = @(& $executable @Arguments 2>&1)
+        return [pscustomobject]@{ Output = $output; ExitCode = $LASTEXITCODE }
+    } catch {
+        return [pscustomobject]@{ Output = @($_); ExitCode = 1 }
+    }
+}
+
+foreach ($tool in @('codex','claude')) {
+    if (Get-Command $tool -ErrorAction SilentlyContinue) {
+        $probe = Invoke-DoctorCommand -Command $tool -Arguments @('--version')
+        if ($probe.ExitCode -eq 0) { Result 'PASS' "$tool available ($($probe.Output -join ' '))" }
+        else { Result 'FAIL' "$tool --version failed (exit $($probe.ExitCode)): $($probe.Output -join ' ')" }
+    } else { Result 'WARN' "$tool unavailable" }
+}
 if (Get-Command jq -ErrorAction SilentlyContinue) { Result 'PASS' 'jq available for Claude Bash status line' } else { Result 'WARN' 'jq unavailable; Claude Bash status line is disabled' }
 
 $sourceAgentCount = @(Get-ChildItem (Join-Path $root 'shared/agents') -Directory -ErrorAction SilentlyContinue).Count
@@ -50,14 +71,14 @@ if (Test-Path -LiteralPath $settingsPath) {
 }
 $configTomlPath = Join-Path $homePath '.codex/config.toml'
 if (Test-Path -LiteralPath $configTomlPath) {
-    $parseResult = & python -c "import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8-sig'))" $configTomlPath 2>&1
-    if ($LASTEXITCODE -eq 0) { Result 'PASS' 'installed .codex/config.toml parses as TOML' } else { Result 'FAIL' "installed .codex/config.toml is invalid TOML: $parseResult" }
+    $parseResult = Invoke-DoctorCommand -Command 'python' -Arguments @('-c', "import sys,tomllib,pathlib; tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8-sig'))", $configTomlPath)
+    if ($parseResult.ExitCode -eq 0) { Result 'PASS' 'installed .codex/config.toml parses as TOML' } else { Result 'FAIL' "installed .codex/config.toml is invalid TOML: $($parseResult.Output -join ' ')" }
     if (Get-Command codex -ErrorAction SilentlyContinue) {
         $previousCodexHome = $env:CODEX_HOME
         try {
             $env:CODEX_HOME = Split-Path $configTomlPath -Parent
-            $schemaResult = & codex --strict-config --help 2>&1
-            if ($LASTEXITCODE -eq 0) { Result 'PASS' 'installed .codex/config.toml matches the installed Codex schema' } else { Result 'FAIL' "installed .codex/config.toml has unsupported Codex settings: $schemaResult" }
+            $schemaResult = Invoke-DoctorCommand -Command 'codex' -Arguments @('--strict-config', '--help')
+            if ($schemaResult.ExitCode -eq 0) { Result 'PASS' 'installed .codex/config.toml matches the installed Codex schema' } else { Result 'FAIL' "installed .codex/config.toml has unsupported Codex settings: $($schemaResult.Output -join ' ')" }
         } finally { $env:CODEX_HOME = $previousCodexHome }
     } else { Result 'WARN' 'Codex CLI unavailable; skipped installed Codex schema validation' }
 }

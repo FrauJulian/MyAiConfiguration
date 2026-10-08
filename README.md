@@ -301,7 +301,9 @@ keep outside this setup's ledger, or files this setup never installed.
 
 Codex and Claude Code receive the same shared rules, skills, agents, hooks, and status data. Codex loads applicable rules from generated files, while Claude Code exposes technology- and situation-specific rules as generated skills.
 
-Codex defaults to workspace-write sandboxing and automatic review for eligible escalation requests. Claude uses
+Codex defaults to full access under the account that launches it, with unrestricted command network access.
+Launch Codex as the repository owner; Codex does not switch to that owner automatically. Full access removes
+Codex's filesystem sandbox boundaries. Eligible approval requests still use automatic review. Claude uses
 automatic permissions and enables its sandbox where the platform supports it; explicit deny rules still apply where it
 does not. Both clients include the same logical agent roles and compact status displays. See
 [Configuration](docs/configuration.md) for settings, permissions, and limitations.
