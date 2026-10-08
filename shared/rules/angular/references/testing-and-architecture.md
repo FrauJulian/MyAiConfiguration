@@ -37,7 +37,6 @@
 * Avoid vague names such as `data`, `item`, `value` or `temp` when better names exist.
 * Remove dead code.
 * Remove unused imports and dependencies.
-* Remove commented-out code instead of keeping it in source files.
 * Add comments only for non-obvious decisions or public contracts.
 * Treat Angular, TypeScript and lint warnings seriously.
 * Do not suppress diagnostics without a concrete reason.

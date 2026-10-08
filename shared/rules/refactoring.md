@@ -40,7 +40,7 @@
 * Avoid unnecessary wrapper classes and indirection.
 * Prefer composition over inheritance.
 * Remove dead code when it is clearly unused.
-* Remove obsolete comments and commented-out code.
+* Remove obsolete comments.
 * Keep methods and classes focused.
 
 ## Architecture

@@ -43,7 +43,6 @@
 * Prefer concrete types where no abstraction is required.
 * Use descriptive names.
 * Remove dead code.
-* Remove commented-out code.
 * Add comments only for non-obvious decisions or public contracts.
 * Treat compiler, analyzer and binding warnings seriously.
 * Do not suppress warnings without a concrete reason.
