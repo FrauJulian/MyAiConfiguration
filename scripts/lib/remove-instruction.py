@@ -7,6 +7,8 @@ import stat
 import tempfile
 from pathlib import Path
 
+from personal_instructions import refresh
+
 
 def remove_instruction(path: Path, instruction: str) -> bool:
     if not path.exists():
@@ -75,6 +77,7 @@ def main() -> int:
             print(f'Instruction removed for {target}.')
         else:
             print(f'Instruction not found for {target}.')
+        refresh(home, target)
     return 0
 
 

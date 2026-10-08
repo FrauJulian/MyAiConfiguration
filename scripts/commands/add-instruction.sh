@@ -33,10 +33,14 @@ if [ -z "${instruction//[[:space:]]/}" ] || [ ${#instruction} -gt 65536 ]; then 
 case "$home_path" in /*|[A-Za-z]:[\\/]*) ;; *) printf 'Home path must be absolute.\n' >&2; exit 1 ;; esac
 
 directory="$home_path/.my-ai-configuration/instructions"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+python_command=$(command -v python || command -v python3 || true)
+[ -n "$python_command" ] || { printf 'Python is required to add instructions.\n' >&2; exit 1; }
 mkdir -p -- "$directory"
 for target in "${targets[@]}"; do
   path="$directory/$target.md"
   [ ! -s "$path" ] || [ "$(tail -c 1 -- "$path" | wc -l)" -eq 1 ] || printf '\n' >> "$path"
   printf '%s\n' "$instruction" >> "$path"
+  "$python_command" "$script_dir/../lib/personal_instructions.py" --home "$home_path" --client "$target"
   printf 'Instruction added for %s.\n' "$target"
 done

@@ -19,5 +19,7 @@ foreach ($target in $(if ($Client -eq 'Both') { @('codex','claude') } else { @($
     $path = Join-Path $directory "$target.md"
     $prefix = if ((Test-Path -LiteralPath $path) -and (Get-Item -LiteralPath $path).Length -gt 0 -and -not (Get-Content -LiteralPath $path -Raw).EndsWith([Environment]::NewLine)) { [Environment]::NewLine } else { '' }
     [System.IO.File]::AppendAllText($path, $prefix + $Instruction.TrimEnd() + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
+    & python (Join-Path $root 'scripts/lib/personal_instructions.py') --home $HomePath --client $target
+    if ($LASTEXITCODE -ne 0) { throw 'Could not refresh the personal instruction rule.' }
     Write-Output "Instruction added for $target."
 }
