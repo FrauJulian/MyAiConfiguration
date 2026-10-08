@@ -1,6 +1,6 @@
 ---
 name: semantic-search
-description: MUST use before reading or grepping code whenever the exact symbol, file, or string is not already known - concept questions, unfamiliar areas, "where/how is X done", and bug reports that describe behavior. Use rg only for known identifiers, paths, or exact strings.
+description: MUST apply before EVERY repository search or lookup, including direct reads, exact matches, and follow-up searches. Route known identifiers to direct reads or rg; run semantic retrieval first for unknown identifiers and behavior questions.
 ---
 
 # Semantic Search
@@ -9,7 +9,7 @@ Search the current Git repository, plus the user's registered QMD collections, b
 
 ## Rule
 
-Run this search first whenever you do not already know the exact identifier, path, or string. Do not start with `rg` guesses for a concept. This skill locates code; `repository-research` then traces the flow from the verified hits.
+Apply `research`, `repository-research`, and this routing rule before each repository lookup. Known exact identifiers, paths, or strings use direct reads or `rg` under the same research checks. Unknown identifiers require semantic retrieval first; guessed keywords are not known identifiers. Reevaluate the route for every follow-up query. Reuse instructions already in context.
 
 ## Run
 
