@@ -2,10 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createServer, gitFingerprint, ignoreGlobs, keepModelsLoaded } from '../../shared/qmd/qmd-daemon.mjs';
+import { acquireStartLock, createServer, gitFingerprint, ignoreGlobs, keepModelsLoaded } from '../../shared/qmd/qmd-daemon.mjs';
 import { collectionName } from '../../shared/qmd/qmd-lib.mjs';
 
 const defaultHits = () => [{ displayPath: `${collectionName('/r')}/src/a.ts`, body: 'x\nretry here', bestChunkPos: 2, bestChunk: 'retry here', score: 0.91 }];
@@ -200,4 +200,18 @@ test('git ignored paths reach addCollection and are persisted only when they cha
   await s.call('/search', { repo: '/r', query: 'q' });
   assert.deepEqual(persisted[1], [collectionName('/r'), ['dist/**', 'tmp/**']]);
   assert.equal(s.store.calls.filter((c) => c[0] === 'update').length, 3);
+});
+
+test('the start lock admits one launcher and is taken over after 2 minutes', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'qmd-lock-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const lock = join(dir, 'daemon.lock');
+  const release = acquireStartLock(lock);
+  assert.equal(typeof release, 'function');
+  assert.equal(acquireStartLock(lock), null, 'a concurrent launch loses');
+  release();
+  assert.equal(existsSync(lock), false);
+  assert.equal(typeof acquireStartLock(lock), 'function');
+  assert.equal(acquireStartLock(lock, () => Date.now() + 60_000), null, 'a fresh lock holds');
+  assert.equal(typeof acquireStartLock(lock, () => Date.now() + 121_000), 'function', 'a stale lock is taken over');
 });

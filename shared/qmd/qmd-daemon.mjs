@@ -1,9 +1,9 @@
 // shared/qmd/qmd-daemon.mjs — keeps QMD's models loaded for fast searches; exits when idle.
 import { execFileSync } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setCollectionIgnore } from './qmd-config.mjs';
 import { MASK, collectionName, idleMinutes, importQmd, qmdConfigPath, qmdDbPath, readJson, runQmdCli, stateDir, writePrivateJson, writeTextAtomic } from './qmd-lib.mjs';
@@ -40,6 +40,29 @@ export function gitIgnored(repo, escape) {
   } catch {
     return [];
   }
+}
+
+// Exclusive start lock: returns a release function, or null while another launch holds a lock younger than 2 minutes.
+// ponytail: two launchers that find the same stale lock can both take it over; the daemon.json health check covers the rest.
+export function acquireStartLock(path, now = Date.now) {
+  mkdirSync(dirname(path), { recursive: true });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      closeSync(openSync(path, 'wx'));
+      let held = true;
+      return () => {
+        if (held) rmSync(path, { force: true });
+        held = false;
+      };
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+    }
+    try {
+      if (now() - statSync(path).mtimeMs < 120_000) return null;
+      rmSync(path, { force: true });
+    } catch { /* the holder released it meanwhile: try again */ }
+  }
+  return null;
 }
 
 // QMD 2.8.3 createStore unloads models after 5 idle minutes (store.internal.llm); the daemon's own idle exit replaces that.
@@ -165,11 +188,15 @@ export function createServer({ store, token, idleMs, now = Date.now, onIdle, ext
 async function main() {
   const dir = stateDir();
   const daemonFile = join(dir, 'daemon.json');
+  // The lock comes before the health check, so a launch that waited for another one sees its daemon.json.
+  const releaseLock = acquireStartLock(join(dir, 'daemon.lock'));
+  if (!releaseLock) return; // another launch is starting the daemon
+  process.on('exit', releaseLock);
   const current = readJson(daemonFile, null);
   if (current) {
     try {
       const health = await fetch(`http://127.0.0.1:${current.port}/health`, { headers: { 'x-qmd-token': current.token }, signal: AbortSignal.timeout(2000) });
-      if (health.ok && (await health.json()).service === 'ai-config-qmd') return;
+      if (health.ok && (await health.json()).service === 'ai-config-qmd') return releaseLock();
     } catch { /* stale file: start a new daemon */ }
   }
   const { createStore, extractSnippet } = await importQmd();
@@ -214,6 +241,7 @@ async function main() {
   });
   daemon.server.listen(0, '127.0.0.1', () => {
     writePrivateJson(daemonFile, { port: daemon.server.address().port, token, pid: process.pid });
+    releaseLock();
   });
   setInterval(daemon.checkIdle, 60_000).unref();
   process.on('SIGTERM', stop);
