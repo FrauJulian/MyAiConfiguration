@@ -382,14 +382,18 @@ def run_one(job, args):
 def summarize(results):
     errors = [result for result in results if result.get('error')]
     results = [result for result in results if not result.get('error')]
-    lines = [f'Excluded {len(errors)} runs that ended with a client or API error (for example a usage limit).', '','| client | arm | runs | pass | first try | rework turns | median s | median input tok | median output tok | median tool calls | cost USD | workflow ok |',
-             '|---|---|---|---|---|---|---|---|---|---|---|---|']
+    lines = [f'Excluded {len(errors)} runs that ended with a client or API error (for example a usage limit).',
+             'Rows are per task category; an overall average would hide a category where one arm is worse.', '',
+             '| category | client | arm | runs | pass | first try | rework turns | median s | median input tok | median output tok | median tool calls | cost USD | workflow ok |',
+             '|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     groups = {}
     for result in results:
-        groups.setdefault((result['client'], result['arm']), []).append(result)
-    for (client, arm), runs in sorted(groups.items()):
+        spec = TASKS / result['task'] / 'task.json'
+        category = json.loads(spec.read_text(encoding='utf-8')).get('category', '?') if spec.is_file() else '?'
+        groups.setdefault((category, result['client'], result['arm']), []).append(result)
+    for (category, client, arm), runs in sorted(groups.items()):
         median = lambda key: statistics.median(run[key] for run in runs)
-        lines.append(f'| {client} | {arm} | {len(runs)} | {sum(run["passed"] for run in runs) / len(runs):.0%} | '
+        lines.append(f'| {category} | {client} | {arm} | {len(runs)} | {sum(run["passed"] for run in runs) / len(runs):.0%} | '
                      f'{sum(run["first_try"] for run in runs) / len(runs):.0%} | {sum(run["rework_turns"] for run in runs)} | '
                      f'{median("seconds"):.0f} | {median("input_tokens"):.0f} | {median("output_tokens"):.0f} | {median("tool_calls"):.0f} | '
                      f'{sum(run["cost_usd"] for run in runs):.2f} | {sum(not run["workflow_violations"] for run in runs) / len(runs):.0%} |')
