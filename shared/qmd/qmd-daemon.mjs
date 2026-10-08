@@ -27,6 +27,14 @@ export function gitFingerprint(repo) {
   }
 }
 
+// QMD 2.8.3 createStore unloads models after 5 idle minutes (store.internal.llm); the daemon's own idle exit replaces that.
+export function keepModelsLoaded(store) {
+  const llm = store.internal?.llm;
+  if (!llm) return;
+  llm.inactivityTimeoutMs = 0;
+  llm.disposeModelsOnInactivity = false;
+}
+
 const REPO_COLLECTION = /^repo-[0-9a-f]{12}$/;
 
 function tokenMatches(given, expected) {
@@ -136,6 +144,7 @@ async function main() {
   }
   const { createStore, extractSnippet } = await importQmd();
   const store = await createStore({ dbPath: qmdDbPath(), configPath: qmdConfigPath() });
+  keepModelsLoaded(store);
   const collectionsFile = join(dir, 'collections.json');
   const token = randomBytes(32).toString('hex');
   let stopping = false;

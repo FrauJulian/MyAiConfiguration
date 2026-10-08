@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createServer, gitFingerprint } from '../../shared/qmd/qmd-daemon.mjs';
+import { createServer, gitFingerprint, keepModelsLoaded } from '../../shared/qmd/qmd-daemon.mjs';
 import { collectionName } from '../../shared/qmd/qmd-lib.mjs';
 
 const defaultHits = () => [{ displayPath: `${collectionName('/r')}/src/a.ts`, body: 'x\nretry here', bestChunkPos: 2, bestChunk: 'retry here', score: 0.91 }];
@@ -167,4 +167,10 @@ test('refresh, stop, 404 and 403 on POST routes', async (t) => {
   assert.equal((await s.call('/search', { repo: '/r', query: 'q' }, 'wrong')).status, 403);
   assert.deepEqual(await (await s.call('/stop', {})).json(), { stopping: true });
   assert.equal(s.idle.length, 1);
+});
+
+test('keepModelsLoaded disables QMD unloading models after 5 idle minutes', () => {
+  const llm = { inactivityTimeoutMs: 5 * 60 * 1000, disposeModelsOnInactivity: true };
+  keepModelsLoaded({ internal: { llm } });
+  assert.deepEqual(llm, { inactivityTimeoutMs: 0, disposeModelsOnInactivity: false });
 });
